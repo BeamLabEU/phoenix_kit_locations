@@ -46,19 +46,34 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   defp tab_title(:index), do: Gettext.gettext(PhoenixKitWeb.Gettext, "Locations")
   defp tab_title(:types), do: Gettext.gettext(PhoenixKitWeb.Gettext, "Location Types")
 
-  defp confirm_delete!(socket) do
-    case socket.assigns.confirm_delete do
-      {_type, _uuid} = value -> value
-      _ -> raise "confirm_delete not set"
+  defp load_data(socket, :index) do
+    try do
+      assign(socket, :locations, Locations.list_locations())
+    rescue
+      error ->
+        Logger.error("Failed to load locations: #{inspect(error)}")
+
+        put_flash(
+          socket,
+          :error,
+          Gettext.gettext(PhoenixKitWeb.Gettext, "Failed to load locations.")
+        )
     end
   end
 
-  defp load_data(socket, :index) do
-    assign(socket, :locations, Locations.list_locations())
-  end
-
   defp load_data(socket, :types) do
-    assign(socket, :location_types, Locations.list_location_types())
+    try do
+      assign(socket, :location_types, Locations.list_location_types())
+    rescue
+      error ->
+        Logger.error("Failed to load location types: #{inspect(error)}")
+
+        put_flash(
+          socket,
+          :error,
+          Gettext.gettext(PhoenixKitWeb.Gettext, "Failed to load location types.")
+        )
+    end
   end
 
   # ── Event handlers ──────────────────────────────────────────────
@@ -69,8 +84,30 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   end
 
   def handle_event("delete_location", _params, socket) do
-    {"location", uuid} = confirm_delete!(socket)
+    case socket.assigns.confirm_delete do
+      {"location", uuid} ->
+        do_delete_location(socket, uuid)
 
+      _ ->
+        {:noreply, assign(socket, :confirm_delete, nil)}
+    end
+  end
+
+  def handle_event("delete_location_type", _params, socket) do
+    case socket.assigns.confirm_delete do
+      {"location_type", uuid} ->
+        do_delete_location_type(socket, uuid)
+
+      _ ->
+        {:noreply, assign(socket, :confirm_delete, nil)}
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :confirm_delete, nil)}
+  end
+
+  defp do_delete_location(socket, uuid) do
     with %{} = location <- Locations.get_location(uuid),
          {:ok, _} <- Locations.delete_location(location) do
       {:noreply,
@@ -83,21 +120,35 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         {:noreply,
          socket
          |> put_flash(:error, Gettext.gettext(PhoenixKitWeb.Gettext, "Location not found."))
-         |> assign(:confirm_delete, nil)}
+         |> assign(:confirm_delete, nil)
+         |> load_data(:index)}
 
       {:error, reason} ->
         Logger.error("Failed to delete location #{uuid}: #{inspect(reason)}")
 
         {:noreply,
          socket
-         |> put_flash(:error, Gettext.gettext(PhoenixKitWeb.Gettext, "Failed to delete location."))
-         |> assign(:confirm_delete, nil)}
+         |> put_flash(
+           :error,
+           Gettext.gettext(PhoenixKitWeb.Gettext, "Failed to delete location.")
+         )
+         |> assign(:confirm_delete, nil)
+         |> load_data(:index)}
     end
+  rescue
+    error ->
+      Logger.error("Unexpected error deleting location: #{inspect(error)}")
+
+      {:noreply,
+       socket
+       |> put_flash(
+         :error,
+         Gettext.gettext(PhoenixKitWeb.Gettext, "An unexpected error occurred.")
+       )
+       |> assign(:confirm_delete, nil)}
   end
 
-  def handle_event("delete_location_type", _params, socket) do
-    {"location_type", uuid} = confirm_delete!(socket)
-
+  defp do_delete_location_type(socket, uuid) do
     with %{} = location_type <- Locations.get_location_type(uuid),
          {:ok, _} <- Locations.delete_location_type(location_type) do
       {:noreply,
@@ -110,7 +161,8 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         {:noreply,
          socket
          |> put_flash(:error, Gettext.gettext(PhoenixKitWeb.Gettext, "Location type not found."))
-         |> assign(:confirm_delete, nil)}
+         |> assign(:confirm_delete, nil)
+         |> load_data(:types)}
 
       {:error, reason} ->
         Logger.error("Failed to delete location type #{uuid}: #{inspect(reason)}")
@@ -121,12 +173,20 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
            :error,
            Gettext.gettext(PhoenixKitWeb.Gettext, "Failed to delete location type.")
          )
-         |> assign(:confirm_delete, nil)}
+         |> assign(:confirm_delete, nil)
+         |> load_data(:types)}
     end
-  end
+  rescue
+    error ->
+      Logger.error("Unexpected error deleting location type: #{inspect(error)}")
 
-  def handle_event("cancel_delete", _params, socket) do
-    {:noreply, assign(socket, :confirm_delete, nil)}
+      {:noreply,
+       socket
+       |> put_flash(
+         :error,
+         Gettext.gettext(PhoenixKitWeb.Gettext, "An unexpected error occurred.")
+       )
+       |> assign(:confirm_delete, nil)}
   end
 
   # ── Render ──────────────────────────────────────────────────────
@@ -243,9 +303,9 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             </.table_default_cell>
             <.table_default_cell class="text-right whitespace-nowrap">
               <.table_row_menu mode="dropdown" id={"loc-menu-#{location.uuid}"}>
-                <.table_row_menu_link navigate={Paths.location_edit(location.uuid)} icon="hero-pencil" label="Edit" />
+                <.table_row_menu_link navigate={Paths.location_edit(location.uuid)} icon="hero-pencil" label={Gettext.gettext(PhoenixKitWeb.Gettext, "Edit")} />
                 <.table_row_menu_divider />
-                <.table_row_menu_button phx-click="show_delete_confirm" phx-value-uuid={location.uuid} phx-value-type="location" icon="hero-trash" label="Delete" variant="error" />
+                <.table_row_menu_button phx-click="show_delete_confirm" phx-value-uuid={location.uuid} phx-value-type="location" icon="hero-trash" label={Gettext.gettext(PhoenixKitWeb.Gettext, "Delete")} variant="error" />
               </.table_row_menu>
             </.table_default_cell>
           </.table_default_row>
@@ -298,9 +358,9 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             </.table_default_cell>
             <.table_default_cell class="text-right whitespace-nowrap">
               <.table_row_menu mode="dropdown" id={"type-menu-#{t.uuid}"}>
-                <.table_row_menu_link navigate={Paths.type_edit(t.uuid)} icon="hero-pencil" label="Edit" />
+                <.table_row_menu_link navigate={Paths.type_edit(t.uuid)} icon="hero-pencil" label={Gettext.gettext(PhoenixKitWeb.Gettext, "Edit")} />
                 <.table_row_menu_divider />
-                <.table_row_menu_button phx-click="show_delete_confirm" phx-value-uuid={t.uuid} phx-value-type="location_type" icon="hero-trash" label="Delete" variant="error" />
+                <.table_row_menu_button phx-click="show_delete_confirm" phx-value-uuid={t.uuid} phx-value-type="location_type" icon="hero-trash" label={Gettext.gettext(PhoenixKitWeb.Gettext, "Delete")} variant="error" />
               </.table_row_menu>
             </.table_default_cell>
           </.table_default_row>

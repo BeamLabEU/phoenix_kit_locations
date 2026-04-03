@@ -197,10 +197,10 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
               <label class="select w-full transition-colors focus-within:select-primary">
                 <select name="location_type[status]">
                   <option value="active" selected={Ecto.Changeset.get_field(@changeset, :status) == "active"}>
-                    Active
+                    {Gettext.gettext(PhoenixKitWeb.Gettext, "Active")}
                   </option>
                   <option value="inactive" selected={Ecto.Changeset.get_field(@changeset, :status) == "inactive"}>
-                    Inactive
+                    {Gettext.gettext(PhoenixKitWeb.Gettext, "Inactive")}
                   </option>
                 </select>
               </label>

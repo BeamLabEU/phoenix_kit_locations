@@ -35,6 +35,7 @@ defmodule PhoenixKitLocations.Schemas.LocationType do
     |> cast(attrs, @required_fields ++ @optional_fields)
     |> validate_required(@required_fields)
     |> validate_length(:name, min: 1, max: 255)
+    |> validate_length(:description, max: 1000)
     |> validate_inclusion(:status, @statuses)
   end
 end

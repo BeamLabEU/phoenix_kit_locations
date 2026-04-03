@@ -45,7 +45,15 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               {nil, nil, []}
 
             l ->
-              linked = Locations.linked_type_uuids(l.uuid)
+              linked =
+                try do
+                  Locations.linked_type_uuids(l.uuid)
+                rescue
+                  error ->
+                    Logger.error("Failed to load linked types for #{l.uuid}: #{inspect(error)}")
+                    []
+                end
+
               {l, Locations.change_location(l), linked}
           end
       end
@@ -56,7 +64,15 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
        |> put_flash(:error, Gettext.gettext(PhoenixKitWeb.Gettext, "Location not found."))
        |> push_navigate(to: Paths.index())}
     else
-      all_types = Locations.list_location_types(status: "active")
+      all_types =
+        try do
+          Locations.list_location_types(status: "active")
+        rescue
+          error ->
+            Logger.error("Failed to load location types: #{inspect(error)}")
+            []
+        end
+
       features = (location && location.features) || %{}
 
       {:ok,
@@ -92,7 +108,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         preserve_fields: @preserve_fields
       )
 
-    # Merge features back into params
     params = Map.put(params, "features", socket.assigns.features)
 
     changeset =
@@ -100,7 +115,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       |> Locations.change_location(params)
       |> Map.put(:action, socket.assigns.changeset.action)
 
-    {:noreply, assign(socket, :changeset, changeset)}
+    {:noreply, assign(socket, changeset: changeset, address_warning: nil)}
   end
 
   def handle_event("toggle_type", %{"uuid" => uuid}, socket) do
@@ -126,12 +141,18 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       if socket.assigns.action == :edit, do: socket.assigns.location.uuid, else: nil
 
     similar =
-      Locations.find_similar_addresses(
-        params["address_line_1"],
-        params["city"],
-        params["postal_code"],
-        exclude_uuid
-      )
+      try do
+        Locations.find_similar_addresses(
+          params["address_line_1"],
+          params["city"],
+          params["postal_code"],
+          exclude_uuid
+        )
+      rescue
+        error ->
+          Logger.error("Address check failed: #{inspect(error)}")
+          []
+      end
 
     warning =
       if similar != [] do
@@ -149,7 +170,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         preserve_fields: @preserve_fields
       )
 
-    # Merge features into params
     params = Map.put(params, "features", socket.assigns.features)
 
     save_location(socket, socket.assigns.action, params)
@@ -158,15 +178,11 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   defp save_location(socket, :new, params) do
     case Locations.create_location(params) do
       {:ok, location} ->
-        Locations.sync_location_types(
+        sync_types_and_redirect(
+          socket,
           location.uuid,
-          MapSet.to_list(socket.assigns.linked_type_uuids)
+          Gettext.gettext(PhoenixKitWeb.Gettext, "Location created.")
         )
-
-        {:noreply,
-         socket
-         |> put_flash(:info, Gettext.gettext(PhoenixKitWeb.Gettext, "Location created."))
-         |> push_navigate(to: Paths.index())}
 
       {:error, changeset} ->
         {:noreply, assign(socket, :changeset, changeset)}
@@ -176,18 +192,37 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   defp save_location(socket, :edit, params) do
     case Locations.update_location(socket.assigns.location, params) do
       {:ok, location} ->
-        Locations.sync_location_types(
+        sync_types_and_redirect(
+          socket,
           location.uuid,
-          MapSet.to_list(socket.assigns.linked_type_uuids)
+          Gettext.gettext(PhoenixKitWeb.Gettext, "Location updated.")
         )
-
-        {:noreply,
-         socket
-         |> put_flash(:info, Gettext.gettext(PhoenixKitWeb.Gettext, "Location updated."))
-         |> push_navigate(to: Paths.index())}
 
       {:error, changeset} ->
         {:noreply, assign(socket, :changeset, changeset)}
+    end
+  end
+
+  defp sync_types_and_redirect(socket, location_uuid, message) do
+    type_uuids = MapSet.to_list(socket.assigns.linked_type_uuids)
+
+    case Locations.sync_location_types(location_uuid, type_uuids) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, message)
+         |> push_navigate(to: Paths.index())}
+
+      {:error, _} ->
+        Logger.error("Failed to sync location types for #{location_uuid}")
+
+        {:noreply,
+         socket
+         |> put_flash(
+           :warning,
+           Gettext.gettext(PhoenixKitWeb.Gettext, "Saved but failed to update type assignments.")
+         )
+         |> push_navigate(to: Paths.index())}
     end
   end
 
@@ -352,15 +387,17 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div class="form-control">
                 <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Phone")}</span>
-                <input type="tel" name="location[phone]" value={Ecto.Changeset.get_field(@changeset, :phone) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder="+1 234 567 890" />
+                <input type="tel" name="location[phone]" value={Ecto.Changeset.get_field(@changeset, :phone) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "+1 234 567 890")} />
               </div>
               <div class="form-control">
                 <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Email")}</span>
-                <input type="email" name="location[email]" value={Ecto.Changeset.get_field(@changeset, :email) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder="location@example.com" />
+                <input type="email" name="location[email]" value={Ecto.Changeset.get_field(@changeset, :email) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "location@example.com")} />
+                <p :for={msg <- changeset_errors(@changeset, :email)} class="text-error text-sm mt-1">{msg}</p>
               </div>
               <div class="form-control">
                 <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Website")}</span>
-                <input type="url" name="location[website]" value={Ecto.Changeset.get_field(@changeset, :website) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder="https://..." />
+                <input type="url" name="location[website]" value={Ecto.Changeset.get_field(@changeset, :website) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "https://...")} />
+                <p :for={msg <- changeset_errors(@changeset, :website)} class="text-error text-sm mt-1">{msg}</p>
               </div>
             </div>
 
@@ -417,8 +454,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Status")}</span>
               <label class="select w-full transition-colors focus-within:select-primary">
                 <select name="location[status]">
-                  <option value="active" selected={Ecto.Changeset.get_field(@changeset, :status) == "active"}>Active</option>
-                  <option value="inactive" selected={Ecto.Changeset.get_field(@changeset, :status) == "inactive"}>Inactive</option>
+                  <option value="active" selected={Ecto.Changeset.get_field(@changeset, :status) == "active"}>{Gettext.gettext(PhoenixKitWeb.Gettext, "Active")}</option>
+                  <option value="inactive" selected={Ecto.Changeset.get_field(@changeset, :status) == "inactive"}>{Gettext.gettext(PhoenixKitWeb.Gettext, "Inactive")}</option>
                 </select>
               </label>
             </div>
@@ -479,5 +516,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       </.form>
     </div>
     """
+  end
+
+  defp changeset_errors(%Ecto.Changeset{action: action, errors: errors}, field)
+       when not is_nil(action) do
+    errors
+    |> Keyword.get_values(field)
+    |> Enum.map(&translate_error/1)
+  end
+
+  defp changeset_errors(_changeset, _field), do: []
+
+  defp translate_error({msg, opts}) do
+    Enum.reduce(opts, msg, fn {key, value}, acc ->
+      String.replace(acc, "%{#{key}}", fn _ -> to_string(value) end)
+    end)
   end
 end

@@ -73,6 +73,9 @@ defmodule PhoenixKitLocations.Schemas.Location do
     |> cast(attrs, @required_fields ++ @optional_fields)
     |> validate_required(@required_fields)
     |> validate_length(:name, min: 1, max: 255)
+    |> validate_length(:description, max: 2000)
+    |> validate_length(:public_notes, max: 2000)
+    |> validate_length(:notes, max: 5000)
     |> validate_length(:address_line_1, max: 500)
     |> validate_length(:address_line_2, max: 500)
     |> validate_length(:city, max: 255)
@@ -83,5 +86,30 @@ defmodule PhoenixKitLocations.Schemas.Location do
     |> validate_length(:email, max: 255)
     |> validate_length(:website, max: 500)
     |> validate_inclusion(:status, @statuses)
+    |> maybe_validate_email()
+    |> maybe_validate_website()
+  end
+
+  defp maybe_validate_email(changeset) do
+    case get_field(changeset, :email) do
+      nil -> changeset
+      "" -> changeset
+      _ -> validate_format(changeset, :email, ~r/@/, message: "must be a valid email address")
+    end
+  end
+
+  defp maybe_validate_website(changeset) do
+    case get_field(changeset, :website) do
+      nil ->
+        changeset
+
+      "" ->
+        changeset
+
+      _ ->
+        validate_format(changeset, :website, ~r/^https?:\/\//,
+          message: "must start with http:// or https://"
+        )
+    end
   end
 end

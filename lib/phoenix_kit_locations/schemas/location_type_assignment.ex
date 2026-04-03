@@ -3,6 +3,8 @@ defmodule PhoenixKitLocations.Schemas.LocationTypeAssignment do
 
   use Ecto.Schema
 
+  @type t :: %__MODULE__{}
+
   @primary_key {:uuid, UUIDv7, autogenerate: true}
   @foreign_key_type UUIDv7
 
