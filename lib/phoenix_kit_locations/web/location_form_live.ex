@@ -51,7 +51,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
            changeset: changeset,
            all_types: safe_list_location_types(),
            linked_type_uuids: MapSet.new(linked_type_uuids),
-           features: (location && location.features) || %{},
+           features: location.features || %{},
            feature_keys: @feature_keys,
            address_warning: nil
          )
