@@ -61,7 +61,7 @@ defmodule PhoenixKitLocations do
   def version, do: "0.1.0"
 
   @impl PhoenixKit.Module
-  def css_sources, do: ["phoenix_kit_locations"]
+  def css_sources, do: [:phoenix_kit_locations]
 
   @impl PhoenixKit.Module
   def permission_metadata do
