@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 - 2026-04-11
+
+### Fixed
+- Add routing anti-pattern warning to AGENTS.md
+
 All notable changes to this project will be documented in this file.
 
 ## 0.1.0 - 2026-04-02
