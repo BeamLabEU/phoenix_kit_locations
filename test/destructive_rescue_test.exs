@@ -18,6 +18,7 @@ defmodule PhoenixKitLocations.DestructiveRescueTest do
   use PhoenixKitLocations.LiveCase, async: false
 
   alias PhoenixKitLocations.Locations
+  alias PhoenixKitLocations.Schemas.Location, as: LocationSchema
   alias PhoenixKitLocations.Test.Repo, as: TestRepo
 
   @actor Ecto.UUID.generate()
@@ -40,6 +41,35 @@ defmodule PhoenixKitLocations.DestructiveRescueTest do
                Locations.create_location(%{name: "NoActivityTable"}, actor_uuid: @actor)
 
       assert location.uuid
+    end
+  end
+
+  describe "LocationsLive do_delete_item outer rescue" do
+    test "delete attempt with missing table flashes the unexpected-error message",
+         %{conn: conn} do
+      # Mount succeeds with a valid location, then drop the table so
+      # `Locations.get_location/1` raises mid-handler. The outer
+      # `rescue error -> ...` clause in `do_delete_item/3` catches
+      # it and flashes "An unexpected error occurred." Covers the
+      # otherwise-unreachable rescue branch (regular delete failures
+      # don't return `{:error, _}` — repo.delete/1 either succeeds
+      # or raises).
+      location =
+        TestRepo.insert!(LocationSchema.changeset(%LocationSchema{}, %{name: "WillBeOrphaned"}))
+
+      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+
+      render_click(view, "show_delete_confirm", %{
+        "uuid" => location.uuid,
+        "type" => "location"
+      })
+
+      TestRepo.query!("DROP TABLE phoenix_kit_location_type_assignments CASCADE")
+      TestRepo.query!("DROP TABLE phoenix_kit_locations CASCADE")
+
+      rendered = render_click(view, "delete_location", %{})
+
+      assert rendered =~ "An unexpected error occurred."
     end
   end
 
