@@ -345,6 +345,62 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     end
   end
 
+  describe "switch_language event" do
+    test "switch_language event does not crash and rerenders", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+
+      rendered = render_click(view, "switch_language", %{"lang" => "fr"})
+
+      assert is_binary(rendered)
+      # The form still renders after a language switch.
+      assert rendered =~ "New Location"
+    end
+  end
+
+  describe "update :error branch" do
+    test "saving an edit with a too-long name re-renders with the validation error", %{
+      conn: conn
+    } do
+      location = fixture_location(%{name: "Original"})
+      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+
+      rendered =
+        view
+        |> form("form", location: %{"name" => String.duplicate("a", 300)})
+        |> render_submit()
+
+      assert rendered =~ "should be at most 255 character"
+      # Record was not updated — original name preserved.
+      assert Locations.get_location(location.uuid).name == "Original"
+    end
+  end
+
+  describe "sync_types_and_redirect :error branch" do
+    test "save redirects with warning flash when sync_location_types fails (FK violation)",
+         %{conn: conn} do
+      # An edit save with a stale linked_type_uuids state hits the
+      # FK assoc_constraint inside sync_location_types and returns
+      # {:error, :type_assignment_failed}. The LV's
+      # `sync_types_and_redirect/3` `:error` clause flashes a warning
+      # and redirects rather than crashing.
+      location = fixture_location(%{name: "Stale"})
+      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+
+      bogus = Ecto.UUID.generate()
+      render_click(view, "toggle_type", %{"uuid" => bogus})
+
+      {:ok, _new_view, html} =
+        view
+        |> form("form", location: %{"name" => "Stale"})
+        |> render_submit()
+        |> follow_redirect(conn, "/en/admin/locations")
+
+      # Follow the live_redirect — the warning flash is replayed on
+      # the index page via our flash-rendering test layout.
+      assert html =~ "Saved but failed to update type assignments."
+    end
+  end
+
   describe "handle_info catch-all" do
     test "ignores unrelated messages without crashing", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/en/admin/locations/new")

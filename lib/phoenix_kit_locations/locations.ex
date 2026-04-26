@@ -330,18 +330,21 @@ defmodule PhoenixKitLocations.Locations do
   end
 
   defp insert_type_assignment!(location_uuid, type_uuid, now) do
-    case repo().insert(%LocationTypeAssignment{
-           location_uuid: location_uuid,
-           location_type_uuid: type_uuid,
-           inserted_at: now,
-           updated_at: now
-         }) do
+    changeset =
+      LocationTypeAssignment.changeset(%LocationTypeAssignment{}, %{
+        location_uuid: location_uuid,
+        location_type_uuid: type_uuid,
+        inserted_at: now,
+        updated_at: now
+      })
+
+    case repo().insert(changeset) do
       {:ok, _} ->
         :ok
 
-      {:error, changeset} ->
+      {:error, %Ecto.Changeset{} = cs} ->
         Logger.error(
-          "Failed to assign type #{type_uuid} to location #{location_uuid} (error count: #{length(changeset.errors)})"
+          "Failed to assign type #{type_uuid} to location #{location_uuid} (error count: #{length(cs.errors)})"
         )
 
         repo().rollback(:type_assignment_failed)
@@ -368,12 +371,14 @@ defmodule PhoenixKitLocations.Locations do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       result =
-        repo().insert(%LocationTypeAssignment{
+        %LocationTypeAssignment{}
+        |> LocationTypeAssignment.changeset(%{
           location_uuid: location_uuid,
           location_type_uuid: type_uuid,
           inserted_at: now,
           updated_at: now
         })
+        |> repo().insert()
 
       case result do
         {:ok, _assignment} = ok ->

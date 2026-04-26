@@ -185,11 +185,120 @@ Five new tests in the `changeset validations` describe block:
 | `test/phoenix_kit_locations/web/location_type_form_live_test.exs` | actor_uuid pin on create |
 | `test/locations_test.exs` | +5 edge-case tests (Unicode, SQL metachars, length limits) |
 
-## Verification (Batch 3)
+### Batch 3d — Coverage push to 96.52%
+
+After Batch 3a–c shipped at 90.07% line coverage (`mix test --cover`),
+Max authorised pushing as close to 100% as possible without external
+tooling. Net: **90.07% → 96.52%** with +20 tests.
+
+**Code change to make dead branches reachable.**
+`LocationTypeAssignment` previously had no changeset — `repo.insert(%struct{})`
+of bad FKs raised `Ecto.ConstraintError` instead of returning a clean
+`{:error, %Ecto.Changeset{}}`. Added `LocationTypeAssignment.changeset/2`
+with `assoc_constraint(:location)` + `assoc_constraint(:location_type)`,
+and routed `insert_type_assignment!/3` and `add_location_type/3`
+through it. This converts FK violations from raises into the same
+`{:error, changeset}` shape as every other CRUD op AND makes the
+Batch 3a `:error`-branch logging code reachable.
+
+**Tests added (+20):**
+- `enable_system/0` / `disable_system/0` direct unit tests (covers
+  the main module's body lines + `log_module_toggle/1` no-opts head)
+- `log_module_toggle(:enabled)` no-opts test (covers default-arg head)
+- `add_location_type` FK-violation logs with `db_pending: true`
+- `sync_location_types` FK-violation logs with `db_pending: true`
+- Schema empty-string skip branches (`maybe_validate_email` / `maybe_validate_website`)
+  via struct-data-supplied empty strings (cast strips `""` → nil)
+- `status_label/1` fallback via raw `insert_all/3` bypassing
+  `validate_inclusion(:status)` to land a row with status `"pending"`
+- `delete_location_type` event with no prior `show_delete_confirm`
+  (covers the `_ -> ...` clause)
+- `actor_opts/1` no-scope path (delete without `put_test_scope/2`)
+- Render with assigned types — covers the `:for span` badge clause
+  and `type_names/1` non-empty branch
+- `switch_language` event in both form LVs
+- `update_location` / `update_location_type` `:error` re-render branch
+- `sync_types_and_redirect` `:error` branch — toggle a bogus type
+  UUID, save, follow_redirect, assert warning flash
+- 5 edge-case tests in `locations_test.exs` (Unicode round-trip, SQL
+  metacharacters, length limits) — landed earlier in Batch 3c
+
+**`test/destructive_rescue_test.exs` (new, async: false).** Three
+tests that DROP TABLEs inside the sandbox transaction to exercise
+rescue branches that are otherwise unreachable without Mox-style
+mocking:
+- `find_similar_addresses` rescue when locations table is missing
+- `maybe_log_activity` swallow when activities table is missing
+- `LocationsLive` `load_data(:index)` and `load_data(:types)` rescues
+  when their respective tables are missing
+
+These ran async first and deadlocked against parallel async tests
+holding row locks on the same schemas — moved to a dedicated
+`async: false` file.
+
+### Coverage breakdown (post-Batch 3d)
+
+| Module | Coverage |
+|--------|----------|
+| `PhoenixKitLocations.Errors` | 100.00% |
+| `PhoenixKitLocations.Paths` | 100.00% |
+| `PhoenixKitLocations.Schemas.Location` | 100.00% |
+| `PhoenixKitLocations.Schemas.LocationType` | 100.00% |
+| `PhoenixKitLocations.Schemas.LocationTypeAssignment` | 100.00% |
+| `PhoenixKitLocations.Web.LocationTypeFormLive` | 100.00% |
+| `PhoenixKitLocations.Web.LocationFormLive` | 96.86% |
+| `PhoenixKitLocations.Web.LocationsLive` | 96.58% |
+| `PhoenixKitLocations.Locations` | 94.57% |
+| `PhoenixKitLocations` | 88.24% |
+| **Total** | **96.52%** |
+
+### What's still uncovered (the residual ~3.5%)
+
+All remaining misses fall into two classes; neither is closable
+without either Mox-style mocking or removing the defensive code:
+
+1. **`PhoenixKitLocations.enabled?/0` rescue/catch fallbacks** —
+   `rescue _ -> false` and `catch :exit, _ -> false`. Core's
+   `Settings.get_boolean_setting/2` already swallows DB errors before
+   they reach our rescue point, so these only fire if core itself
+   re-raises (which it doesn't today).
+
+2. **Defensive non-changeset error branches and unreachable
+   pattern-match catchalls.** Examples: `add_location_type` final
+   `error -> error` (only `:ok` and `{:error, %Ecto.Changeset{}}`
+   reach it now that the changeset wires `assoc_constraint`),
+   `log_activity({:error, _}, ...)` plain catchall (no caller passes
+   non-changeset error tuples), `LocationsLive.delete_failed_atom/1`
+   clauses (the `{:error, reason}` arm of `do_delete_item` is dead
+   because `Locations.delete_*` either succeeds or raises),
+   `feature_label(key)` unknown-key fallback (`@feature_keys` is a
+   compile-time-static list of known keys).
+
+   These could be removed entirely without changing observable
+   behavior. Keeping them is a deliberate defense-in-depth choice;
+   surfaced here for future cleanup.
+
+## Files touched (Batch 3d)
+
+| File | Change |
+|------|--------|
+| `lib/phoenix_kit_locations/schemas/location_type_assignment.ex` | new `changeset/2` with `assoc_constraint/2` for both FKs |
+| `lib/phoenix_kit_locations/locations.ex` | `insert_type_assignment!/3` + `add_location_type/3` route through the changeset |
+| `test/locations_test.exs` | +2 schema empty-string tests; updated FK-violation test to expect `{:error, :type_assignment_failed}` instead of raise; +alias `LocationSchema` |
+| `test/activity_logging_test.exs` | +5 tests (no-opts toggle, enable/disable_system, FK-violation logging) |
+| `test/phoenix_kit_locations/web/locations_live_test.exs` | +4 tests (with-types render, no-scope delete, type-not-found-fallback, status_label fallback); alias `TestRepo` |
+| `test/phoenix_kit_locations/web/location_form_live_test.exs` | +3 tests (switch_language, update :error, sync :error follow_redirect) |
+| `test/phoenix_kit_locations/web/location_type_form_live_test.exs` | +2 tests (switch_language, update :error) |
+| `test/destructive_rescue_test.exs` | new, async: false; 4 DROP-TABLE rescue tests |
+
+## Verification
 
 - `mix precommit` clean (compile + format + credo --strict + dialyzer)
-- **167 tests, 0 failures** (up from 162)
-- 10/10 stable runs
+- **187 tests, 0 failures** (up from 162 in Batch 3a–c, 160 pre-sweep)
+- 15/15 stable runs (the destructive-test deadlock was traced and
+  fixed by moving them to `async: false`)
+- **96.52% line coverage** via `mix test --cover` (up from 90.07%
+  pre-Batch-3d)
 
 ## Files touched
 

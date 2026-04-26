@@ -209,6 +209,52 @@ defmodule PhoenixKitLocations.ActivityLoggingTest do
       assert length(added) == 1
     end
 
+    test "sync_location_types logs db_pending: true on FK violation" do
+      {:ok, location} = Locations.create_location(%{name: "L"})
+      {:ok, real_type} = Locations.create_location_type(%{name: "T"})
+      bogus = Ecto.UUID.generate()
+
+      # Establishes a baseline assignment so we can verify rollback.
+      {:ok, :synced} =
+        Locations.sync_location_types(location.uuid, [real_type.uuid], actor_uuid: @actor)
+
+      # The bogus type_uuid hits the assoc_constraint and the
+      # transaction rolls back. Batch 3a's :error-branch log fires.
+      assert {:error, :type_assignment_failed} =
+               Locations.sync_location_types(
+                 location.uuid,
+                 [real_type.uuid, bogus],
+                 actor_uuid: @actor
+               )
+
+      failed_rows =
+        list_activities()
+        |> Enum.filter(fn r ->
+          r.action == "location.types_synced" and r.metadata["db_pending"] == true
+        end)
+
+      assert [row] = failed_rows
+      assert row.metadata["types_to"] |> Enum.sort() == Enum.sort([real_type.uuid, bogus])
+    end
+
+    test "add_location_type logs db_pending: true on FK violation" do
+      {:ok, location} = Locations.create_location(%{name: "L"})
+      bogus = Ecto.UUID.generate()
+
+      {:error, %Ecto.Changeset{}} =
+        Locations.add_location_type(location.uuid, bogus, actor_uuid: @actor)
+
+      failed_rows =
+        list_activities()
+        |> Enum.filter(fn r ->
+          r.action == "location.type_added" and r.metadata["db_pending"] == true
+        end)
+
+      assert [row] = failed_rows
+      assert row.metadata["type_uuid"] == bogus
+      assert "location_type" in row.metadata["error_fields"]
+    end
+
     test "remove_location_type logs location.type_removed (only when a row was actually deleted)" do
       {:ok, location} = Locations.create_location(%{name: "L"})
       {:ok, type} = Locations.create_location_type(%{name: "T"})
@@ -256,7 +302,31 @@ defmodule PhoenixKitLocations.ActivityLoggingTest do
         metadata_has: %{"module_key" => "locations"}
       )
     end
+
+    test "log_module_toggle/1 (no opts) still logs (covers default-arg head)" do
+      # `enable_system/0` and `disable_system/0` call this without the
+      # opts arg — must work with `actor_uuid: nil` since core's
+      # admin-toggle UI doesn't always know the actor.
+      Locations.log_module_toggle(:enabled)
+
+      row = assert_activity_logged("locations_module.enabled")
+      assert row.actor_uuid == nil
+    end
+
+    test "PhoenixKitLocations.enable_system/0 writes the setting and logs" do
+      assert {:ok, _} = PhoenixKitLocations.enable_system()
+      assert_activity_logged("locations_module.enabled")
+    end
+
+    test "PhoenixKitLocations.disable_system/0 writes the setting and logs" do
+      assert {:ok, _} = PhoenixKitLocations.disable_system()
+      assert_activity_logged("locations_module.disabled")
+    end
   end
+
+  # Destructive-DROP tests for missing-table rescue branches live in
+  # `test/destructive_rescue_test.exs` (async: false) — running them
+  # alongside async tests deadlocks on schema-level locks.
 
   describe "no spurious logging" do
     test "query functions (list, get, count) do not log activity" do

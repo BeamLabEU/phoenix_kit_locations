@@ -396,11 +396,17 @@ defmodule PhoenixKitLocations.LocationsTest do
       results = Locations.find_similar_addresses("Rue de l'Étoile", "Paris", "")
       assert length(results) == 1
     end
+
+    # The "table missing" rescue test lives in
+    # `test/destructive_rescue_test.exs` (async: false) — running it
+    # alongside async tests deadlocks on the DROP TABLE.
   end
 
   # ═══════════════════════════════════════════════════════════════════
   # Validation edge cases
   # ═══════════════════════════════════════════════════════════════════
+
+  alias PhoenixKitLocations.Schemas.Location, as: LocationSchema
 
   describe "changeset validations" do
     test "rejects unknown status values" do
@@ -488,6 +494,32 @@ defmodule PhoenixKitLocations.LocationsTest do
 
       assert errors_on(cs).postal_code
     end
+
+    test "changeset on a struct with empty-string :email skips format validation" do
+      # `cast/3` strips "" → nil for new params, so the only way to
+      # exercise the `"" -> changeset` branch in `maybe_validate_email`
+      # is to start with a struct whose `:email` field is already an
+      # empty string and let `get_field/2` fall back to the data.
+      changeset =
+        LocationSchema.changeset(
+          %LocationSchema{email: ""},
+          %{name: "X"}
+        )
+
+      assert changeset.valid?
+      refute changeset.errors[:email]
+    end
+
+    test "changeset on a struct with empty-string :website skips format validation" do
+      changeset =
+        LocationSchema.changeset(
+          %LocationSchema{website: ""},
+          %{name: "X"}
+        )
+
+      assert changeset.valid?
+      refute changeset.errors[:website]
+    end
   end
 
   # ═══════════════════════════════════════════════════════════════════
@@ -532,15 +564,14 @@ defmodule PhoenixKitLocations.LocationsTest do
 
       bogus = Ecto.UUID.generate()
 
-      # The FK constraint raises `Ecto.ConstraintError` inside the
-      # transaction (the join-schema has no `foreign_key_constraint/2`
-      # declared, so Ecto can't translate the DB violation to a
-      # changeset error and re-raises). This is the intended behaviour
-      # for what is a programmer-error path: the UI never hands us
-      # nonexistent type_uuids.
-      assert_raise Ecto.ConstraintError, fn ->
-        Locations.sync_location_types(l.uuid, [t.uuid, bogus])
-      end
+      # The FK constraint surfaces as a clean `{:error,
+      # :type_assignment_failed}` (LocationTypeAssignment.changeset/2
+      # wires `assoc_constraint/2` for both FK fields, so an unknown
+      # type_uuid comes back as a changeset error, the transaction
+      # rolls back via `repo.rollback(:type_assignment_failed)`, and
+      # the wrapper returns the rollback reason).
+      assert {:error, :type_assignment_failed} =
+               Locations.sync_location_types(l.uuid, [t.uuid, bogus])
 
       # Rollback verified: the original single assignment survives.
       assert Locations.linked_type_uuids(l.uuid) == [t.uuid]

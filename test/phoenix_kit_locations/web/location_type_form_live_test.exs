@@ -114,6 +114,34 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
     end
   end
 
+  describe "switch_language event" do
+    test "switch_language event does not crash and rerenders", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+
+      rendered = render_click(view, "switch_language", %{"lang" => "fr"})
+
+      assert is_binary(rendered)
+      assert rendered =~ "New Location Type"
+    end
+  end
+
+  describe "update :error branch" do
+    test "saving an edit with a too-long name re-renders with the validation error", %{
+      conn: conn
+    } do
+      type = fixture_location_type(%{name: "Original"})
+      {:ok, view, _html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+
+      rendered =
+        view
+        |> form("form", location_type: %{"name" => String.duplicate("a", 300)})
+        |> render_submit()
+
+      assert rendered =~ "should be at most 255 character"
+      assert Locations.get_location_type(type.uuid).name == "Original"
+    end
+  end
+
   describe "handle_info catch-all" do
     test "ignores unrelated messages without crashing", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
