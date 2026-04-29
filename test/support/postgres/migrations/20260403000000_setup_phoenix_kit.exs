@@ -93,9 +93,49 @@ defmodule PhoenixKitLocations.Test.Repo.Migrations.SetupPhoenixKit do
     )
 
     create(index(:phoenix_kit_location_type_assignments, [:location_uuid]))
+    create(index(:phoenix_kit_location_type_assignments, [:location_type_uuid]))
+
+    # Settings table — mirrors core's real schema so PhoenixKit.Settings
+    # callers (e.g. Multilang's `languages_enabled` lookup at LV mount)
+    # hit a real (empty) table instead of logging "relation does not
+    # exist" on every test. Column shape per workspace AGENTS.md:921.
+    create_if_not_exists table(:phoenix_kit_settings, primary_key: false) do
+      add(:uuid, :binary_id, primary_key: true)
+      add(:key, :string, null: false, size: 255)
+      add(:value, :string)
+      add(:value_json, :map)
+      add(:module, :string, size: 50)
+      add(:date_added, :utc_datetime, default: fragment("now()"))
+      add(:date_updated, :utc_datetime, default: fragment("now()"))
+    end
+
+    create_if_not_exists(unique_index(:phoenix_kit_settings, [:key]))
+
+    # Activity feed table (normally created by PhoenixKit V90 migration).
+    # Uses binary_id (not uuid_generate_v7()) because the Ecto schema
+    # supplies the UUIDv7 — the DB column only needs to hold 16 bytes.
+    create_if_not_exists table(:phoenix_kit_activities, primary_key: false) do
+      add(:uuid, :binary_id, primary_key: true)
+      add(:action, :string, null: false, size: 100)
+      add(:module, :string, size: 50)
+      add(:mode, :string, size: 20)
+      add(:actor_uuid, :binary_id)
+      add(:resource_type, :string, size: 50)
+      add(:resource_uuid, :binary_id)
+      add(:target_uuid, :binary_id)
+      add(:metadata, :map, default: %{})
+      add(:inserted_at, :utc_datetime, null: false, default: fragment("now()"))
+    end
+
+    create_if_not_exists(index(:phoenix_kit_activities, [:module]))
+    create_if_not_exists(index(:phoenix_kit_activities, [:action]))
+    create_if_not_exists(index(:phoenix_kit_activities, [:actor_uuid]))
+    create_if_not_exists(index(:phoenix_kit_activities, [:inserted_at]))
   end
 
   def down do
+    drop_if_exists(table(:phoenix_kit_activities))
+    drop_if_exists(table(:phoenix_kit_settings))
     drop_if_exists(table(:phoenix_kit_location_type_assignments))
     drop_if_exists(table(:phoenix_kit_locations))
     drop_if_exists(table(:phoenix_kit_location_types))

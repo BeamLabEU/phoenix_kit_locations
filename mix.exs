@@ -36,7 +36,15 @@ defmodule PhoenixKitLocations.MixProject do
     [
       quality: ["format", "credo --strict", "dialyzer"],
       "quality.ci": ["format --check-formatted", "credo --strict", "dialyzer"],
-      precommit: ["compile", "quality"]
+      precommit: ["compile", "quality"],
+      "test.setup": [
+        "ecto.create --quiet -r PhoenixKitLocations.Test.Repo",
+        "ecto.migrate -r PhoenixKitLocations.Test.Repo"
+      ],
+      "test.reset": [
+        "ecto.drop --quiet -r PhoenixKitLocations.Test.Repo",
+        "test.setup"
+      ]
     ]
   end
 
@@ -46,7 +54,8 @@ defmodule PhoenixKitLocations.MixProject do
       {:phoenix_live_view, "~> 1.1"},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end
 

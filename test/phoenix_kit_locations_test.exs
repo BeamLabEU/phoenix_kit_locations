@@ -33,12 +33,14 @@ defmodule PhoenixKitLocationsTest do
       assert is_boolean(PhoenixKitLocations.enabled?())
     end
 
-    test "enable_system/0 is exported" do
-      assert function_exported?(PhoenixKitLocations, :enable_system, 0)
+    test "enable_system/0 is defined" do
+      functions = PhoenixKitLocations.__info__(:functions)
+      assert {:enable_system, 0} in functions
     end
 
-    test "disable_system/0 is exported" do
-      assert function_exported?(PhoenixKitLocations, :disable_system, 0)
+    test "disable_system/0 is defined" do
+      functions = PhoenixKitLocations.__info__(:functions)
+      assert {:disable_system, 0} in functions
     end
   end
 
@@ -119,8 +121,8 @@ defmodule PhoenixKitLocationsTest do
       assert Map.has_key?(config, :enabled)
     end
 
-    test "css_sources/0 returns otp app name" do
-      assert PhoenixKitLocations.css_sources() == ["phoenix_kit_locations"]
+    test "css_sources/0 returns otp app name as atom list" do
+      assert PhoenixKitLocations.css_sources() == [:phoenix_kit_locations]
     end
 
     test "settings_tabs/0 returns empty list" do

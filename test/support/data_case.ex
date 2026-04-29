@@ -15,6 +15,7 @@ defmodule PhoenixKitLocations.DataCase do
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
+      import PhoenixKitLocations.ActivityLogAssertions
       import PhoenixKitLocations.DataCase
     end
   end

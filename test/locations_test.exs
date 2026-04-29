@@ -389,5 +389,231 @@ defmodule PhoenixKitLocations.LocationsTest do
       results = Locations.find_similar_addresses("123 Main St", "Springfield", "")
       assert length(results) == 1
     end
+
+    test "handles unicode input" do
+      create_location(%{name: "Café", address_line_1: "Rue de l'Étoile", city: "Paris"})
+
+      results = Locations.find_similar_addresses("Rue de l'Étoile", "Paris", "")
+      assert length(results) == 1
+    end
+
+    # The "table missing" rescue test lives in
+    # `test/destructive_rescue_test.exs` (async: false) — running it
+    # alongside async tests deadlocks on the DROP TABLE.
+  end
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Validation edge cases
+  # ═══════════════════════════════════════════════════════════════════
+
+  alias PhoenixKitLocations.Schemas.Location, as: LocationSchema
+
+  describe "changeset validations" do
+    test "rejects unknown status values" do
+      {:error, cs} = Locations.create_location(%{name: "X", status: "bogus"})
+      assert errors_on(cs).status
+    end
+
+    test "enforces name length limit" do
+      {:error, cs} = Locations.create_location(%{name: String.duplicate("a", 300)})
+      assert errors_on(cs).name
+    end
+
+    test "enforces description length limit" do
+      {:error, cs} =
+        Locations.create_location(%{
+          name: "HQ",
+          description: String.duplicate("d", 2100)
+        })
+
+      assert errors_on(cs).description
+    end
+
+    test "empty email is accepted (optional field)" do
+      assert {:ok, _} = Locations.create_location(%{name: "HQ", email: ""})
+    end
+
+    test "empty website is accepted (optional field)" do
+      assert {:ok, _} = Locations.create_location(%{name: "HQ", website: ""})
+    end
+
+    test "preserves Unicode round-trip in name + city + notes" do
+      attrs = %{
+        name: "東京本部 — Tōkyō HQ 🗼",
+        city: "東京",
+        country: "日本",
+        public_notes: "ベルが壊れています — please knock loudly. Звонок не работает."
+      }
+
+      assert {:ok, loc} = Locations.create_location(attrs)
+      reloaded = Locations.get_location(loc.uuid)
+
+      assert reloaded.name == attrs.name
+      assert reloaded.city == attrs.city
+      assert reloaded.country == attrs.country
+      assert reloaded.public_notes == attrs.public_notes
+    end
+
+    test "accepts SQL-metacharacter strings without crashing or escaping" do
+      # Single quotes, semicolons, comment markers — Ecto's parameterised
+      # queries treat these as data, not SQL syntax. Round-trip should
+      # preserve byte-for-byte.
+      payloads = [
+        "Robert'); DROP TABLE phoenix_kit_locations; --",
+        "Bob \" OR 1=1 --",
+        "<script>alert('x')</script>",
+        "\\u0000 NUL",
+        "newline\nin\tname"
+      ]
+
+      for payload <- payloads do
+        assert {:ok, loc} = Locations.create_location(%{name: payload})
+        assert Locations.get_location(loc.uuid).name == payload
+      end
+
+      assert Locations.count_locations() >= length(payloads)
+    end
+
+    test "name >255 chars rejected with explicit length error" do
+      {:error, cs} = Locations.create_location(%{name: String.duplicate("a", 256)})
+
+      assert {:name, {_, [count: 255, validation: :length, kind: :max, type: :string]}} =
+               Enum.find(cs.errors, fn {field, _} -> field == :name end)
+    end
+
+    test "phone >50 chars rejected" do
+      {:error, cs} =
+        Locations.create_location(%{name: "X", phone: String.duplicate("9", 51)})
+
+      assert errors_on(cs).phone
+    end
+
+    test "very long postal_code rejected (>20)" do
+      {:error, cs} =
+        Locations.create_location(%{name: "X", postal_code: String.duplicate("0", 21)})
+
+      assert errors_on(cs).postal_code
+    end
+
+    test "changeset on a struct with empty-string :email skips format validation" do
+      # `cast/3` strips "" → nil for new params, so the only way to
+      # exercise the `"" -> changeset` branch in `maybe_validate_email`
+      # is to start with a struct whose `:email` field is already an
+      # empty string and let `get_field/2` fall back to the data.
+      changeset =
+        LocationSchema.changeset(
+          %LocationSchema{email: ""},
+          %{name: "X"}
+        )
+
+      assert changeset.valid?
+      refute changeset.errors[:email]
+    end
+
+    test "changeset on a struct with empty-string :website skips format validation" do
+      changeset =
+        LocationSchema.changeset(
+          %LocationSchema{website: ""},
+          %{name: "X"}
+        )
+
+      assert changeset.valid?
+      refute changeset.errors[:website]
+    end
+  end
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Public API surface
+  # ═══════════════════════════════════════════════════════════════════
+
+  describe "get_location_by/2 allowlist" do
+    test "rejects fields outside the allowlist" do
+      create_location(%{name: "HQ"})
+
+      assert_raise FunctionClauseError, fn ->
+        Locations.get_location_by(:notes, "anything")
+      end
+    end
+  end
+
+  describe "sync_location_types/3 semantics" do
+    test "returns :unchanged when types didn't change" do
+      l = create_location()
+      t = create_location_type()
+
+      {:ok, :synced} = Locations.sync_location_types(l.uuid, [t.uuid])
+      assert {:ok, :unchanged} = Locations.sync_location_types(l.uuid, [t.uuid])
+    end
+
+    test "returns :synced when the set actually changes" do
+      l = create_location()
+      t1 = create_location_type(%{name: "A"})
+      t2 = create_location_type(%{name: "B"})
+
+      assert {:ok, :synced} = Locations.sync_location_types(l.uuid, [t1.uuid])
+      assert {:ok, :synced} = Locations.sync_location_types(l.uuid, [t1.uuid, t2.uuid])
+    end
+
+    test "sync with nonexistent type_uuid rolls back and preserves existing assignments" do
+      l = create_location()
+      t = create_location_type(%{name: "Real"})
+
+      # Establish a baseline assignment.
+      {:ok, :synced} = Locations.sync_location_types(l.uuid, [t.uuid])
+      assert Locations.linked_type_uuids(l.uuid) == [t.uuid]
+
+      bogus = Ecto.UUID.generate()
+
+      # The FK constraint surfaces as a clean `{:error,
+      # :type_assignment_failed}` (LocationTypeAssignment.changeset/2
+      # wires `assoc_constraint/2` for both FK fields, so an unknown
+      # type_uuid comes back as a changeset error, the transaction
+      # rolls back via `repo.rollback(:type_assignment_failed)`, and
+      # the wrapper returns the rollback reason).
+      assert {:error, :type_assignment_failed} =
+               Locations.sync_location_types(l.uuid, [t.uuid, bogus])
+
+      # Rollback verified: the original single assignment survives.
+      assert Locations.linked_type_uuids(l.uuid) == [t.uuid]
+    end
+
+    test "sync with empty list clears all assignments" do
+      l = create_location()
+      t1 = create_location_type(%{name: "A"})
+      t2 = create_location_type(%{name: "B"})
+
+      {:ok, :synced} = Locations.sync_location_types(l.uuid, [t1.uuid, t2.uuid])
+      assert length(Locations.linked_type_uuids(l.uuid)) == 2
+
+      assert {:ok, :synced} = Locations.sync_location_types(l.uuid, [])
+      assert Locations.linked_type_uuids(l.uuid) == []
+    end
+  end
+
+  describe "find_similar_addresses — safety" do
+    test "handles SQL metacharacters in input without crashing" do
+      # Parametrised queries mean these are harmless, but the function
+      # should still just return [] (no match).
+      create_location(%{name: "X", address_line_1: "123 Main St", city: "SF"})
+
+      assert [] = Locations.find_similar_addresses("'; DROP TABLE x; --", "SF", "")
+      assert [] = Locations.find_similar_addresses("%%%", "SF", "")
+      assert [] = Locations.find_similar_addresses("_", "SF", "")
+    end
+
+    test "limits to 5 results" do
+      # Create 6 locations sharing the same address so the limit fires.
+      for i <- 1..6 do
+        create_location(%{
+          name: "L#{i}",
+          address_line_1: "100 Same St",
+          city: "Limit City",
+          postal_code: "111"
+        })
+      end
+
+      results = Locations.find_similar_addresses("100 Same St", "Limit City", "111")
+      assert length(results) == 5
+    end
   end
 end

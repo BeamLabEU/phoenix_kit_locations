@@ -2,12 +2,18 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   @moduledoc "Create/edit form for locations with multilang, type toggles, and feature checkboxes."
 
   use Phoenix.LiveView
+  use Gettext, backend: PhoenixKitWeb.Gettext
 
   require Logger
 
   import PhoenixKitWeb.Components.MultilangForm
   import PhoenixKitWeb.Components.Core.AdminPageHeader, only: [admin_page_header: 1]
+  import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
+  import PhoenixKitWeb.Components.Core.Input
+  import PhoenixKitWeb.Components.Core.Select
+  import PhoenixKitWeb.Components.Core.Textarea
 
+  alias PhoenixKitLocations.Errors
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
   alias PhoenixKitLocations.Schemas.Location
@@ -15,18 +21,21 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   @translatable_fields ["name", "description", "public_notes"]
   @preserve_fields %{"status" => :status}
 
-  @feature_keys [
-    {"wheelchair_accessible", "Wheelchair Accessible"},
-    {"elevator", "Elevator"},
-    {"parking", "Parking"},
-    {"public_transport", "Public Transport Nearby"},
-    {"loading_dock", "Loading Dock"},
-    {"air_conditioning", "Air Conditioning"},
-    {"wifi", "Wi-Fi"},
-    {"restrooms", "Restrooms"},
-    {"security", "24/7 Security"},
-    {"cctv", "CCTV"}
-  ]
+  # Feature keys are paired with a translatable label at render time via
+  # `feature_label/1` — keeping the call site literal is what lets
+  # `mix gettext.extract` (run in core) pick these up.
+  @feature_keys ~w(
+    wheelchair_accessible
+    elevator
+    parking
+    public_transport
+    loading_dock
+    air_conditioning
+    wifi
+    restrooms
+    security
+    cctv
+  )
 
   @impl true
   def mount(params, _session, socket) do
@@ -34,11 +43,11 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
     case load_location(action, params) do
       {:not_found, uuid} ->
-        Logger.warning("Location not found for edit: #{uuid}")
+        Logger.info("Location not found for edit: #{uuid}")
 
         {:ok,
          socket
-         |> put_flash(:error, Gettext.gettext(PhoenixKitWeb.Gettext, "Location not found."))
+         |> put_flash(:error, Errors.message(:location_not_found))
          |> push_navigate(to: Paths.index())}
 
       {location, changeset, linked_type_uuids} ->
@@ -48,13 +57,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
            page_title: page_title(action, location),
            action: action,
            location: location,
-           changeset: changeset,
            all_types: safe_list_location_types(),
            linked_type_uuids: MapSet.new(linked_type_uuids),
            features: location.features || %{},
            feature_keys: @feature_keys,
            address_warning: nil
          )
+         |> assign_form(changeset)
          |> mount_multilang()}
     end
   end
@@ -90,11 +99,17 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       []
   end
 
-  defp page_title(:new, _location),
-    do: Gettext.gettext(PhoenixKitWeb.Gettext, "New Location")
+  defp page_title(:new, _location), do: gettext("New Location")
 
   defp page_title(:edit, location),
-    do: Gettext.gettext(PhoenixKitWeb.Gettext, "Edit %{name}", name: location.name)
+    do: gettext("Edit %{name}", name: location.name)
+
+  # Keeps the `:changeset` assign (for `<.translatable_field>`) and `:form`
+  # (for core `<.input>` / `<.select>` / `<.textarea>` which want a
+  # `Phoenix.HTML.FormField` via `@form[:field]`) in sync.
+  defp assign_form(socket, %Ecto.Changeset{} = changeset) do
+    assign(socket, changeset: changeset, form: to_form(changeset, as: :location))
+  end
 
   @impl true
   def handle_event("switch_language", %{"lang" => lang_code}, socket) do
@@ -113,9 +128,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     changeset =
       socket.assigns.location
       |> Locations.change_location(params)
-      |> Map.put(:action, socket.assigns.changeset.action)
+      |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, changeset: changeset, address_warning: nil)}
+    {:noreply, socket |> assign_form(changeset) |> assign(:address_warning, nil)}
   end
 
   def handle_event("toggle_type", %{"uuid" => uuid}, socket) do
@@ -141,23 +156,17 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       if socket.assigns.action == :edit, do: socket.assigns.location.uuid, else: nil
 
     similar =
-      try do
-        Locations.find_similar_addresses(
-          params["address_line_1"],
-          params["city"],
-          params["postal_code"],
-          exclude_uuid
-        )
-      rescue
-        error ->
-          Logger.error("Address check failed: #{inspect(error)}")
-          []
-      end
+      Locations.find_similar_addresses(
+        params["address_line_1"],
+        params["city"],
+        params["postal_code"],
+        exclude_uuid
+      )
 
     warning =
       if similar != [] do
         names = Enum.map_join(similar, ", ", & &1.name)
-        Gettext.gettext(PhoenixKitWeb.Gettext, "Similar address found at: %{names}", names: names)
+        gettext("Similar address found at: %{names}", names: names)
       end
 
     {:noreply, assign(socket, :address_warning, warning)}
@@ -176,38 +185,39 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   defp save_location(socket, :new, params) do
-    case Locations.create_location(params) do
+    case Locations.create_location(params, actor_opts(socket)) do
       {:ok, location} ->
-        sync_types_and_redirect(
-          socket,
-          location.uuid,
-          Gettext.gettext(PhoenixKitWeb.Gettext, "Location created.")
-        )
+        sync_types_and_redirect(socket, location.uuid, gettext("Location created."))
 
       {:error, changeset} ->
-        {:noreply, assign(socket, :changeset, changeset)}
+        {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
     end
   end
 
   defp save_location(socket, :edit, params) do
-    case Locations.update_location(socket.assigns.location, params) do
+    case Locations.update_location(socket.assigns.location, params, actor_opts(socket)) do
       {:ok, location} ->
-        sync_types_and_redirect(
-          socket,
-          location.uuid,
-          Gettext.gettext(PhoenixKitWeb.Gettext, "Location updated.")
-        )
+        sync_types_and_redirect(socket, location.uuid, gettext("Location updated."))
 
       {:error, changeset} ->
-        {:noreply, assign(socket, :changeset, changeset)}
+        {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
     end
+  end
+
+  # Defensive catch-all for unmatched messages — e.g. future PubSub
+  # broadcasts, multilang hook fall-throughs. Logs at :debug per the
+  # workspace sync precedent at AGENTS.md:678-680.
+  @impl true
+  def handle_info(msg, socket) do
+    Logger.debug("[LocationFormLive] ignoring unrelated message: #{inspect(msg)}")
+    {:noreply, socket}
   end
 
   defp sync_types_and_redirect(socket, location_uuid, message) do
     type_uuids = MapSet.to_list(socket.assigns.linked_type_uuids)
 
-    case Locations.sync_location_types(location_uuid, type_uuids) do
-      {:ok, _} ->
+    case Locations.sync_location_types(location_uuid, type_uuids, actor_opts(socket)) do
+      {:ok, _sync_state} ->
         {:noreply,
          socket
          |> put_flash(:info, message)
@@ -218,10 +228,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
         {:noreply,
          socket
-         |> put_flash(
-           :warning,
-           Gettext.gettext(PhoenixKitWeb.Gettext, "Saved but failed to update type assignments.")
-         )
+         |> put_flash(:warning, Errors.message(:type_assignment_failed))
          |> push_navigate(to: Paths.index())}
     end
   end
@@ -240,10 +247,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       <.admin_page_header
         back={Paths.index()}
         title={@page_title}
-        subtitle={if @action == :new, do: Gettext.gettext(PhoenixKitWeb.Gettext, "Add a new location."), else: Gettext.gettext(PhoenixKitWeb.Gettext, "Update location details.")}
+        subtitle={if @action == :new, do: gettext("Add a new location."), else: gettext("Update location details.")}
       />
 
-      <.form for={to_form(@changeset)} action="#" phx-change="validate" phx-submit="save">
+      <.form for={@form} action="#" phx-change="validate" phx-submit="save">
         <%!-- ═══════════════════════════════════════════════════════ --%>
         <%!-- PUBLIC INFORMATION                                     --%>
         <%!-- ═══════════════════════════════════════════════════════ --%>
@@ -285,8 +292,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 current_lang={@current_lang}
                 primary_language={@primary_language}
                 lang_data={@lang_data}
-                label={Gettext.gettext(PhoenixKitWeb.Gettext, "Name")}
-                placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "e.g., Main Office, Downtown Showroom")}
+                label={gettext("Name")}
+                placeholder={gettext("e.g., Main Office, Downtown Showroom")}
                 required
                 class="w-full"
               />
@@ -300,9 +307,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 current_lang={@current_lang}
                 primary_language={@primary_language}
                 lang_data={@lang_data}
-                label={Gettext.gettext(PhoenixKitWeb.Gettext, "Description")}
+                label={gettext("Description")}
                 type="textarea"
-                placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "Brief description of this location...")}
+                placeholder={gettext("Brief description of this location...")}
                 class="w-full"
               />
 
@@ -315,9 +322,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 current_lang={@current_lang}
                 primary_language={@primary_language}
                 lang_data={@lang_data}
-                label={Gettext.gettext(PhoenixKitWeb.Gettext, "Public Notes")}
+                label={gettext("Public Notes")}
                 type="textarea"
-                placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "e.g., Bell is broken — knock loudly, entrance from side street...")}
+                placeholder={gettext("e.g., Bell is broken — knock loudly, entrance from side street...")}
                 class="w-full"
               />
             </div>
@@ -326,100 +333,86 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
           <div class="card-body flex flex-col gap-5 pt-0">
             <div class="divider my-0"></div>
 
-            <%!-- Address --%>
-            <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              {Gettext.gettext(PhoenixKitWeb.Gettext, "Address")}
-            </h2>
+            <.section_heading icon="hero-map-pin">{gettext("Address")}</.section_heading>
 
             <div :if={@address_warning} class="alert alert-warning text-sm py-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
+              <.icon name="hero-exclamation-triangle" class="h-4 w-4 shrink-0" />
               <span>{@address_warning}</span>
             </div>
 
-            <div class="form-control">
-              <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Address Line 1")}</span>
-              <input type="text" name="location[address_line_1]" value={Ecto.Changeset.get_field(@changeset, :address_line_1) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "Street address, P.O. box")} phx-blur="check_address" />
-            </div>
+            <.input
+              field={@form[:address_line_1]}
+              type="text"
+              label={gettext("Address Line 1")}
+              placeholder={gettext("Street address, P.O. box")}
+              phx-blur="check_address"
+            />
 
-            <div class="form-control">
-              <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Address Line 2")}</span>
-              <input type="text" name="location[address_line_2]" value={Ecto.Changeset.get_field(@changeset, :address_line_2) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "Apartment, suite, unit, building, floor")} />
+            <.input
+              field={@form[:address_line_2]}
+              type="text"
+              label={gettext("Address Line 2")}
+              placeholder={gettext("Apartment, suite, unit, building, floor")}
+            />
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <.input
+                field={@form[:city]}
+                type="text"
+                label={gettext("City")}
+                phx-blur="check_address"
+              />
+              <.input field={@form[:state]} type="text" label={gettext("State / Region")} />
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="form-control">
-                <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "City")}</span>
-                <input type="text" name="location[city]" value={Ecto.Changeset.get_field(@changeset, :city) || ""} class="input input-bordered w-full transition-colors focus:input-primary" phx-blur="check_address" />
-              </div>
-              <div class="form-control">
-                <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "State / Region")}</span>
-                <input type="text" name="location[state]" value={Ecto.Changeset.get_field(@changeset, :state) || ""} class="input input-bordered w-full transition-colors focus:input-primary" />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="form-control">
-                <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Postal Code")}</span>
-                <input type="text" name="location[postal_code]" value={Ecto.Changeset.get_field(@changeset, :postal_code) || ""} class="input input-bordered w-full transition-colors focus:input-primary" phx-blur="check_address" />
-              </div>
-              <div class="form-control">
-                <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Country")}</span>
-                <input type="text" name="location[country]" value={Ecto.Changeset.get_field(@changeset, :country) || ""} class="input input-bordered w-full transition-colors focus:input-primary" />
-              </div>
+              <.input
+                field={@form[:postal_code]}
+                type="text"
+                label={gettext("Postal Code")}
+                phx-blur="check_address"
+              />
+              <.input field={@form[:country]} type="text" label={gettext("Country")} />
             </div>
 
             <div class="divider my-0"></div>
 
-            <%!-- Contact --%>
-            <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              {Gettext.gettext(PhoenixKitWeb.Gettext, "Contact")}
-            </h2>
+            <.section_heading icon="hero-envelope">{gettext("Contact")}</.section_heading>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="form-control">
-                <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Phone")}</span>
-                <input type="tel" name="location[phone]" value={Ecto.Changeset.get_field(@changeset, :phone) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "+1 234 567 890")} />
-              </div>
-              <div class="form-control">
-                <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Email")}</span>
-                <input type="email" name="location[email]" value={Ecto.Changeset.get_field(@changeset, :email) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "location@example.com")} />
-                <p :for={msg <- changeset_errors(@changeset, :email)} class="text-error text-sm mt-1">{msg}</p>
-              </div>
-              <div class="form-control">
-                <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Website")}</span>
-                <input type="url" name="location[website]" value={Ecto.Changeset.get_field(@changeset, :website) || ""} class="input input-bordered w-full transition-colors focus:input-primary" placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "https://...")} />
-                <p :for={msg <- changeset_errors(@changeset, :website)} class="text-error text-sm mt-1">{msg}</p>
-              </div>
+              <.input
+                field={@form[:phone]}
+                type="tel"
+                label={gettext("Phone")}
+                placeholder={gettext("+1 234 567 890")}
+              />
+              <.input
+                field={@form[:email]}
+                type="email"
+                label={gettext("Email")}
+                placeholder={gettext("location@example.com")}
+              />
+              <.input
+                field={@form[:website]}
+                type="url"
+                label={gettext("Website")}
+                placeholder={gettext("https://...")}
+              />
             </div>
 
             <div class="divider my-0"></div>
 
-            <%!-- Features & Amenities --%>
-            <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {Gettext.gettext(PhoenixKitWeb.Gettext, "Features & Amenities")}
-            </h2>
+            <.section_heading icon="hero-check-circle">{gettext("Features & Amenities")}</.section_heading>
 
             <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
               <label
-                :for={{key, label} <- @feature_keys}
+                :for={key <- @feature_keys}
                 class="flex items-center gap-2 cursor-pointer select-none"
                 phx-click="toggle_feature"
                 phx-value-key={key}
               >
                 <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" checked={Map.get(@features, key, false)} tabindex="-1" />
-                <span class="label-text text-sm">{Gettext.gettext(PhoenixKitWeb.Gettext, label)}</span>
+                <span class="label-text text-sm">{feature_label(key)}</span>
               </label>
             </div>
           </div>
@@ -430,48 +423,33 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         <%!-- ═══════════════════════════════════════════════════════ --%>
         <div class="card bg-base-100 shadow-lg mt-6">
           <div class="card-body flex flex-col gap-5">
-            <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              {Gettext.gettext(PhoenixKitWeb.Gettext, "Internal")}
-            </h2>
+            <.section_heading icon="hero-lock-closed">{gettext("Internal")}</.section_heading>
             <p class="text-sm text-base-content/50 -mt-3">
-              {Gettext.gettext(PhoenixKitWeb.Gettext, "This information is only visible to administrators.")}
+              {gettext("This information is only visible to administrators.")}
             </p>
 
-            <div class="form-control">
-              <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Internal Notes")}</span>
-              <textarea
-                name="location[notes]"
-                class="textarea textarea-bordered w-full min-h-[5rem] transition-colors focus:textarea-primary"
-                rows="3"
-                placeholder={Gettext.gettext(PhoenixKitWeb.Gettext, "Notes only visible to admins...")}
-              >{Ecto.Changeset.get_field(@changeset, :notes) || ""}</textarea>
-            </div>
+            <.textarea
+              field={@form[:notes]}
+              label={gettext("Internal Notes")}
+              rows="3"
+              placeholder={gettext("Notes only visible to admins...")}
+              class="min-h-[5rem]"
+            />
 
-            <div class="form-control">
-              <span class="label-text font-semibold mb-2">{Gettext.gettext(PhoenixKitWeb.Gettext, "Status")}</span>
-              <label class="select w-full transition-colors focus-within:select-primary">
-                <select name="location[status]">
-                  <option value="active" selected={Ecto.Changeset.get_field(@changeset, :status) == "active"}>{Gettext.gettext(PhoenixKitWeb.Gettext, "Active")}</option>
-                  <option value="inactive" selected={Ecto.Changeset.get_field(@changeset, :status) == "inactive"}>{Gettext.gettext(PhoenixKitWeb.Gettext, "Inactive")}</option>
-                </select>
-              </label>
-            </div>
+            <.select
+              field={@form[:status]}
+              label={gettext("Status")}
+              options={[{gettext("Active"), "active"}, {gettext("Inactive"), "inactive"}]}
+              class="transition-colors focus-within:select-primary"
+            />
 
             <%!-- Location types --%>
             <div :if={@all_types != []} class="flex flex-col gap-4">
               <div class="divider my-0"></div>
 
-              <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-                {Gettext.gettext(PhoenixKitWeb.Gettext, "Location Types")}
-              </h2>
+              <.section_heading icon="hero-tag">{gettext("Location Types")}</.section_heading>
               <p class="text-sm text-base-content/50 -mt-2">
-                {Gettext.gettext(PhoenixKitWeb.Gettext, "Click to toggle. A location can have multiple types.")}
+                {gettext("Click to toggle. A location can have multiple types.")}
               </p>
 
               <div class="flex flex-wrap gap-2">
@@ -487,16 +465,11 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                   phx-click="toggle_type"
                   phx-value-uuid={t.uuid}
                 >
-                  <svg
+                  <.icon
                     :if={MapSet.member?(@linked_type_uuids, t.uuid)}
-                    xmlns="http://www.w3.org/2000/svg"
+                    name="hero-check"
                     class="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
+                  />
                   {t.name}
                 </label>
               </div>
@@ -506,9 +479,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
             <div class="divider my-0"></div>
 
             <div class="flex justify-end gap-3">
-              <.link navigate={Paths.index()} class="btn btn-ghost">{Gettext.gettext(PhoenixKitWeb.Gettext, "Cancel")}</.link>
-              <button type="submit" class="btn btn-primary phx-submit-loading:opacity-75">
-                {if @action == :new, do: Gettext.gettext(PhoenixKitWeb.Gettext, "Create Location"), else: Gettext.gettext(PhoenixKitWeb.Gettext, "Save Changes")}
+              <.link navigate={Paths.index()} class="btn btn-ghost">{gettext("Cancel")}</.link>
+              <button
+                type="submit"
+                class="btn btn-primary phx-submit-loading:opacity-75"
+                phx-disable-with={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
+              >
+                {if @action == :new, do: gettext("Create Location"), else: gettext("Save Changes")}
               </button>
             </div>
           </div>
@@ -518,18 +495,40 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     """
   end
 
-  defp changeset_errors(%Ecto.Changeset{action: action, errors: errors}, field)
-       when not is_nil(action) do
-    errors
-    |> Keyword.get_values(field)
-    |> Enum.map(&translate_error/1)
+  # Small local component — keeps the five section headings in the
+  # form template identical in shape (icon + label) without repeating
+  # the `<h2>` chrome five times.
+  attr(:icon, :string, required: true)
+  slot(:inner_block, required: true)
+
+  defp section_heading(assigns) do
+    ~H"""
+    <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
+      <.icon name={@icon} class="h-4 w-4" />
+      {render_slot(@inner_block)}
+    </h2>
+    """
   end
 
-  defp changeset_errors(_changeset, _field), do: []
-
-  defp translate_error({msg, opts}) do
-    Enum.reduce(opts, msg, fn {key, value}, acc ->
-      String.replace(acc, "%{#{key}}", fn _ -> to_string(value) end)
-    end)
+  defp actor_opts(socket) do
+    case socket.assigns[:phoenix_kit_current_scope] do
+      %{user: %{uuid: uuid}} -> [actor_uuid: uuid]
+      _ -> []
+    end
   end
+
+  # Translatable feature labels. Each literal string is picked up by
+  # `mix gettext.extract` (run in core). Falls back to the raw key so
+  # unknown feature keys render *something* instead of crashing.
+  defp feature_label("wheelchair_accessible"), do: gettext("Wheelchair Accessible")
+  defp feature_label("elevator"), do: gettext("Elevator")
+  defp feature_label("parking"), do: gettext("Parking")
+  defp feature_label("public_transport"), do: gettext("Public Transport Nearby")
+  defp feature_label("loading_dock"), do: gettext("Loading Dock")
+  defp feature_label("air_conditioning"), do: gettext("Air Conditioning")
+  defp feature_label("wifi"), do: gettext("Wi-Fi")
+  defp feature_label("restrooms"), do: gettext("Restrooms")
+  defp feature_label("security"), do: gettext("24/7 Security")
+  defp feature_label("cctv"), do: gettext("CCTV")
+  defp feature_label(key), do: key
 end
