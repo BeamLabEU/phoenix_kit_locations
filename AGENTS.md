@@ -178,7 +178,7 @@ CI runs the same chain via `mix quality.ci` (format-check mode). If `precommit` 
 
 This repo ships **no production migrations** — all runtime database tables are created by the parent [phoenix_kit](https://github.com/BeamLabEU/phoenix_kit) project (V90). This module only defines Ecto schemas that map to those tables.
 
-A **test-only** migration at `test/support/postgres/migrations/20260403000000_setup_phoenix_kit.exs` recreates the three tables plus `phoenix_kit_activities` and the `uuid_generate_v7()` function so the test suite can run standalone.
+The test suite builds its schema by running core's versioned migrations directly via `PhoenixKit.Migration.ensure_current/2` in `test/test_helper.exs` — no module-owned DDL.
 
 ### Tables (created by PhoenixKit V90)
 
@@ -194,7 +194,7 @@ This module implements `css_sources/0` returning `[:phoenix_kit_locations]` (ato
 
 ### Setup
 
-This module owns its own test database (`phoenix_kit_locations_test`) and a test migration at `test/support/postgres/migrations/`. Create the DB once:
+This module owns its own test database (`phoenix_kit_locations_test`). Schema setup runs core's versioned migrations directly via `PhoenixKit.Migration.ensure_current/2` in `test/test_helper.exs` — no module-owned DDL anywhere. Create the DB once:
 
 ```bash
 createdb phoenix_kit_locations_test
@@ -216,7 +216,7 @@ Without this, all DB calls through `PhoenixKit.RepoHelper` crash with "No reposi
 - `test/support/data_case.ex` — `PhoenixKitLocations.DataCase` (sandbox setup, auto-tags `:integration`)
 - `test/support/live_case.ex` — `PhoenixKitLocations.LiveCase` (thin wrapper around `Phoenix.LiveViewTest` with router + endpoint wiring)
 - `test/support/test_endpoint.ex` + `test_router.ex` + `test_layouts.ex` — minimal Phoenix plumbing so LiveViews can render under `Phoenix.LiveViewTest.live/2`
-- `test/support/postgres/migrations/20260403000000_setup_phoenix_kit.exs` — creates `phoenix_kit_locations`, `phoenix_kit_location_types`, `phoenix_kit_location_type_assignments`, and the `phoenix_kit_settings` + `phoenix_kit_activities` tables + `uuid_generate_v7()` function
+- `test/test_helper.exs` calls `PhoenixKit.Migration.ensure_current/2` to apply all core versioned migrations (V40 extensions + `uuid_generate_v7()`, V03 settings, V90 locations + activities) on every boot — no module-owned DDL
 
 ### Running tests
 

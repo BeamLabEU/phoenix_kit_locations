@@ -8,8 +8,7 @@ config :phoenix_kit_locations, PhoenixKitLocations.Test.Repo,
   hostname: System.get_env("PGHOST", "localhost"),
   database: "phoenix_kit_locations_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: System.schedulers_online() * 2,
-  priv: "test/support/postgres"
+  pool_size: System.schedulers_online() * 2
 
 # Wire repo for library code that calls PhoenixKit.RepoHelper.repo()
 config :phoenix_kit, repo: PhoenixKitLocations.Test.Repo

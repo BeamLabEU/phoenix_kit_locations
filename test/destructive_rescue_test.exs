@@ -35,7 +35,7 @@ defmodule PhoenixKitLocations.DestructiveRescueTest do
     end
 
     test "create_location still succeeds when phoenix_kit_activities is missing" do
-      TestRepo.query!("DROP TABLE phoenix_kit_activities")
+      TestRepo.query!("DROP TABLE phoenix_kit_activities CASCADE")
 
       assert {:ok, location} =
                Locations.create_location(%{name: "NoActivityTable"}, actor_uuid: @actor)
