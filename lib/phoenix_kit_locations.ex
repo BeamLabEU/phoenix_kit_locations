@@ -71,6 +71,38 @@ defmodule PhoenixKitLocations do
   @impl PhoenixKit.Module
   def css_sources, do: [:phoenix_kit_locations]
 
+  # Project-extension contribution to the `phoenix_kit_projects` hub — the
+  # duck-typed one-way contract (same shape as the dashboards widget
+  # contract): its Extensions.Registry discovers this function; no
+  # dependency on the projects package. The Sites tab links locations to a
+  # project via per-instance CONFIG (comma-separated location uuids, set in
+  # the project's Modules & features panel) — no FK.
+  @doc false
+  def phoenix_kit_project_extensions do
+    [
+      %{
+        key: "locations_sites",
+        name: "Sites",
+        description: "Link physical locations to this project",
+        icon: "hero-map-pin",
+        module_key: "locations",
+        default_enabled: false,
+        tabs: [
+          %{
+            key: "sites",
+            label: "Sites",
+            icon: "hero-map-pin",
+            lv: PhoenixKitLocations.Web.ProjectSitesLive
+          }
+        ],
+        config_schema: [
+          %{key: "location_uuids", type: :string, label: "Location UUIDs (comma-separated)"}
+        ],
+        permission_actions: [:view]
+      }
+    ]
+  end
+
   @impl PhoenixKit.Module
   def permission_metadata do
     %{
