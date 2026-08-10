@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0 - 2026-08-10
+
+### Changed
+
+- **⚠️ Requires `phoenix_kit ~> 2.0`.** The core pin moved to `~> 2.0`, so this
+  release no longer resolves against core 1.7.
+
+  Core 2.0.0 squashes the migration chain into a single `V135` baseline and makes
+  V135 the chain's floor: `mix ecto.migrate` now *refuses* on a database below it
+  rather than migrating. Check `mix phoenix_kit.status` **before** upgrading. A
+  host below V135 must install `phoenix_kit 1.7.236` — the migration bridge, the
+  last release carrying the full pre-squash chain — migrate until the reported
+  version is at least V135, and only then move to 2.0.
+
+  This package does not call migration internals, so the change is the pin
+  itself.
+
+### Added
+
+- **Sites tab for the `phoenix_kit_projects` hub (PR #10).** Contributed through
+  `phoenix_kit_project_extensions/0`, the duck-typed one-way discovery contract —
+  the projects package finds it, and this package takes **no dependency** on
+  projects. Linkage is per-project config (comma-separated location UUIDs in the
+  Modules & features panel), not a foreign key. Read-only address cards with
+  link-outs to the locations admin; a stale UUID or a DB hiccup degrades to a
+  missing card rather than crashing the host project page.
+
 ## 0.3.0 - 2026-07-13
 
 ### Added

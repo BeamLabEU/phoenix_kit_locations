@@ -110,7 +110,7 @@ defmodule PhoenixKitLocationsTest do
 
   describe "version/0" do
     test "returns version string" do
-      assert PhoenixKitLocations.version() == "0.3.0"
+      assert PhoenixKitLocations.version() == "0.4.0"
     end
   end
 

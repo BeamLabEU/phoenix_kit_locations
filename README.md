@@ -21,7 +21,7 @@ Add `phoenix_kit_locations` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:phoenix_kit_locations, "~> 0.1"}
+    {:phoenix_kit_locations, "~> 0.4"}
   ]
 end
 ```
