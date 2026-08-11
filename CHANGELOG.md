@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 - 2026-08-11
+
+### Fixed
+
+- **Sidebar tab labels are translated** (#12). All eight admin tabs now declare
+  `gettext_backend` and `gettext_domain`. Without them a tab label is passed
+  through untranslated no matter what the `.po` files hold, so the Locations
+  section stayed English in every locale while its pages were fully translated.
+
+### Changed
+
+- Dependency updates (`phoenix_kit` 2.2.0, `phoenix` 1.8.10, `hackney` 4.7.3).
+
 ## 0.4.0 - 2026-08-10
 
 ### Changed
