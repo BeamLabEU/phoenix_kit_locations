@@ -130,6 +130,8 @@ defmodule PhoenixKitLocations do
         subtab_display: :when_active,
         highlight_with_subtabs: false,
         redirect_to_first_subtab: true,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationsLive, :index}
       },
       # Subtabs — Locations, Types
@@ -147,6 +149,8 @@ defmodule PhoenixKitLocations do
         # parent tab as the only visible "active" item on those pages.
         match: {:regex, ~r{(?:^|/)locations(?:/new|/[^/]+/edit)?$}},
         parent: :admin_locations,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationsLive, :index}
       },
       %Tab{
@@ -158,6 +162,8 @@ defmodule PhoenixKitLocations do
         level: :admin,
         permission: module_key(),
         parent: :admin_locations,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationsLive, :types}
       },
       # Static paths MUST come before wildcard :uuid paths
@@ -173,6 +179,8 @@ defmodule PhoenixKitLocations do
         permission: module_key(),
         parent: :admin_locations,
         visible: false,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationFormLive, :new}
       },
       # Types — static paths
@@ -186,6 +194,8 @@ defmodule PhoenixKitLocations do
         permission: module_key(),
         parent: :admin_locations,
         visible: false,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationTypeFormLive, :new}
       },
       %Tab{
@@ -198,6 +208,8 @@ defmodule PhoenixKitLocations do
         permission: module_key(),
         parent: :admin_locations,
         visible: false,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationTypeFormLive, :edit}
       },
       # Wildcard :uuid routes LAST
@@ -211,6 +223,8 @@ defmodule PhoenixKitLocations do
         permission: module_key(),
         parent: :admin_locations,
         visible: false,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationFormLive, :edit}
       },
       %Tab{
@@ -223,6 +237,8 @@ defmodule PhoenixKitLocations do
         permission: module_key(),
         parent: :admin_locations,
         visible: false,
+        gettext_backend: PhoenixKitLocations.Gettext,
+        gettext_domain: "default",
         live_view: {PhoenixKitLocations.Web.LocationStructureLive, :edit}
       }
     ]

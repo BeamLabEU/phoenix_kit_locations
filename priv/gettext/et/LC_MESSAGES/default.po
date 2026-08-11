@@ -118,6 +118,16 @@ msgstr "Kirjeldus"
 msgid "Details"
 msgstr "Üksikasjad"
 
+#: lib/phoenix_kit_locations.ex:218
+#, elixir-autogen, elixir-format
+msgid "Edit Location"
+msgstr "Muuda asukohta"
+
+#: lib/phoenix_kit_locations.ex:203
+#, elixir-autogen, elixir-format
+msgid "Edit Type"
+msgstr "Muuda tüüpi"
+
 #: lib/phoenix_kit_locations/web/location_structure_live.ex:637
 #, elixir-autogen, elixir-format
 msgid "Failed to delete space"
@@ -145,6 +155,12 @@ msgstr "Sisemärkmed (ainult administraatoritele)"
 msgid "Kind"
 msgstr "Tüüp"
 
+#: lib/phoenix_kit_locations.ex:122
+#: lib/phoenix_kit_locations.ex:140
+#, elixir-autogen, elixir-format
+msgid "Locations"
+msgstr "Asukohad"
+
 #: lib/phoenix_kit_locations/web/components/space_tree.ex:260
 #, elixir-autogen, elixir-format
 msgid "Move down"
@@ -160,6 +176,16 @@ msgstr "Teisalda üles"
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "Nimi"
+
+#: lib/phoenix_kit_locations.ex:174
+#, elixir-autogen, elixir-format
+msgid "New Location"
+msgstr "Uus asukoht"
+
+#: lib/phoenix_kit_locations.ex:189
+#, elixir-autogen, elixir-format
+msgid "New Type"
+msgstr "Uus tüüp"
 
 #: lib/phoenix_kit_locations/web/components/place_picker.ex:340
 #, elixir-autogen, elixir-format
@@ -211,10 +237,16 @@ msgstr "Kuvatakse selle koha juures."
 msgid "Status"
 msgstr "Olek"
 
+#: lib/phoenix_kit_locations.ex:232
 #: lib/phoenix_kit_locations/web/components/location_tabs.ex:35
 #, elixir-autogen, elixir-format
 msgid "Structure"
 msgstr "Struktuur"
+
+#: lib/phoenix_kit_locations.ex:158
+#, elixir-autogen, elixir-format
+msgid "Types"
+msgstr "Tüübid"
 
 #: lib/phoenix_kit_locations/web/components/place_picker.ex:277
 #, elixir-autogen, elixir-format
