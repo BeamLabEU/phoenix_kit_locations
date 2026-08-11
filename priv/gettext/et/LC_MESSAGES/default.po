@@ -119,12 +119,12 @@ msgid "Details"
 msgstr "Üksikasjad"
 
 #: lib/phoenix_kit_locations.ex:218
-#, elixir-autogen, elixir-format
+#, elixir-format
 msgid "Edit Location"
 msgstr "Muuda asukohta"
 
 #: lib/phoenix_kit_locations.ex:203
-#, elixir-autogen, elixir-format
+#, elixir-format
 msgid "Edit Type"
 msgstr "Muuda tüüpi"
 
@@ -157,7 +157,7 @@ msgstr "Tüüp"
 
 #: lib/phoenix_kit_locations.ex:122
 #: lib/phoenix_kit_locations.ex:140
-#, elixir-autogen, elixir-format
+#, elixir-format
 msgid "Locations"
 msgstr "Asukohad"
 
@@ -178,12 +178,12 @@ msgid "Name"
 msgstr "Nimi"
 
 #: lib/phoenix_kit_locations.ex:174
-#, elixir-autogen, elixir-format
+#, elixir-format
 msgid "New Location"
 msgstr "Uus asukoht"
 
 #: lib/phoenix_kit_locations.ex:189
-#, elixir-autogen, elixir-format
+#, elixir-format
 msgid "New Type"
 msgstr "Uus tüüp"
 
@@ -244,7 +244,7 @@ msgid "Structure"
 msgstr "Struktuur"
 
 #: lib/phoenix_kit_locations.ex:158
-#, elixir-autogen, elixir-format
+#, elixir-format
 msgid "Types"
 msgstr "Tüübid"
 
