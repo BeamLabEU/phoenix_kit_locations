@@ -346,15 +346,15 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
             skeleton_class="card-body pt-0 flex flex-col gap-5"
           >
             <:skeleton>
-              <div class="form-control">
+              <div class="fieldset">
                 <div class="label"><div class="skeleton h-4 w-14"></div></div>
                 <div class="skeleton h-12 w-full rounded-lg"></div>
               </div>
-              <div class="form-control">
+              <div class="fieldset">
                 <div class="label"><div class="skeleton h-4 w-24"></div></div>
                 <div class="skeleton h-20 w-full rounded-lg"></div>
               </div>
-              <div class="form-control">
+              <div class="fieldset">
                 <div class="label"><div class="skeleton h-4 w-20"></div></div>
                 <div class="skeleton h-20 w-full rounded-lg"></div>
               </div>
@@ -487,7 +487,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 phx-value-key={key}
               >
                 <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" checked={Map.get(@features, key, false)} tabindex="-1" />
-                <span class="label-text text-sm">{feature_label(key)}</span>
+                <span class="fieldset-legend text-sm">{feature_label(key)}</span>
               </label>
             </div>
           </div>

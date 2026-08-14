@@ -167,11 +167,11 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
             skeleton_class="card-body pt-0 flex flex-col gap-5"
           >
             <:skeleton>
-              <div class="form-control">
+              <div class="fieldset">
                 <div class="label"><div class="skeleton h-4 w-14"></div></div>
                 <div class="skeleton h-12 w-full rounded-lg"></div>
               </div>
-              <div class="form-control">
+              <div class="fieldset">
                 <div class="label"><div class="skeleton h-4 w-24"></div></div>
                 <div class="skeleton h-20 w-full rounded-lg"></div>
               </div>
@@ -212,14 +212,14 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
           <div class="card-body flex flex-col gap-5 pt-0">
             <div class="divider my-0"></div>
 
-            <div class="form-control">
+            <div class="fieldset">
               <.select
                 field={@form[:status]}
                 label={gettext("Status")}
                 options={[{gettext("Active"), "active"}, {gettext("Inactive"), "inactive"}]}
                 class="transition-colors focus-within:select-primary"
               />
-              <span class="label-text-alt text-base-content/50 mt-1">
+              <span class="fieldset-label text-base-content/50 mt-1">
                 {gettext("Inactive types won't appear in the location type selection.")}
               </span>
             </div>
