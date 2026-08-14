@@ -18,7 +18,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
       {:error, {:live_redirect, %{to: to}}} =
         view
-        |> form("form", location_type: %{"name" => "Warehouse"})
+        |> form("#location-type-form", location_type: %{"name" => "Warehouse"})
         |> render_submit()
 
       assert to == "/en/admin/locations/types"
@@ -36,7 +36,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
       rendered =
         view
-        |> form("form", location_type: %{"name" => ""})
+        |> form("#location-type-form", location_type: %{"name" => ""})
         |> render_submit()
 
       assert rendered =~ "can&#39;t be blank" or rendered =~ "can't be blank"
@@ -59,7 +59,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
       {:error, {:live_redirect, %{to: to}}} =
         view
-        |> form("form", location_type: %{"name" => "Renamed"})
+        |> form("#location-type-form", location_type: %{"name" => "Renamed"})
         |> render_submit()
 
       assert to == "/en/admin/locations/types"
@@ -81,7 +81,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
       rendered =
         view
-        |> form("form", location_type: %{"name" => ""})
+        |> form("#location-type-form", location_type: %{"name" => ""})
         |> render_change()
 
       assert rendered =~ "can&#39;t be blank" or rendered =~ "can't be blank"
@@ -94,7 +94,9 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
       {:error, {:live_redirect, _}} =
         view
-        |> form("form", location_type: %{"name" => "InactiveType", "status" => "inactive"})
+        |> form("#location-type-form",
+          location_type: %{"name" => "InactiveType", "status" => "inactive"}
+        )
         |> render_submit()
 
       assert %{status: "inactive"} = Locations.get_location_type_by_name("InactiveType")
@@ -134,7 +136,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
       rendered =
         view
-        |> form("form", location_type: %{"name" => String.duplicate("a", 300)})
+        |> form("#location-type-form", location_type: %{"name" => String.duplicate("a", 300)})
         |> render_submit()
 
       assert rendered =~ "should be at most 255 character"

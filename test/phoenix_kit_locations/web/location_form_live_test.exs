@@ -21,7 +21,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       {:error, {:live_redirect, %{to: to}}} =
         view
-        |> form("form", location: %{"name" => "Fresh HQ", "city" => "Berlin"})
+        |> form("#location-form", location: %{"name" => "Fresh HQ", "city" => "Berlin"})
         |> render_submit()
 
       assert to == "/en/admin/locations"
@@ -39,7 +39,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       rendered =
         view
-        |> form("form", location: %{"name" => ""})
+        |> form("#location-form", location: %{"name" => ""})
         |> render_submit()
 
       assert rendered =~ "can&#39;t be blank" or rendered =~ "can't be blank"
@@ -50,7 +50,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       rendered =
         view
-        |> form("form",
+        |> form("#location-form",
           location: %{"name" => "X", "email" => "bad"}
         )
         |> render_submit()
@@ -79,7 +79,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       {:error, {:live_redirect, %{to: to}}} =
         view
-        |> form("form",
+        |> form("#location-form",
           location: %{"name" => "Original", "city" => "Newcity"}
         )
         |> render_submit()
@@ -130,7 +130,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       {:error, {:live_redirect, _}} =
         view
-        |> form("form", location: %{"name" => "ToggledTwice"})
+        |> form("#location-form", location: %{"name" => "ToggledTwice"})
         |> render_submit()
 
       location = Locations.get_location_by(:name, "ToggledTwice")
@@ -146,7 +146,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       {:error, {:live_redirect, _}} =
         view
-        |> form("form", location: %{"name" => "Feature HQ"})
+        |> form("#location-form", location: %{"name" => "Feature HQ"})
         |> render_submit()
 
       location = Locations.get_location_by(:name, "Feature HQ")
@@ -162,7 +162,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       {:error, {:live_redirect, _}} =
         view
-        |> form("form", location: %{"name" => "Inactive HQ", "status" => "inactive"})
+        |> form("#location-form", location: %{"name" => "Inactive HQ", "status" => "inactive"})
         |> render_submit()
 
       assert %{status: "inactive"} = Locations.get_location_by(:name, "Inactive HQ")
@@ -180,7 +180,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       # After an even number of toggles we're back to no types
       {:error, {:live_redirect, _}} =
         view
-        |> form("form", location: %{"name" => "NoType HQ"})
+        |> form("#location-form", location: %{"name" => "NoType HQ"})
         |> render_submit()
 
       created = Locations.get_location_by(:name, "NoType HQ")
@@ -195,7 +195,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       {:error, {:live_redirect, _}} =
         view
-        |> form("form", location: %{"name" => "LinkedHQ"})
+        |> form("#location-form", location: %{"name" => "LinkedHQ"})
         |> render_submit()
 
       created = Locations.get_location_by(:name, "LinkedHQ")
@@ -209,7 +209,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       rendered =
         view
-        |> form("form", location: %{"name" => "X", "email" => "not-an-email"})
+        |> form("#location-form", location: %{"name" => "X", "email" => "not-an-email"})
         |> render_change()
 
       assert rendered =~ "must be a valid email address"
@@ -220,7 +220,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       rendered =
         view
-        |> form("form",
+        |> form("#location-form",
           location: %{"name" => String.duplicate("a", 300)}
         )
         |> render_change()
@@ -235,7 +235,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       rendered =
         view
-        |> form("form", location: %{"name" => "", "city" => "PreservedCity"})
+        |> form("#location-form", location: %{"name" => "", "city" => "PreservedCity"})
         |> render_submit()
 
       # The city input still carries the user's value after the error
@@ -264,7 +264,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     # real browser would.
     defp seed_address(view, address_line_1, city, postal_code) do
       view
-      |> form("form",
+      |> form("#location-form",
         location: %{
           "address_line_1" => address_line_1,
           "city" => city,
@@ -324,7 +324,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       cleared =
         view
-        |> form("form", location: %{"name" => "New"})
+        |> form("#location-form", location: %{"name" => "New"})
         |> render_change()
 
       refute cleared =~ "Similar address found at"
@@ -363,7 +363,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       seed_address(view, "1 Reproduce Ave", "Reprocity", "00001")
 
       view
-      |> form("form",
+      |> form("#location-form",
         location: %{"name" => "RegressionHQ", "city" => "Reprocity"}
       )
       |> render_change()
@@ -399,7 +399,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       rendered =
         view
-        |> form("form", location: %{"name" => String.duplicate("a", 300)})
+        |> form("#location-form", location: %{"name" => String.duplicate("a", 300)})
         |> render_submit()
 
       assert rendered =~ "should be at most 255 character"
@@ -424,7 +424,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       {:ok, _new_view, html} =
         view
-        |> form("form", location: %{"name" => "Stale"})
+        |> form("#location-form", location: %{"name" => "Stale"})
         |> render_submit()
         |> follow_redirect(conn, "/en/admin/locations")
 

@@ -152,7 +152,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
       />
 
       <div class="max-w-3xl mx-auto w-full">
-      <.form for={@form} action="#" phx-change="validate" phx-submit="save">
+      <.form for={@form} id="location-type-form" action="#" phx-change="validate" phx-submit="save">
         <div class="card bg-base-100 shadow-lg">
           <.multilang_tabs
             multilang_enabled={@multilang_enabled}
