@@ -12,29 +12,32 @@ defmodule PhoenixKitLocations.Web.Components.LocationTabs do
   use Phoenix.Component
   use Gettext, backend: PhoenixKitLocations.Gettext
 
+  import PhoenixKitWeb.Components.Core.NavTabs, only: [nav_tabs: 1]
+
   alias PhoenixKitLocations.Paths
 
   attr(:location, :map, required: true)
   attr(:active, :atom, required: true, values: [:details, :structure])
 
+  # Rendering goes through core's <.nav_tabs> (border variant), so the
+  # strip shares the ecosystem's tab markup instead of restating it; this
+  # wrapper keeps only what is local — the tab list and the location.
+  # Paths.* URLs are already prefixed; nav_tabs passes :navigate verbatim.
   def location_tabs(assigns) do
     ~H"""
-    <div role="tablist" class="tabs tabs-border mb-4">
-      <.link
-        role="tab"
-        navigate={Paths.location_edit(@location.uuid)}
-        class={["tab", @active == :details && "tab-active"]}
-      >
-        {gettext("Details")}
-      </.link>
-      <.link
-        role="tab"
-        navigate={Paths.location_structure(@location.uuid)}
-        class={["tab", @active == :structure && "tab-active"]}
-      >
-        {gettext("Structure")}
-      </.link>
-    </div>
+    <.nav_tabs
+      variant={:border}
+      class="mb-4"
+      active_tab={to_string(@active)}
+      tabs={[
+        %{id: "details", label: gettext("Details"), navigate: Paths.location_edit(@location.uuid)},
+        %{
+          id: "structure",
+          label: gettext("Structure"),
+          navigate: Paths.location_structure(@location.uuid)
+        }
+      ]}
+    />
     """
   end
 end
