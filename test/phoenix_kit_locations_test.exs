@@ -109,8 +109,8 @@ defmodule PhoenixKitLocationsTest do
   end
 
   describe "version/0" do
-    test "returns version string" do
-      assert PhoenixKitLocations.version() == "0.4.0"
+    test "matches mix.exs" do
+      assert PhoenixKitLocations.version() == Mix.Project.config()[:version]
     end
   end
 

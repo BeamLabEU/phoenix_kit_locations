@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.2 - 2026-08-22
+
+### Changed
+
+- **Details/Structure tab strip uses core `<.nav_tabs variant={:border}>`** (#13).
+  The wrapper's local API (`location` + `active` atom) is unchanged; only the
+  markup moves to core so the underline look stays in one place. Needs
+  `phoenix_kit` 2.13.6 (verbatim `:navigate` + the border variant); the mix.exs
+  pin stays `~> 2.0` so later 2.x minors still resolve.
+
+### Fixed
+
+- The edit Location form now shows the Details/Structure tab strip. It was
+  only rendered on the Structure page, so there was no in-page way from
+  Details to Structure.
+- `PhoenixKitLocations.version/0` had drifted to `"0.4.0"` after the 0.4.1
+  bump. It now has to match `mix.exs`.
+
 ## 0.4.1 - 2026-08-11
 
 ### Fixed

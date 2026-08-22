@@ -2,14 +2,17 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
   use PhoenixKitLocations.LiveCase
 
   alias PhoenixKitLocations.Locations
+  alias PhoenixKitLocations.Paths
 
   describe "new form" do
     test "renders the New Location heading", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, html} = live(conn, "/en/admin/locations/new")
       assert html =~ "New Location"
       assert html =~ "Address"
       assert html =~ "Contact"
       assert html =~ "Features &amp; Amenities"
+      # No persisted uuid yet, so the Details/Structure strip stays off.
+      refute has_element?(view, "[role=tablist]")
     end
 
     test "submitting the form creates a location, redirects, and logs with actor_uuid",
@@ -67,6 +70,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       assert html =~ "Edit Original"
       assert html =~ "value=\"Oldtown\""
+    end
+
+    test "renders the Details/Structure tabs linking to the Structure page", %{conn: conn} do
+      location = fixture_location(%{name: "Has Tabs"})
+
+      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+
+      assert has_element?(view, "a.tab-active", "Details")
+
+      assert has_element?(
+               view,
+               ~s(a[href="#{Paths.location_structure(location.uuid)}"]),
+               "Structure"
+             )
     end
 
     test "updating fields persists changes, redirects, and logs with actor_uuid",

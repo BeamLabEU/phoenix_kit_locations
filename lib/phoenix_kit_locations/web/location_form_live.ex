@@ -13,6 +13,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   import PhoenixKitWeb.Components.Core.Select
   import PhoenixKitWeb.Components.Core.Textarea
   import PhoenixKitLocations.Web.Components.FilesCard, only: [files_card_body: 1]
+  import PhoenixKitLocations.Web.Components.LocationTabs, only: [location_tabs: 1]
 
   alias PhoenixKitLocations.Attachments
   alias PhoenixKitLocations.Errors
@@ -321,6 +322,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
       <%!-- Form content capped at 5xl (matches AI module pattern). --%>
       <div class="max-w-5xl mx-auto w-full">
+        <%!-- Structure tab needs a persisted uuid; :new has none. --%>
+        <.location_tabs :if={@action == :edit} location={@location} active={:details} />
         <.form
           for={@form}
           id="location-form"
