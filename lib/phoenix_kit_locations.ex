@@ -26,6 +26,8 @@ defmodule PhoenixKitLocations do
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Settings
 
+  @version Mix.Project.config()[:version]
+
   # ===========================================================================
   # Required callbacks
   # ===========================================================================
@@ -66,7 +68,7 @@ defmodule PhoenixKitLocations do
   # ===========================================================================
 
   @impl PhoenixKit.Module
-  def version, do: "0.4.2"
+  def version, do: @version
 
   @impl PhoenixKit.Module
   def css_sources, do: [:phoenix_kit_locations]
