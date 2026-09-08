@@ -1,362 +1,205 @@
 # AGENTS.md
 
-This file provides guidance to AI agents working with code in this repository.
+Guidance for AI agents working on `phoenix_kit_locations`.
 
-## Project Overview
+## Overview
 
-PhoenixKit Locations — an Elixir module for physical location management, built as a pluggable module for the PhoenixKit framework. Manages locations with full international addresses, contact info, translatable fields (name, description, public notes), feature/amenity checkboxes, and user-defined location types with many-to-many assignment.
+Physical-location management for PhoenixKit: locations with international
+addresses, contact info, translatable name/description/public notes, JSONB
+feature flags, user-defined location types assigned many-to-many, a per-location
+tree of nested spaces (floors, rooms, zones, sections, aisles, shelves), and
+folder-scoped file attachments with a featured image on both locations and
+spaces. It is a library, not an app: no production `config/`, endpoint or
+router; the host provides Repo, Endpoint and Settings.
 
-## Common Commands
+- **Depends on:** `phoenix_kit` `~> 2.0` (Hex), `phoenix_live_view ~> 1.1`. No sibling `phoenix_kit_*` deps.
+- **Consumed by:** `phoenix_kit_projects` discovers `phoenix_kit_project_extensions/0` (the Sites tab) through its extension registry; duck-typed, no dependency in either direction. `PlacePicker` is built for warehouse/manufacturing-style consumers; none is wired yet.
+- **Admin surface:** tab `:admin_locations` at `/admin/locations` (`group: :admin_modules`, priority 670, redirects to its first subtab). Visible subtabs: Locations (`/admin/locations`), Types (`/admin/locations/types`). Hidden subtabs: `/admin/locations/new`, `/admin/locations/:uuid/edit`, `/admin/locations/:uuid/structure`, `/admin/locations/types/new`, `/admin/locations/types/:uuid/edit`. Plus a Sites tab rendered inside a project page by the projects hub.
+- **Module key** `"locations"`; settings prefix `locations_`.
 
-### Setup & Dependencies
+## What this module does NOT do
 
-```bash
-mix deps.get                # Install dependencies
-```
+- **No PubSub broadcasts or real-time sync.** Locations are admin-only reference data; no public LiveView subscribes. Two admins editing one record is last-write-wins. Adding broadcasts means a new `pubsub_topic/0`, a mount-time subscribe and a payload-minimal contract; defer until there is a consumer.
+- **No soft-delete / restore.** Hard delete only. FK cascades remove type assignments and the whole space subtree; nothing survives into a restore flow.
+- **No background jobs / Oban workers.** No reconciliation, async geocoding or import worker. CSV/XLSX import is out of scope (each location is hand-curated).
+- **No external HTTP calls.** No geocoding API, map tiles or reverse DNS; no SSRF surface to harden.
+- **No public API routes.** Every route sits in `live_session :phoenix_kit_admin` behind the `locations` permission. The context modules are the only public API; no JSON, REST or GraphQL.
+- **No address validation against a registry.** `find_similar_addresses/4` detects exact-match duplicates in the local DB only.
+- **No migrations of its own.** All four tables ship in core's chain.
+- **No dependency on `phoenix_kit_projects`.** The Sites extension is a one-way discovery contract; linkage is per-project config (comma-separated location uuids), not a FK.
+- **No `route_module/0`.** Every page is a `live_view:` on a tab.
+- **`PlacePicker` does not resolve type names.** Callers resolve `location_type_uuid` via `Locations.get_location_type_by_name/1` first, keeping the component's API small.
 
-### Testing
-
-```bash
-mix test                        # Run all tests (integration excluded if no DB)
-mix test test/file_test.exs     # Run single test file
-mix test test/file_test.exs:42  # Run specific test by line
-```
-
-### Code Quality
-
-```bash
-mix format                  # Format code
-mix credo --strict          # Lint / code quality (strict mode)
-mix dialyzer                # Static type checking
-mix precommit               # compile + format + credo --strict + dialyzer
-mix quality                 # format + credo --strict + dialyzer
-mix quality.ci              # format --check-formatted + credo --strict + dialyzer
-```
-
-## Dependencies
-
-This is a **library**, not a standalone Phoenix app — there is no production `config/` directory, no endpoint, no router. (There *is* a `config/test.exs` — it wires a test-only `PhoenixKitLocations.Test.Repo` + `Test.Endpoint` for `Phoenix.LiveViewTest`; see the Testing section.) The full dependency chain:
-
-- `phoenix_kit` (Hex `~> 1.7`) — provides `Module` behaviour, `Settings`, `RepoHelper`, Dashboard tabs, Multilang, Activity logging, and the core form primitives (`<.input>`, `<.select>`, `<.textarea>`)
-- `phoenix_live_view` (`~> 1.1`) — web framework (LiveView UI)
-- `lazy_html` (test only) — HTML parser used by `Phoenix.LiveViewTest`
-
-## Local cross-repo development
-
-`phoenix_kit` (and any sibling `phoenix_kit_*` dep) resolves from Hex by
-default. To build or test this module against a **local checkout** of a
-dependency — e.g. an unpublished core change — export `<APP>_PATH` and Mix
-swaps the Hex pin for a `path:` + `override: true` dep at resolve time:
+## Commands
 
 ```bash
-PHOENIX_KIT_PATH=../phoenix_kit mix test     # this module against local core
+mix deps.get
+createdb phoenix_kit_locations_test          # once; DB-backed tests are tagged :integration and auto-skip without it
+mix test
+mix precommit                # compile --warnings-as-errors + format + credo --strict + dialyzer; run before every commit
 ```
 
-The variable name is the dep's app name upper-cased with `_PATH` appended
-(`:phoenix_kit` -> `PHOENIX_KIT_PATH`, `:phoenix_kit_ai` ->
-`PHOENIX_KIT_AI_PATH`). Set several at once to override multiple deps. **Unset = the
-published pin**, so `mix hex.publish` and CI resolve exactly as before.
-Implemented via `pk_dep/3` in `mix.exs` — never hand-edit a `phoenix_kit*`
-dep into a `path:` tuple (a committed path dep ships a broken package); set
-the env var instead.
+`phoenix_kit*` deps resolve from Hex. To run against a local checkout, export
+`<APP>_PATH` (the dep's app name upper-cased plus `_PATH`); `pk_dep/3` in
+`mix.exs` swaps the Hex pin for a `path:` dep at resolve time. Unset means the
+Hex pin, so `mix hex.publish` is unaffected. Run `mix deps.get` with the var
+exported before the first `mix test` (a stale lock aborts on the optional
+`igniter` dep), and never commit a hand-edited `path:` tuple.
+
+```bash
+PHOENIX_KIT_PATH=../phoenix_kit mix deps.get && PHOENIX_KIT_PATH=../phoenix_kit mix test
+```
+
+Also: `mix test.setup` (creates the test DB), `mix test.reset` (drop + create;
+clears the `schema_migrations` rows `ensure_current/2` accumulates), `mix quality`
+(format + credo --strict + dialyzer), `mix quality.ci` (format check instead of
+format). `precommit` also runs `deps.unlock --check-unused` and `mix hex.audit`.
+
+## Conventions
+
+- **Module key** `"locations"` everywhere: `module_key/0`, tab `permission:`, settings keys, activity `module:`. Tab ids carry the `:admin_locations_` prefix. URL segments use hyphens, never underscores.
+- **Paths** come from `PhoenixKitLocations.Paths` (`index/0`, `location_new/0`, `location_edit/1`, `location_structure/1`, `types/0`, `type_new/0`, `type_edit/1`), each through `PhoenixKit.Utils.Routes.path/1` for prefix + locale. Never hardcode a URL in a LiveView or component.
+- **Routing:** every page, visible or hidden, is a `live_view:` on a `Tab` in `admin_tabs/0`; `route_module/0` is nil. Static paths (`locations/new`, `locations/types/new`, `locations/types/:uuid/edit`) are listed before the `:uuid` wildcards (`locations/:uuid/edit`, `locations/:uuid/structure`). `:admin_locations_list` matches with a regex (`(?:^|/)locations(?:/new|/[^/]+/edit)?$`) so `/new` and `/:uuid/edit` highlight it without swallowing the `types` subtree (`:prefix` swallows, `:exact` misses). Never hand-register these routes in a host router; core's `guides/custom-admin-pages.md` is the reference. A host that wants the data without the UI sets `config :phoenix_kit, hidden_admin_tabs: [:admin_locations]`.
+- **LiveView macro:** `use Phoenix.LiveView` with explicit imports (`PhoenixKitWeb.Components.Core.{AdminPageHeader, Icon, Input, Select, Textarea, Modal, TableDefault, TableRowMenu, NavTabs}`, `PhoenixKitWeb.Components.MultilangForm`, `LanguageSwitcher`), never `use PhoenixKitWeb, :live_view`. Components are `use Phoenix.Component` / `use Phoenix.LiveComponent`. No template wraps in `LayoutWrapper`; the admin live_session supplies the layout. Assigns available in admin pages: `@phoenix_kit_current_scope`, `@phoenix_kit_current_user`, `@current_locale`, `@url_path`.
+- **Gettext is a hybrid.** The module's own `PhoenixKitLocations.Gettext` (`priv/gettext`, en/et/ru) serves the admin tabs (`gettext_backend: PhoenixKitLocations.Gettext`, `gettext_domain: "default"` on every `Tab`), `Space.kind_label/1`, `LocationStructureLive`, `LocationTabs`, `SpaceTree` and `PlacePicker`. Core's `PhoenixKitWeb.Gettext` serves `LocationsLive`, `LocationFormLive`, `LocationTypeFormLive`, `Errors`, `FilesCard` and `Attachments`. New strings go on the module backend. Extract with `mix gettext.extract --merge`. The tab-label msgids (`Locations`, `Types`, `New Location`, `Edit Location`, `New Type`, `Edit Type`, `Structure`) are looked up at runtime by core's `Tab.localized_label/1`, so the extractor never sees them: they are hand-written in the pot/po **without** the `elixir-autogen` flag, which is what stops `--merge` from pruning them.
+- **JS hooks:** no `js_sources/0` bundle. The one hook, `.PkLocationsUploadScope` in `FilesCard`, is a `Phoenix.LiveView.ColocatedHook` (compiled into the host's colocated manifest, spread into the LiveSocket as `colocatedHooks`). Never register a hook from a plain inline `<script>`: morphdom does not execute inserted script tags, so it vanishes on LiveView navigation.
+- **`enabled?/0`** reads `locations_enabled` via `Settings.get_boolean_setting/2`, rescues every error **and catches `:exit`**, returning `false` (the DB may be down at boot; sandbox-owner exits on test teardown otherwise surface as a 1-in-N flake). `enable_system/0` / `disable_system/0` write the setting through `update_boolean_setting_with_module/3` and log the toggle.
+- **Activity logging:** every mutating function in `Locations` and `Spaces` accepts `opts \\ []`; LiveViews thread the caller through `actor_opts/1`, which reads `socket.assigns[:phoenix_kit_current_scope].user.uuid` into `actor_uuid:`. Two helpers per context: `log_activity/5` is a pipe step on a repo result (`{:ok, struct}` logs metadata; `{:error, %Ecto.Changeset{}}` logs a `db_pending: true` row with the invalid field names only; `{:error, atom}` passes through unlogged), and `maybe_log_activity/5` is called directly by operations with no single repo result. Both call `PhoenixKit.Activity.log/1` inside `Code.ensure_loaded?(PhoenixKit.Activity)`, swallow `Postgrex.Error` `:undefined_table` (host without the activities table) and `Logger.warning` anything else; logging never crashes the primary operation. Metadata is minimal and PII-aware: `name`, `city`, `status` for locations; `name`, `status` for types; `name`, `kind`, `status`, `location_uuid`, `parent_uuid` for spaces. Never log `email`, `phone` or `notes`. Action format is `resource.verb` (table in Architecture).
+- **Hard delete only**, no soft-delete sentinel.
+- **Single context per aggregate:** `Locations` (locations, types, assignments, duplicate detection) and `Spaces` (the tree). Schemas are data-only with changesets. Both read the repo through `PhoenixKit.RepoHelper.repo()`.
+- **Errors dispatcher:** non-changeset errors are atoms (`:location_not_found`, `:location_type_not_found`, `:location_delete_failed`, `:location_type_delete_failed`, `:type_assignment_failed`, `:space_not_found`, `:parent_in_other_location`, `:parent_not_found`, `:cycle`, `:parent_floor_unsaved`, `:unexpected`). LiveViews call `PhoenixKitLocations.Errors.message/1` at the UI boundary; strings pass through, anything else renders as `Unexpected error: <inspect>`. Extend `Errors.message/1` instead of inlining user-facing error strings.
+- **Multilang:** translatable fields are `name`, `description`, `public_notes` on Location, `name`, `description` on LocationType and Space. Primary-language values live in the columns; other languages nest in `data` under the language code with `_`-prefixed keys (`"_name"`). Forms use core's `MultilangForm` (`mount_multilang/1`, `handle_switch_language/2`, `merge_translatable_params/4` with `preserve_fields`, `get_lang_data/3`; components `multilang_tabs`, `multilang_fields_wrapper`, `translatable_field`). A form LiveView assigns both `:changeset` (read by `<.translatable_field>`) and `:form = to_form(changeset, as: :location)` (read by core `<.input>` / `<.select>` / `<.textarea>`) and keeps them in sync through one `assign_form/2` helper (`assign_space_form/2` on the Structure tab).
+- **Core form primitives** (`<.input field={@form[:x]}>`, `<.select>`, `<.textarea>`) rather than raw HTML; they wire labels, errors and daisyUI styling.
+- **Location form:** one `<.form id="location-form">` with `phx-change="validate"` / `phx-submit="save"`, laid out as three cards: Public Information (translatable fields, address, contact, features), Files & Featured Image, Internal (admin notes, status, type badges). `features` is a `%{"key" => boolean}` map toggled by `toggle_feature` (keys in `@feature_keys`, labels via `feature_label/1` so the literals are extractable); types toggle via `toggle_type` into a `MapSet` and are synced after save. `check_address` runs on `phx-blur` of the address fields and reads the changeset, not the event payload. The Details/Structure tab strip renders only in `:edit` (a new location has no uuid). Save is disabled while uploads are in flight.
+- **Type sync:** `sync_location_types(location_uuid, type_uuids, opts)` is delete-all + re-insert in a transaction returning `{:ok, :synced}`; when the requested set equals the current set it short-circuits to `{:ok, :unchanged}` with no write and no log entry. `add_location_type/3` is a no-op when already assigned; `remove_location_type/3` returns `{:ok, 0 | 1}`.
+- **Duplicate detection:** `find_similar_addresses/4` matches on lower-cased, trimmed `address_line_1` + `city` + `postal_code`, limit 5, excludes the record being edited, and rescues to `[]` so the form still saves.
+- **Spaces:** `kind` is app-narrowed to `floor room zone section aisle shelf` (the DB CHECK also allows `hall suite corner`). The same-Location parent rule and indirect-cycle guard live in the `Spaces` context, not the schema or the DB; the schema catches only a direct self-parent. `create_space/2` appends to the sibling group when no `position` is given. The Structure tab commits immediately (no drafts); deletes cascade the subtree and fire only from the confirmation modal that shows `count_descendants/1`. Details in `dev_docs/guides/spaces.md`.
+- **Attachments:** per-scope state in `socket.assigns.attachments_by_scope`, keyed by an opaque scope string (`"location"` on the form; the Space uuid on the Structure tab); modal state is shared at socket level and tracks `:media_selector_scope`. One upload config, `:attachment_files` (any type, 20 entries, 100 MB, auto-upload); every event carries `phx-value-scope`; the dropzone sets the active scope on click and on `dragenter` (the colocated hook). Pointers `files_folder_uuid` / `featured_image_uuid` live in the resource's `data` JSONB and are merged into params at save by `inject_attachment_data/3`. Folders are named `location-<uuid>` / `location-space-<uuid>` (`folder_name_for/1`); a `:new` resource uploads into `location-attachment-pending-<uuid>` and `maybe_rename_pending_folder_for/2` renames it after the insert. The featured-image picker is core's `MediaSelectorModal` (`:image` filter, `:single` mode) replying `{:media_selected, uuids}` / `{:media_selector_closed}`. Uploads need `@phoenix_kit_current_user` (folder and file are owned by that user; without one the upload fails with `:no_user`). Removing a file soft-trashes a single-owner home file and only unlinks a multi-resource one.
+- **Sites extension** (`phoenix_kit_project_extensions/0`): a plain map (`key: "locations_sites"`, `module_key: "locations"`, `default_enabled: false`, one tab `sites` → `ProjectSitesLive`, `config_schema` with `location_uuids`, `permission_actions: [:view]`). `ProjectSitesLive` is rendered by the hub via `live_render` with its embed-session contract, reads `session["config"]["location_uuids"]`, has **no `handle_params/3`** (off-router mount is the hub's hard requirement), and degrades a stale uuid or DB error to a missing card rather than crashing the host page.
+- **`css_sources/0`** returns `[:phoenix_kit_locations]` (atoms; the core compiler resolves them to `lib/` + `priv/`).
+
+### Landmines
+
+- `Spaces.update_space/3` does `Map.put_new(attrs, "location_uuid", …)`: atom-keyed attrs become a mixed-key map and `cast/3` raises `Ecto.CastError`. Pass string-keyed attrs, as `LocationStructureLive` and the tests do.
+- Root-sibling queries (`reorder_siblings/4`, `next_position/2`) must match `is_nil(parent_uuid)`; a pinned `^nil` compiles to `= NULL`, never matches, and floor reordering silently updates zero rows.
+- `phx-blur` payloads carry only `key`/`value`, never form params. `check_address` reads `socket.assigns.changeset`; a clause matching `%{"location" => params}` crashes the LiveView on every blur and the reconnect wipes the form.
+- Strings on core's `PhoenixKitWeb.Gettext` backend (the three list/form LiveViews, `Errors`, `FilesCard`, `Attachments`) are not in core's catalogue, so they render as the English msgid in every locale; `Attachments` also uses the runtime `Gettext.gettext(Backend, …)` form the extractor cannot see. Moving a string to the module backend is the fix, not editing core's po.
+- Never add `elixir-autogen` to the hand-written tab-label msgids in `priv/gettext`: `mix gettext.extract --merge` then finds no call site, drops them, and the sidebar falls back to English with no warning.
 
 ## Architecture
 
-This is a **PhoenixKit module** that implements the `PhoenixKit.Module` behaviour. It depends on the host PhoenixKit app for Repo, Endpoint, and Settings.
-
-### How It Works
-
-1. Parent app adds this as a dependency in `mix.exs`
-2. PhoenixKit scans `.beam` files at startup and auto-discovers modules (zero config)
-3. `admin_tabs/0` callback registers admin pages; PhoenixKit generates routes at compile time
-4. Settings are persisted via `PhoenixKit.Settings` API (DB-backed in parent app)
-5. Permissions are declared via `permission_metadata/0` and checked via `Scope.has_module_access?/2`
-
-### Core Schemas (all use UUIDv7 primary keys)
-
-- **LocationType** (`phoenix_kit_location_types`) — user-created categories with name, description (translatable), status (active/inactive)
-- **Location** (`phoenix_kit_locations`) — physical places with:
-  - Translatable fields: name, description, public_notes (via `data` JSONB column + MultilangForm)
-  - Address: address_line_1, address_line_2, city, state, postal_code, country
-  - Contact: phone, email, website
-  - Features: JSONB map of boolean flags (wheelchair_accessible, elevator, parking, etc.)
-  - Internal: notes (admin-only), status (active/inactive)
-- **LocationTypeAssignment** (`phoenix_kit_location_type_assignments`) — many-to-many join table (a location can have multiple types, e.g. both "Showroom" and "Storage")
-- **Space** (`phoenix_kit_location_spaces`, V122) — nested floors / rooms inside a Location. Required `location_uuid` FK (cascade), optional `parent_uuid` self-ref FK (cascade) forming a 2-level tree (`@kinds ~w(floor room)`). `kind` is CHECK-constrained at the DB. `data` JSONB mirrors the Location's: attachment pointers (`files_folder_uuid`, `featured_image_uuid`) + multilang translation tree. The "child belongs to same Location as parent" cross-row invariant is enforced in `PhoenixKitLocations.Spaces.validate_parent_location/1` (composite-FK alternative is heavier than the consumer surface justifies)
-
-### Web Layer
-
-- **Admin** (3 LiveViews):
-  - `LocationsLive` — index page with Locations/Types tab switching
-  - `LocationFormLive` — create/edit location with multilang tabs, address fields, feature checkboxes, type toggle badges, duplicate address warning
-  - `LocationTypeFormLive` — create/edit type with multilang tabs
-- **Routes**: Admin routes auto-generated from `admin_tabs/0` — no route module needed (single-page pattern per tab). Each visible tab and hidden sub-tab (`:admin_locations_new`, `:admin_locations_edit`, `:admin_locations_type_new`, `:admin_locations_type_edit`) sets its own `live_view:`, and PhoenixKit auto-generates the route. Never hand-register these routes in the parent app's `router.ex`; see `phoenix_kit/guides/custom-admin-pages.md` for the authoritative reference
-- **Routing pattern**: this module uses the **Single-Page** pattern (`live_view:` on each tab). The alternative **Multi-Page** pattern (a `route_module/0` returning `admin_routes/0` + `admin_locale_routes/0`) is for modules with so many sub-routes that enumerating each as a hidden `Tab` becomes noisy — see `phoenix_kit_ai` / `phoenix_kit_publishing` for that shape. This module is small enough that the tab-based approach is clearer
-- **Paths**: Centralized path helpers in `Paths` module — always use these instead of hardcoding URLs
-
-### Activity Logging Pattern
-
-Every mutating function in the `PhoenixKitLocations.Locations` context logs a business-level activity via `PhoenixKit.Activity.log/1`, guarded so logging never crashes the primary operation.
-
-Two helpers live in the context module:
-
-1. **`log_activity/5`** is a pipe-step used on simple CRUD — it pattern-matches on the repo result, logs on `{:ok, struct}`, and passes `{:error, changeset}` through untouched:
-
-   ```elixir
-   def create_location(attrs, opts \\ []) do
-     %Location{}
-     |> Location.changeset(attrs)
-     |> repo().insert()
-     |> log_activity("location.created", "location", opts, &location_metadata/1)
-   end
-   ```
-
-2. **`maybe_log_activity/5`** is called directly for operations that don't produce a single repo result to pipe from — e.g. `sync_location_types`, `add_location_type`, `remove_location_type`, and the module enable/disable toggle (`log_module_toggle/2`).
-
-Both ultimately call `PhoenixKit.Activity.log/1` inside a `Code.ensure_loaded?(PhoenixKit.Activity)` guard, with a rescue that swallows `Postgrex.Error %{postgres: %{code: :undefined_table}}` (for hosts without core's activity migration) and logs a `Logger.warning` for anything else.
-
-Key rules:
-
-- **Mutating context fns accept `opts \\ []`** — LiveViews forward the caller's UUID via an `actor_opts/1` helper reading `socket.assigns[:phoenix_kit_current_scope].user.uuid`.
-- **Metadata is minimal and PII-aware** — `name`, `city`, `status` for locations; `name`, `status` for types. Never log `email`, `phone`, or `notes`.
-- **Actions logged**: create/update/delete on `Location` and `LocationType`, `sync_location_types` (with `types_from`/`types_to` diffs, skipped when unchanged), `add_location_type`, `remove_location_type`, module `enable_system` / `disable_system`.
-- **Action format**: `"resource.verb"` — e.g. `"location.created"`, `"location_type.deleted"`, `"locations_module.enabled"`.
-
-### Multilang (Translatable Fields)
-
-Location and LocationType forms use PhoenixKit's `MultilangForm` component system:
-- Translatable fields are stored in the `data` JSONB column
-- Primary language values are denormalized to DB columns (name, description, public_notes) for querying
-- Secondary language overrides stored nested in `data` by language code
-- Form handling: `mount_multilang/1`, `handle_switch_language/2`, `merge_translatable_params/4`
-- Template components: `multilang_tabs`, `multilang_fields_wrapper`, `translatable_field`
-
-### Location Form Layout
-
-The form is split into two cards with a Spaces section between them:
-1. **Public Information** (top card) — translatable fields, address, contact, features & amenities
-2. **Spaces** (middle card) — staged floor + room drafts (see below)
-3. **Internal** (bottom card) — admin-only notes, status, location type assignment
-
-The two `<.form>` halves are bound to the same `@form` so the Spaces card can sit between them without HTML's no-nested-forms rule biting. Both halves carry `phx-change="validate"` / `phx-submit="save"`; see `merge_running_changes/2` for why validate/save handlers carry forward the running changeset's `changes`.
-
-### Spaces — staged drafts
-
-Floors and rooms commit together with the Location: clicking "+ Add floor" / "+ Add room" appends an in-memory draft; edits update the draft's working changeset; nothing touches the DB until the global Save / Create button fires.
-
-The `space_drafts` assign is the single source of truth — both new (`persisted?: false`) and existing (`persisted?: true`) spaces live in it; existing ones marked `deleted: true` are persisted as deletions on save. The list query is rescued so a missing migration (V122 not yet applied on the host) leaves the Spaces card empty rather than crashing the whole form.
-
-**Validation gate:** save is blocked when any non-orphan draft has invalid changes. The block-flash is kind-aware ("Floor 2 needs a name") via `draft_error_summary/2` + `identify_draft/2` + `humanize_field/1`. Orphan-blank floor drafts (no name, no children) are silently skipped — abandoning them mid-edit is the natural escape hatch.
-
-**Persistence pipeline** (`persist_space_drafts/3`):
-1. `persist_floor_drafts/5` — orphan-blank floors skip; deletes go first; creates record their new UUID into an `id_map` so child rooms can resolve their parent FK.
-2. `persist_room_drafts/6` — rooms whose floor is being deleted skip (the DB CASCADE will catch them); creates resolve `parent_uuid` from the `id_map`; updates and persists.
-3. Partial failures: `finish_save/5` stays on the page, reloads the persisted drafts, preserves the failed in-memory drafts (so the user can fix and retry instead of losing all their typing), and re-mounts attachment scopes.
-
-**Per-draft Files + language:** each draft gets its own `Attachments` scope (keyed by draft id) for featured-image picker + multi-file uploads, and its own multilang state. Scope mounts on creation; on save, pending folders are renamed to point at the freshly-saved Space's UUID.
-
-**Floor delete cascade** (`cascade_delete_floor/2` + `classify_for_floor_delete/3`): deleting a floor marks itself + its child rooms for delete (for persisted ones) or drops them entirely (for new in-memory drafts that were never staged). The DB CASCADE fires only when the floor's delete is committed; the marking just hides them in the UI immediately.
-
-### Settings Keys
-
-`locations_enabled`
-
-### File Layout
-
 ```
-lib/phoenix_kit_locations.ex                    # Main module (PhoenixKit.Module behaviour)
+lib/phoenix_kit_locations.ex                 # PhoenixKit.Module: tabs, permission, css_sources, project extension
 lib/phoenix_kit_locations/
-├── locations.ex                               # Locations context (CRUD, type sync, address detection, activity logging)
-├── spaces.ex                                  # Spaces context (CRUD on nested floors/rooms, parent-location + cycle guards)
-├── attachments.ex                             # Scope-aware files / featured-image picker for Location + each Space draft
-├── errors.ex                                  # Atom → gettext message dispatcher for UI boundary
-├── paths.ex                                   # Centralized URL path helpers
+├── locations.ex                             # Locations context: types, locations, assignments, duplicates, logging
+├── spaces.ex                                # Spaces context: tree reads, CRUD, reorder, parent/cycle guards, logging
+├── attachments.ex                           # Multi-scope files + featured image (Location and each Space)
+├── errors.ex                                # Error atom -> translated message
+├── gettext.ex                               # PhoenixKitLocations.Gettext backend
+├── paths.ex                                 # URL helpers
 ├── schemas/
-│   ├── location.ex                            # Location schema + changeset
-│   ├── location_type.ex                       # LocationType schema + changeset
-│   ├── location_type_assignment.ex            # Many-to-many join table schema
-│   └── space.ex                               # Space schema (floor/room) + changeset
+│   ├── location.ex                          # phoenix_kit_locations
+│   ├── location_type.ex                     # phoenix_kit_location_types
+│   ├── location_type_assignment.ex          # phoenix_kit_location_type_assignments
+│   └── space.ex                             # phoenix_kit_location_spaces (+ kinds, kind_label/1, kind_icon/1)
 └── web/
-    ├── locations_live.ex                      # Index page (locations/types subtabs via dashboard nav)
-    ├── location_form_live.ex                  # Create/edit location (multilang, features, types, staged Spaces)
-    └── location_type_form_live.ex             # Create/edit location type (multilang)
+    ├── locations_live.ex                    # :index (locations) and :types lists, delete confirm modals
+    ├── location_form_live.ex                # :new / :edit location (Details tab)
+    ├── location_structure_live.ex           # :edit Structure tab (space tree CRUD + detail panel)
+    ├── location_type_form_live.ex           # :new / :edit location type
+    ├── project_sites_live.ex                # Sites tab inside the projects hub
+    └── components/
+        ├── files_card.ex                    # files_card_body/1 + colocated .PkLocationsUploadScope hook
+        ├── location_tabs.ex                 # Details / Structure strip via core <.nav_tabs variant={:border}>
+        ├── place_picker.ex                  # LiveComponent: location combobox + space tree picker
+        └── space_tree.ex                    # space_tree/1, pure presentation, picker mode
 ```
 
-## Critical Conventions
+### Data model (UUIDv7 PKs, `use PhoenixKit.SchemaPrefix`, `timestamps(type: :utc_datetime)`)
 
-- **Module key**: `"locations"` — MUST be consistent across all callbacks (`module_key/0`, `admin_tabs/0`, settings keys, tab IDs)
-- **Tab ID prefix**: all admin tabs MUST use `:admin_locations_` prefix (e.g., `:admin_locations_list`, `:admin_locations_types`)
-- **UUIDv7 primary keys** — all schemas MUST use `@primary_key {:uuid, UUIDv7, autogenerate: true}`
-- **Centralized paths via `Paths` module** — NEVER hardcode URLs or route paths in LiveViews; always use `Paths` helpers
-- **URL paths use hyphens** — route segments use hyphens (e.g., `/admin/locations`), never underscores
-- **Admin routes from `admin_tabs/0`** — all admin navigation is auto-generated by PhoenixKit Dashboard from the tabs; do not manually add admin routes elsewhere
-- **Navigation paths** — always use `PhoenixKit.Utils.Routes.path/1` for navigation within the PhoenixKit ecosystem
-- **LiveViews use `Phoenix.LiveView` directly** — do not use `PhoenixKitWeb` macros (`use PhoenixKitWeb, :live_view`) in this standalone package; import helpers explicitly
-- **`enabled?/0` MUST rescue** — the function must rescue all errors and return `false` as fallback (DB may not be available at boot)
-- **Single context module** — all business logic lives in `PhoenixKitLocations.Locations`; schemas are data-only with changesets
-- **Hard-delete only** — locations and types use hard-delete (simple reference data, no soft-delete cascade needed)
-- **Multilang fields** — name and description fields use PhoenixKit's `Multilang` module for i18n support; public_notes on Location is also translatable
-- **Features stored as JSONB** — the `features` field is a map of `%{"key" => boolean}` pairs, toggled via `toggle_feature` events in the LiveView
-- **Many-to-many types** — location ↔ type relationship uses a join table. `sync_location_types(location_uuid, type_uuids, opts \\ [])` does a delete-all + re-insert in a transaction and returns `{:ok, :synced}`. When the requested set matches the existing set it short-circuits to `{:ok, :unchanged}` and skips both the DB write and the activity log entry (no noise on unchanged saves)
-- **JavaScript hooks**: inline `<script>` tags if needed; register on `window.PhoenixKitHooks`
-- **LiveView assigns** available in admin pages: `@phoenix_kit_current_scope`, `@current_locale`, `@url_path`
-- **Errors dispatcher** — non-changeset errors returned by the Locations context are atoms (`:location_not_found`, `:type_assignment_failed`, `:unexpected`, …). LiveViews call `PhoenixKitLocations.Errors.message/1` at the UI boundary to get a `gettext`-translated string. Do not inline user-facing error strings in LiveViews; extend `Errors.message/1` instead
-- **Core form primitives** — use `<.input field={@form[:x]}>`, `<.select field={@form[:x]} options={...}>`, `<.textarea field={@form[:x]}>` from `PhoenixKitWeb.Components.Core.{Input, Select, Textarea}` rather than raw HTML. These handle label wiring, error rendering via `phx-feedback-for`, and daisyUI styling. The form LV must assign both `:changeset` (for `<.translatable_field>`) and `:form = to_form(changeset, as: :location)` — keep them in sync via an `assign_form/2` private helper
+| Schema | Table | Notes |
+|---|---|---|
+| `LocationType` | `phoenix_kit_location_types` | `name`, `description`, `status` (`active`/`inactive`), `data` JSONB |
+| `Location` | `phoenix_kit_locations` | `name`, `description`, `public_notes`, `address_line_1/2`, `city`, `state`, `postal_code`, `country`, `phone`, `email`, `website`, `notes`, `status`, `features` JSONB, `data` JSONB; `has_many :location_types, through:` the join |
+| `LocationTypeAssignment` | `phoenix_kit_location_type_assignments` | `location_uuid`, `location_type_uuid` (both FK CASCADE, `assoc_constraint` so FK failures come back as changesets); unique on the pair |
+| `Space` | `phoenix_kit_location_spaces` | `location_uuid` (required, FK CASCADE), `parent_uuid` (self FK CASCADE), `kind` (CHECK), `name`, `description`, `notes`, `status`, `position`, `data` JSONB; indexes on `(location_uuid)`, `(parent_uuid)`, `(location_uuid, parent_uuid, position)` |
 
-### Commit Message Rules
+Changeset rules: `name` required (1–255); `email` must contain `@`; `website` must start with `http://` or `https://`; `status` in `active`/`inactive`; length caps on every text column.
 
-Start with action verbs: `Add`, `Update`, `Fix`, `Remove`, `Merge`. Do not include AI attribution or `Co-Authored-By` footers — Max handles attribution on his own.
+### Activity log actions (`module: "locations"`, `mode` defaults to `"manual"`)
 
-## Pre-commit Commands
+| Action | Resource | When |
+|---|---|---|
+| `location.created` / `updated` / `deleted` | `location` | Location CRUD |
+| `location.types_synced` | `location` | `sync_location_types/3`, only when the set changed (`types_from` / `types_to`) |
+| `location.type_added` / `type_removed` | `location` | single assignment add/remove (`type_uuid`) |
+| `location_type.created` / `updated` / `deleted` | `location_type` | LocationType CRUD |
+| `space.created` / `updated` / `deleted` | `location_space` | Space CRUD (children of a cascade are not logged) |
+| `space.reordered` | `location_space` (resource = parent uuid) | `reorder_siblings/4` (`location_uuid`, `count`) |
+| `locations_module.enabled` / `disabled` | `module` | `enable_system/0` / `disable_system/0` |
 
-Always run before `git commit`:
+- **Settings keys:** `locations_enabled`.
+- **Permissions:** `locations` (`permission_metadata/0`; every tab carries `permission: module_key()`). No sub-permissions. The Sites extension declares `permission_actions: [:view]` for the hub.
+- **PubSub topics:** none.
 
-```bash
-mix precommit               # compile + format + credo --strict + dialyzer
-```
+## Database & migrations
 
-CI runs the same chain via `mix quality.ci` (format-check mode). If `precommit` fails, fix the underlying issue — do not bypass with `--no-verify`.
-
-## Database & Migrations
-
-This repo ships **no production migrations** — all runtime database tables are created by the parent [phoenix_kit](https://github.com/BeamLabEU/phoenix_kit) project. This module only defines Ecto schemas that map to those tables.
-
-The test suite builds its schema by running core's versioned migrations directly via `PhoenixKit.Migration.ensure_current/2` in `test/test_helper.exs` — no module-owned DDL.
-
-### Tables (created by PhoenixKit core)
-
-Base — `V90`:
-- `phoenix_kit_location_types` — name, description, status, data (JSONB for multilang), timestamps
-- `phoenix_kit_locations` — name, description, public_notes, address_line_1, address_line_2, city, state, postal_code, country, phone, email, website, notes, status, features (JSONB), data (JSONB for multilang), timestamps
-- `phoenix_kit_location_type_assignments` — location_uuid (FK CASCADE), location_type_uuid (FK CASCADE), timestamps; unique index on (location_uuid, location_type_uuid)
-
-Added later — `V122`:
-- `phoenix_kit_location_spaces` — uuid (PK), location_uuid (FK CASCADE, required), parent_uuid (self-ref FK CASCADE, optional), kind (CHECK `in ('floor', 'room', 'hall', 'suite', 'section', 'zone', 'aisle', 'shelf', 'corner')`), name, description, notes, status, position, data (JSONB), timestamps. Indexed on (location_uuid), (parent_uuid), and the composite (location_uuid, parent_uuid, position) for sibling-ordering queries.
-
-## Tailwind CSS Scanning
-
-This module implements `css_sources/0` returning `[:phoenix_kit_locations]` (atom list — the core scanner resolves it to the OTP app's `lib/` and `priv/` paths). CSS source discovery is **automatic at compile time** — the `:phoenix_kit_css_sources` compiler scans all discovered modules, resolves their paths, and writes `assets/css/_phoenix_kit_sources.css`. The parent app's `app.css` imports this generated file.
+None. Tables `phoenix_kit_location_types`, `phoenix_kit_locations`,
+`phoenix_kit_location_type_assignments`, `phoenix_kit_location_spaces` ship in
+core's chain (V135 baseline); `migration_module/0` is unset. A schema change is
+a core migration first, then schema edits here. The `kind` CHECK constraint
+(`phoenix_kit_location_spaces_kind_check`) allows `floor room hall suite section
+zone aisle shelf corner`; the app list is narrower. UUIDv7 PKs and
+`use PhoenixKit.SchemaPrefix` on every table-backed schema (a conformance test
+enforces the latter).
 
 ## Testing
 
-### Setup
+- **DB:** `phoenix_kit_locations_test` (+ `MIX_TEST_PARTITION` suffix), overridable with `PGDATABASE`. `config/test.exs` honours `PGUSER` (default `postgres`), `PGPASSWORD`, `PGHOST`, `PGPOOL` (pool size; default `schedulers_online * 2`). It also sets `config :phoenix_kit, repo: PhoenixKitLocations.Test.Repo`; without it every `RepoHelper` call fails with "No repository configured".
+- **`test/test_helper.exs`:** `Code.require_file`s the support modules first (Elixir 1.19 no longer auto-loads `test/support` at helper time), checks `psql -lqt` for the DB, then starts the repo, runs `PhoenixKit.Migration.ensure_current/2` (core's chain, no module DDL), sets the sandbox to `:manual`, pins `:persistent_term.put({PhoenixKit.Config, :url_prefix}, "/")`, and starts `Test.Endpoint` (`server: false`) only when the DB is available. Without a DB, `ExUnit.start(exclude: [:integration])`.
+- **Runs without Postgres:** the behaviour test, `errors_test`, `attachments_test`, `space_tree_test`, `core_pin_conformance_test`, `schema_prefix_conformance_test`.
+- **Support modules:** `Test.Repo`; `DataCase` (sandbox owner, tags `:integration`, imports `ActivityLogAssertions`, `errors_on/1`); `LiveCase` (same plus `Phoenix.LiveViewTest`, `fake_scope/1` returning a real `PhoenixKit.Users.Auth.Scope` with `cached_roles` as role-name strings, `put_test_scope/2`, `fixture_location/1`, `fixture_location_type/1`); `Test.Endpoint` + `Test.Router` (base `/en/admin/locations`, mirroring `Paths`) + `Test.Layouts`; `Test.Hooks` (`:assign_scope` on_mount reads `"phoenix_kit_test_scope"` from the session into `:phoenix_kit_current_scope` / `:phoenix_kit_current_user`); `ActivityLogAssertions.assert_activity_logged/2` (`resource_uuid:`, `actor_uuid:`, `metadata_has:`); `PlacePickerHarnessLive` at `/en/admin/locations/__test__/place-picker` (test-only host for the LiveComponent).
+- **Conformance tests:** the `:phoenix_kit` requirement must stay a two-segment `~> 2.0` (a three-segment `~> 2.0.x` excludes every later core minor and breaks hosts' `deps.get`; a committed `path:` dep also fails it); every table-backed schema uses `SchemaPrefix`.
+- **`destructive_rescue_test.exs`** DROPs tables inside the sandbox transaction to reach the `Postgrex.Error` rescue branches; it must stay `async: false` or it deadlocks against async tests holding row locks.
+- **Creating the DB:** `mix test.setup` / `mix test.reset` only work under `MIX_ENV=test` (`Test.Repo` lives in `test/support`, compiled in test only). The database needs a UTF-8 ctype: under a `C`-ctype database Postgres `LOWER()` leaves non-ASCII untouched and the unicode duplicate-address test fails (`createdb -T template0 -E UTF8 --lc-ctype=en_US.UTF-8 --lc-collate=en_US.UTF-8 phoenix_kit_locations_test` when the cluster default is `C`).
+- **Known noise:** `[error] Failed to assign type … / Failed to sync location types` (the FK-failure paths under test), `undefined_table` errors and warnings from `destructive_rescue_test`, and a compile-time "form with phx-change but missing id" warning from the inline rename form in `SpaceTree`.
+- **Stability:** `for i in $(seq 1 10); do mix test; done` catches sandbox/activity-log flakes. Form tests target `#location-form` / `#location-type-form` / `#new-space-form` by id.
 
-This module owns its own test database (`phoenix_kit_locations_test`). Schema setup runs core's versioned migrations directly via `PhoenixKit.Migration.ensure_current/2` in `test/test_helper.exs` — no module-owned DDL anywhere. Create the DB once:
+## Feature notes
 
-```bash
-createdb phoenix_kit_locations_test
-```
+| Feature | Constraint that must hold | Where |
+|---|---|---|
+| Spaces tree + Structure tab | A parent must be in the same Location (context guard, not DB); deletes cascade the subtree and fire only from the confirm modal | `dev_docs/guides/spaces.md` |
+| Multi-scope attachments | All per-resource state lives in `attachments_by_scope`; every event carries its scope; pending folders are renamed after a `:new` insert | `PhoenixKitLocations.Attachments` moduledoc |
+| Sites project extension | One-way duck-typed contract; `ProjectSitesLive` has no `handle_params/3` and never crashes the host project page | `PhoenixKitLocations.Web.ProjectSitesLive` moduledoc |
+| PlacePicker | Sends `{:place_picker_select, id, %{location_uuid, space_uuid}}`; `selected_space_uuid` is seed-once | `PhoenixKitLocations.Web.Components.PlacePicker` moduledoc |
 
-If the DB is absent, integration tests auto-exclude via the `:integration` tag (see `test/test_helper.exs`) — unit tests still run.
+## Versioning & releases
 
-The critical config wiring is in `config/test.exs`:
+SemVer. The version is single-sourced in `mix.exs` (`@version`); `version/0`
+reads it at compile time and the behaviour test asserts against
+`Mix.Project.config()[:version]`, so nothing else needs bumping.
 
-```elixir
-config :phoenix_kit, repo: PhoenixKitLocations.Test.Repo
-```
+Release procedure (the steps the maintainer runs):
 
-Without this, all DB calls through `PhoenixKit.RepoHelper` crash with "No repository configured".
+1. Bump `@version` in `mix.exs`; add a `CHANGELOG.md` entry headed `## x.y.z - YYYY-MM-DD`.
+2. `mix precommit` clean.
+3. Commit (`"Bump version to x.y.z"`) and push; verify the push landed.
+4. `mix hex.publish`.
+5. Tag, matching the form of the newest existing tag (`git tag --sort=-creatordate | head -1` shows it), and push the tag.
+6. GitHub release via `gh release create` if the repo does those (`gh release list` shows whether it does).
 
-### Test infrastructure
+Tags are immutable pointers: never tag before the commit is pushed and the
+publish has succeeded.
 
-- `test/support/test_repo.ex` — `PhoenixKitLocations.Test.Repo` (Ecto repo for tests)
-- `test/support/data_case.ex` — `PhoenixKitLocations.DataCase` (sandbox setup, auto-tags `:integration`)
-- `test/support/live_case.ex` — `PhoenixKitLocations.LiveCase` (thin wrapper around `Phoenix.LiveViewTest` with router + endpoint wiring)
-- `test/support/test_endpoint.ex` + `test_router.ex` + `test_layouts.ex` — minimal Phoenix plumbing so LiveViews can render under `Phoenix.LiveViewTest.live/2`
-- `test/test_helper.exs` calls `PhoenixKit.Migration.ensure_current/2` to apply all core versioned migrations (V40 extensions + `uuid_generate_v7()`, V03 settings, V90 locations + activities) on every boot — no module-owned DDL
+## Pull requests & commits
 
-### Running tests
+- Commit messages start with an action verb (`Add`, `Update`, `Fix`, `Remove`, `Merge`). No AI attribution and no `Co-Authored-By` trailers.
+- Version bumps and CHANGELOG entries land with the release commit on upstream, not in feature PRs.
+- Review files live in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/{AGENT}_REVIEW.md`, one file per reviewing agent, never edited by another agent; `FOLLOW_UP.md` records how each finding was resolved. Severities: `BUG - CRITICAL/HIGH/MEDIUM`, `IMPROVEMENT - HIGH/MEDIUM`, `NITPICK`.
 
-```bash
-mix test                             # All tests (excludes :integration if no DB)
-mix test test/locations_test.exs     # Context tests only
-mix test test/phoenix_kit_locations/web  # LiveView smoke tests only
-for i in $(seq 1 10); do mix test; done   # stability check — catches sandbox/activity-log flakes
-```
+## TODOs
 
-## Versioning & Releases
-
-This project follows [Semantic Versioning](https://semver.org/).
-
-### Version locations
-
-The version must be updated in **three places** when bumping:
-
-1. `mix.exs` — `@version` module attribute
-2. `lib/phoenix_kit_locations.ex` — `def version, do: "x.y.z"`
-3. `test/phoenix_kit_locations_test.exs` — version compliance test
-
-### Tagging & GitHub releases
-
-Tags use **bare version numbers** (no `v` prefix):
-
-```bash
-git tag 0.1.0
-git push origin 0.1.0
-```
-
-GitHub releases are created with `gh release create`:
-
-```bash
-gh release create 0.1.0 \
-  --title "0.1.0 - 2026-04-03" \
-  --notes "$(changelog body for this version)"
-```
-
-### Full release checklist
-
-1. Update version in `mix.exs`, `lib/phoenix_kit_locations.ex`, and the version test
-2. Add changelog entry in `CHANGELOG.md`
-3. Run `mix precommit` — ensure zero warnings/errors before proceeding
-4. Commit all changes: `"Bump version to x.y.z"`
-5. Push to main and **verify the push succeeded** before tagging
-6. Create and push git tag: `git tag x.y.z && git push origin x.y.z`
-7. Create GitHub release: `gh release create x.y.z --title "x.y.z - YYYY-MM-DD" --notes "..."`
-
-**IMPORTANT:** Never tag or create a release before all changes are committed and pushed. Tags are immutable pointers — tagging before pushing means the release points to the wrong commit.
-
-## Pull Requests
-
-### PR Reviews
-
-PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` directory. Use `{AGENT}_REVIEW.md` naming (e.g., `CLAUDE_REVIEW.md`, `GEMINI_REVIEW.md`).
-
-Severity levels for review findings:
-
-- `BUG - CRITICAL` — Will cause crashes, data loss, or security issues
-- `BUG - HIGH` — Incorrect behavior that affects users
-- `BUG - MEDIUM` — Edge cases, minor incorrect behavior
-- `IMPROVEMENT - HIGH` — Significant code quality or performance issue
-- `IMPROVEMENT - MEDIUM` — Better patterns or maintainability
-- `NITPICK` — Style, naming, minor suggestions
-
-## External Dependencies
-
-- **PhoenixKit** (`~> 1.7`) — Module behaviour, Settings API, RepoHelper, Dashboard tabs, Multilang, MultilangForm components, Activity logging
-- **Phoenix LiveView** (`~> 1.1`) — Admin LiveViews
-- **ex_doc** (`~> 0.39`, dev only) — Documentation generation
-- **credo** (`~> 1.7`, dev/test) — Static analysis / code quality
-- **dialyxir** (`~> 1.4`, dev/test) — Static type checking
-- **lazy_html** (`~> 0.1`, test only) — HTML parser used by `Phoenix.LiveViewTest` for smoke tests
-
-## Two Module Types
-
-PhoenixKit modules come in two shapes:
-
-- **Full-featured**: admin tabs, routes, UI, settings — this module
-- **Headless**: functions/API only, no UI — still gets auto-discovery, toggles, and permissions
-
-Both shapes implement `PhoenixKit.Module`. The difference is whether `admin_tabs/0` returns entries with `live_view:` bindings.
-
-## What This Module Does NOT Have
-
-Deliberate non-features — pinning these in writing prevents future scope creep and makes review-finding triage faster.
-
-- **No PubSub broadcasts or real-time sync.** Locations are admin-only reference data; no public-facing LiveViews subscribe to changes. If two admins edit the same record, last-write-wins. Adding broadcasts would mean a new `pubsub_topic/0`, mount-time subscribe, and a payload-minimal contract — defer until there's a real consumer.
-- **No soft-delete / restore.** Hard-delete only. Cascading FK deletes remove `phoenix_kit_location_type_assignments` rows when a location or type is deleted; the locations themselves don't survive a restore flow.
-- **No background jobs / Oban workers.** No cron'd reconciliation, no async geocoding, no batch import worker. CSV/XLSX import is intentionally out of scope (each location is hand-curated).
-- **No external HTTP calls.** No geocoding API, no map tile fetch, no reverse-DNS, no SSRF surface to harden.
-- **No public API routes.** All routes are gated behind `live_session :phoenix_kit_admin` and the `locations` permission. The context module is the only public API surface; no JSON endpoint, no REST, no GraphQL.
-- **No file uploads or attachments.** Locations don't carry photos, documents, or `featured_image`. The `Attachments` module from core is not wired up.
-- **No multi-step / wizard form.** A single `LocationFormLive` page with a two-card layout (public info + internal). No tabs beyond multilang.
-- **No address validation against a registry.** The `find_similar_addresses/4` helper detects exact-match duplicates within the local DB but does not validate against postal authorities or geocode.
+- Move the strings still on core's `PhoenixKitWeb.Gettext` (`LocationsLive`, `LocationFormLive`, `LocationTypeFormLive`, `Errors`, `FilesCard`, `Attachments`) onto `PhoenixKitLocations.Gettext` and extract them; until then those pages render English in every locale. Trigger: the next i18n pass or a translated-locale bug report.
+- `PlacePicker` has no production consumer; `:selected_location_uuid` is accepted but unused and Space names inside its tree are untranslated. Trigger: the first warehouse/manufacturing integration.
+- `hall`, `suite`, `corner` are allowed by the DB CHECK but not by `Space.kinds/0`; enabling one is a schema-only change (`@kinds`, `kind_label/1`, `kind_icon/1`). Trigger: a product request for that kind.

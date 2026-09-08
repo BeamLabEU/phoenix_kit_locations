@@ -23,27 +23,38 @@ db_name =
   Application.get_env(:phoenix_kit_locations, PhoenixKitLocations.Test.Repo)[:database] ||
     "phoenix_kit_locations_test"
 
+# The preflight ships in core, and this module's core floor (`~> 2.0`)
+# predates it — so it is used when the running core has it, and otherwise
+# this falls through to exactly the previous behaviour.
 db_check =
-  case System.cmd("psql", ["-lqt"], stderr_to_stdout: true) do
-    {output, 0} ->
-      exists =
-        output
-        |> String.split("\n")
-        |> Enum.any?(fn line ->
-          line |> String.split("|") |> List.first("") |> String.trim() == db_name
-        end)
+  if Code.ensure_loaded?(PhoenixKit.TestSupport.PostgresPreflight) do
+    # One classified connection attempt, with the repo's OWN credentials and
+    # transport, before anything starts the pool.
+    #
+    # This replaces a `psql -lqt` listing. That check asked the wrong question:
+    # it ran as the shell's user over a unix socket, so it reported "the
+    # database is there" and said nothing about whether the CONFIGURED role
+    # could reach it over TCP. When it could not, the answer arrived minutes
+    # later as a pool checkout timeout that reads like a flaky test.
+    case PhoenixKit.TestSupport.PostgresPreflight.check(
+           Application.get_env(:phoenix_kit_locations, PhoenixKitLocations.Test.Repo, [])
+         ) do
+      :ok ->
+        :exists
 
-      if exists, do: :exists, else: :not_found
-
-    _ ->
-      :try_connect
+      {:error, _reason, message} ->
+        IO.puts(:stderr, "\n" <> message)
+        :not_found
+    end
+  else
+    :try_connect
   end
 
 repo_available =
   if db_check == :not_found do
     IO.puts("""
-    \n⚠  Test database "#{db_name}" not found — integration tests will be excluded.
-       Run `mix test.setup` to create the test database.
+    \n⚠  Cannot reach test database "#{db_name}" — integration tests will be excluded.
+       The reason is printed above.
     """)
 
     false
@@ -63,7 +74,7 @@ repo_available =
       e ->
         IO.puts("""
         \n⚠  Could not connect to test database — integration tests will be excluded.
-           Run `mix test.setup` to create the test database.
+           The reason is printed above.
            Error: #{Exception.message(e)}
         """)
 
@@ -72,7 +83,7 @@ repo_available =
       :exit, reason ->
         IO.puts("""
         \n⚠  Could not connect to test database — integration tests will be excluded.
-           Run `mix test.setup` to create the test database.
+           The reason is printed above.
            Error: #{inspect(reason)}
         """)
 
