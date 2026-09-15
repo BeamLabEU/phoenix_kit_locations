@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Attachment folders can be created under a host-configured parent
+  (`:attachments_parent_folder`); the host can also name them
+  (`:attachments_folder_name`). Lookups check the host name under the
+  parent, then the deterministic name under the parent, then the root.
+  The pending-folder rename now writes the parent too.
 ## 0.5.0 - 2026-09-15
 
 ⚠️ **Breaking for hosts with custom roles:** the `locations` permission now
