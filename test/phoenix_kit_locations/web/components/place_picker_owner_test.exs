@@ -62,4 +62,15 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerOwnerTest do
     assert html =~ "Site Mine"
     assert html =~ "Use this location"
   end
+
+  test "a malformed select_location uuid is ignored, not a crash", %{conn: conn} do
+    {:ok, view, _html} = live(conn, @base)
+
+    html =
+      view
+      |> with_target("#harness-picker")
+      |> render_click("select_location", %{"uuid" => "not-a-uuid"})
+
+    refute html =~ "Use this location"
+  end
 end

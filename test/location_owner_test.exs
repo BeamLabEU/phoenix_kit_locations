@@ -95,6 +95,9 @@ defmodule PhoenixKitLocations.LocationOwnerTest do
                ~w(A1 A2 B1)
 
       assert Locations.list_locations(owner_uuid: []) == []
+      assert Locations.list_locations(owner_uuid: ["not-a-uuid", nil]) == []
+      assert Locations.list_locations(owner_uuid: "not-a-uuid") == []
+      assert Locations.list_locations(owner_uuid: 42) == []
       assert Locations.count_locations(owner_uuid: [owner_a.uuid]) == 2
     end
 

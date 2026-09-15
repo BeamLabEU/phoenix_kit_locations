@@ -428,16 +428,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
   describe "sync_types_and_redirect :error branch" do
     test "save redirects with warning flash when sync_location_types fails (FK violation)",
          %{conn: conn} do
-      # An edit save with a stale linked_type_uuids state hits the
-      # FK assoc_constraint inside sync_location_types and returns
+      # A type deleted while the form is open leaves a stale
+      # linked_type_uuids state: the save hits the FK assoc_constraint
+      # inside sync_location_types and returns
       # {:error, :type_assignment_failed}. The LV's
       # `sync_types_and_redirect/3` `:error` clause flashes a warning
-      # and redirects rather than crashing.
+      # and redirects rather than crashing. (A forged toggle of an
+      # unknown uuid can't reach this any more: `toggle_type` only
+      # accepts the offered types.)
       location = fixture_location(%{name: "Stale"})
+      type = fixture_location_type(%{name: "Soon Gone"})
       {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
 
-      bogus = Ecto.UUID.generate()
-      render_click(view, "toggle_type", %{"uuid" => bogus})
+      render_click(view, "toggle_type", %{"uuid" => type.uuid})
+      {:ok, _} = Locations.delete_location_type(type)
 
       {:ok, _new_view, html} =
         view

@@ -48,7 +48,7 @@ Routes are registered automatically:
 | `/admin/locations/types/new` | Create type |
 | `/admin/locations/types/:uuid/edit` | Edit type |
 
-The list shows each location's **Owner** and filters by All / Global / Owned; the location form has an owner picker.
+With `locations.manage_all`, the list shows each location's **Owner** and filters by All / Global / Owned, and the location form has an owner picker. Users with only `locations` see neither (see Permissions below).
 
 ### Permissions: own locations vs. all locations
 
@@ -98,7 +98,7 @@ Locations.list_locations()                        # everything — never for ten
 Locations.get_location_for_owner(uuid, user.uuid) # nil unless user owns it
 ```
 
-`PlacePicker` takes the same filter as an attr (`owner_uuid={@current_user.uuid}`) and enforces it on selection.
+`PlacePicker` takes the same filter as an attr and enforces it on selection. For a person and their organization, pass `owner_uuid={PhoenixKitLocations.Policy.owner_uuids(@phoenix_kit_current_scope)}`; leaving the attr out lists every location.
 
 ### Error Handling
 

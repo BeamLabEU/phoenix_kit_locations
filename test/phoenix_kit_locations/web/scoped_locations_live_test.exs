@@ -10,6 +10,7 @@ defmodule PhoenixKitLocations.Web.ScopedLocationsLiveTest do
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
   alias PhoenixKitLocations.Schemas.Location
+  alias PhoenixKitLocations.Schemas.Space
   alias PhoenixKitLocations.Spaces
   alias PhoenixKitLocations.Test.Repo, as: TestRepo
 
@@ -342,6 +343,101 @@ defmodule PhoenixKitLocations.Web.ScopedLocationsLiveTest do
                live(member_conn, Paths.location_edit(rival.uuid))
 
       assert to == Paths.index()
+    end
+  end
+
+  describe "hardening" do
+    test "file events are ignored and a forged attachment pointer is not stored",
+         %{conn: conn, user: user} do
+      mine = owned_location(user, %{name: "No Files"})
+      {:ok, view, _html} = live(conn, Paths.location_edit(mine.uuid))
+
+      for {event, params} <- [
+            {"open_featured_image_picker", %{"scope" => "location"}},
+            {"set_active_upload_scope", %{"scope" => "location"}},
+            {"clear_featured_image", %{"scope" => "location"}},
+            {"remove_file", %{"scope" => "location", "uuid" => UUIDv7.generate()}}
+          ] do
+        render_click(view, event, params)
+      end
+
+      assert {:error, {:live_redirect, _}} =
+               render_submit(view, "save", %{
+                 "location" => %{
+                   "name" => "No Files",
+                   "data" => %{
+                     "files_folder_uuid" => UUIDv7.generate(),
+                     "featured_image_uuid" => UUIDv7.generate()
+                   }
+                 }
+               })
+
+      data = TestRepo.get!(Location, mine.uuid).data
+      refute Map.has_key?(data, "files_folder_uuid")
+      refute Map.has_key?(data, "featured_image_uuid")
+    end
+
+    test "a forged toggle_type can't link a type the form didn't offer", %{conn: conn} do
+      inactive = fixture_location_type(%{name: "Retired", status: "inactive"})
+
+      {:ok, view, _html} = live(conn, Paths.location_new())
+      render_click(view, "toggle_type", %{"uuid" => inactive.uuid})
+      render_click(view, "toggle_type", %{"uuid" => UUIDv7.generate()})
+
+      assert {:error, {:live_redirect, _}} =
+               render_submit(view, "save", %{"location" => %{"name" => "Typed"}})
+
+      created = Locations.get_location_by(:name, "Typed")
+      assert Locations.linked_type_uuids(created.uuid) == []
+    end
+
+    test "Structure writes stop once the location is reassigned",
+         %{conn: conn, user: user, other: other} do
+      mine = owned_location(user)
+
+      {:ok, view, _html} = live(conn, Paths.location_structure(mine.uuid))
+      render_click(view, "open_add_root", %{})
+      {:ok, _} = Locations.set_location_owner(mine, other.uuid)
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               render_submit(view, "create_space", %{
+                 "space" => %{"kind" => "floor", "name" => "Too Late"}
+               })
+
+      assert to == Paths.index()
+      assert TestRepo.get_by(Space, location_uuid: mine.uuid) == nil
+    end
+
+    test "malformed or foreign uuids in Structure events are ignored, not crashes",
+         %{conn: conn, user: user} do
+      mine = owned_location(user)
+      {:ok, view, _html} = live(conn, Paths.location_structure(mine.uuid))
+
+      render_click(view, "delete_space", %{"uuid" => "not-a-uuid"})
+      render_click(view, "start_rename_space", %{"uuid" => "not-a-uuid"})
+      render_click(view, "rename_space", %{"uuid" => "not-a-uuid", "name" => "X"})
+      render_click(view, "open_add_child", %{"parent_uuid" => UUIDv7.generate()})
+
+      refute has_element?(view, "#new-space-form")
+    end
+
+    test "create_space never stores a client-sent attachment pointer", %{user: user} do
+      mine = owned_location(user)
+      admin_conn = put_test_scope(build_conn(), fake_scope())
+
+      {:ok, view, _html} = live(admin_conn, Paths.location_structure(mine.uuid))
+      render_click(view, "open_add_root", %{})
+
+      render_submit(view, "create_space", %{
+        "space" => %{
+          "kind" => "floor",
+          "name" => "Forged",
+          "data" => %{"files_folder_uuid" => UUIDv7.generate()}
+        }
+      })
+
+      space = TestRepo.get_by!(Space, location_uuid: mine.uuid)
+      refute Map.has_key?(space.data || %{}, "files_folder_uuid")
     end
   end
 end

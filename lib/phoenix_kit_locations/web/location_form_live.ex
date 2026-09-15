@@ -41,6 +41,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   alias PhoenixKitLocations.Policy
   alias PhoenixKitLocations.Schemas.Location
 
+  @attachment_events ~w(open_featured_image_picker close_media_selector cancel_upload
+                        remove_file clear_featured_image set_active_upload_scope)
+
   @translatable_fields ["name", "description", "public_notes"]
   @preserve_fields %{"status" => :status}
 
@@ -76,6 +79,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
          |> push_navigate(to: Paths.index())}
 
       {location, changeset, linked_type_uuids} ->
+        all_types = safe_list_location_types()
+
         {:ok,
          socket
          |> assign(
@@ -86,7 +91,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
            owner: load_owner(mode, location),
            owner_query: "",
            owner_matches: [],
-           all_types: safe_list_location_types(),
+           all_types: all_types,
+           # Types a `toggle_type` may name: the active ones offered, plus
+           # whatever is already linked (an inactive type survives a save).
+           allowed_type_uuids: MapSet.new(Enum.map(all_types, & &1.uuid) ++ linked_type_uuids),
            linked_type_uuids: MapSet.new(linked_type_uuids),
            features: location.features || %{},
            feature_keys: @feature_keys,
@@ -95,7 +103,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
          |> assign_form(changeset)
          |> mount_multilang()
          |> Attachments.init()
-         |> Attachments.allow_attachment_upload()
+         |> maybe_allow_uploads(mode)
          |> Attachments.mount(scope: location_scope(), resource: location)}
     end
   end
@@ -188,14 +196,18 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   def handle_event("toggle_type", %{"uuid" => uuid}, socket) do
-    linked = socket.assigns.linked_type_uuids
+    if MapSet.member?(socket.assigns.allowed_type_uuids, uuid) do
+      linked = socket.assigns.linked_type_uuids
 
-    linked =
-      if MapSet.member?(linked, uuid),
-        do: MapSet.delete(linked, uuid),
-        else: MapSet.put(linked, uuid)
+      linked =
+        if MapSet.member?(linked, uuid),
+          do: MapSet.delete(linked, uuid),
+          else: MapSet.put(linked, uuid)
 
-    {:noreply, assign(socket, :linked_type_uuids, linked)}
+      {:noreply, assign(socket, :linked_type_uuids, linked)}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("toggle_feature", %{"key" => key}, socket) do
@@ -263,28 +275,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   # ── Attachments (featured image modal + inline files dropzone) ──
-  # All events take a `scope` via phx-value-scope so multiple Files
-  # cards on the same page route to their own state.
+  # `locations.manage_all` only, checked against the live scope: hiding the
+  # Files card is not the gate. Without it every file event is ignored and
+  # the upload was never allowed (`maybe_allow_uploads/2`).
 
-  def handle_event("open_featured_image_picker", %{"scope" => scope}, socket),
-    do: Attachments.open_featured_image_picker(socket, scope)
-
-  def handle_event("close_media_selector", _params, socket),
-    do: {:noreply, Attachments.close_media_selector(socket)}
-
-  def handle_event("cancel_upload", %{"ref" => ref}, socket),
-    do: Attachments.cancel_attachment_upload(socket, ref)
-
-  def handle_event("remove_file", %{"scope" => scope, "uuid" => uuid}, socket),
-    do: Attachments.trash_file(socket, scope, uuid)
-
-  def handle_event("clear_featured_image", %{"scope" => scope}, socket),
-    do: Attachments.clear_featured_image(socket, scope)
-
-  # Marks which Files card the next upload is for. Wired to phx-click
-  # on each dropzone label.
-  def handle_event("set_active_upload_scope", %{"scope" => scope}, socket),
-    do: {:noreply, Attachments.set_active_upload_scope(socket, scope)}
+  def handle_event(event, params, socket) when event in @attachment_events do
+    if manage_all?(socket), do: attachment_event(event, params, socket), else: {:noreply, socket}
+  end
 
   defp owner_event("search_owner", %{"owner_search" => query}, socket) do
     {:noreply, assign(socket, owner_query: query, owner_matches: safe_search_users(query))}
@@ -310,6 +307,40 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   defp owner_event(_event, _params, socket), do: {:noreply, socket}
+
+  # All take a `scope` via phx-value-scope so multiple Files cards on the
+  # same page route to their own state.
+  defp attachment_event("open_featured_image_picker", %{"scope" => scope}, socket),
+    do: Attachments.open_featured_image_picker(socket, scope)
+
+  defp attachment_event("close_media_selector", _params, socket),
+    do: {:noreply, Attachments.close_media_selector(socket)}
+
+  defp attachment_event("cancel_upload", %{"ref" => ref}, socket),
+    do: Attachments.cancel_attachment_upload(socket, ref)
+
+  defp attachment_event("remove_file", %{"scope" => scope, "uuid" => uuid}, socket),
+    do: Attachments.trash_file(socket, scope, uuid)
+
+  defp attachment_event("clear_featured_image", %{"scope" => scope}, socket),
+    do: Attachments.clear_featured_image(socket, scope)
+
+  # Marks which Files card the next upload is for. Wired to phx-click on each
+  # dropzone label.
+  defp attachment_event("set_active_upload_scope", %{"scope" => scope}, socket),
+    do: {:noreply, Attachments.set_active_upload_scope(socket, scope)}
+
+  defp attachment_event(_event, _params, socket), do: {:noreply, socket}
+
+  # Uploads exist only for a site-wide manager: a scope without
+  # `manage_all` never gets the upload config, so a forged upload has no
+  # channel to arrive on.
+  defp maybe_allow_uploads(socket, :all), do: Attachments.allow_attachment_upload(socket)
+  defp maybe_allow_uploads(socket, _mode), do: socket
+
+  # `@uploads` has no `:attachment_files` entry when uploads were never allowed.
+  defp uploads_in_flight?(assigns),
+    do: match?(%{attachment_files: %{entries: [_ | _]}}, assigns[:uploads])
 
   # Without `manage_all` a new location must have the signed-in user to own
   # it; with neither, nothing is created (fail closed, never a global row).
@@ -714,11 +745,11 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               <button
                 type="submit"
                 class="btn btn-primary phx-submit-loading:opacity-75"
-                disabled={@uploads.attachment_files.entries != []}
+                disabled={uploads_in_flight?(assigns)}
                 phx-disable-with={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
               >
                 {cond do
-                  @uploads.attachment_files.entries != [] -> gettext("Waiting for uploads...")
+                  uploads_in_flight?(assigns) -> gettext("Waiting for uploads...")
                   @action == :new -> gettext("Create Location")
                   true -> gettext("Save Changes")
                 end}

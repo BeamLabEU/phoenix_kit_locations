@@ -254,9 +254,12 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   # owner filter, so a forged `select_location` can't reach a location the
   # search would never have offered.
   defp selectable_location(uuid, owner_filter) do
-    case Locations.get_location(uuid) do
-      %Location{} = location -> if owner_allowed?(location, owner_filter), do: location
-      nil -> nil
+    with {:ok, _} <- Ecto.UUID.cast(uuid),
+         %Location{} = location <- Locations.get_location(uuid),
+         true <- owner_allowed?(location, owner_filter) do
+      location
+    else
+      _ -> nil
     end
   end
 

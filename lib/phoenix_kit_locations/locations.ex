@@ -608,10 +608,22 @@ defmodule PhoenixKitLocations.Locations do
         where(query, [l], not is_nil(l.owner_uuid))
 
       {:ok, owner_uuid} when is_binary(owner_uuid) ->
-        where(query, [l], l.owner_uuid == ^owner_uuid)
+        filter_owner(query, owner_uuid: [owner_uuid])
 
+      # Malformed entries are dropped rather than raising inside the query; a
+      # list with nothing valid left matches no rows.
       {:ok, owner_uuids} when is_list(owner_uuids) ->
-        where(query, [l], l.owner_uuid in ^owner_uuids)
+        owners =
+          for owner <- owner_uuids,
+              is_binary(owner),
+              {:ok, cast} <- [Ecto.UUID.cast(owner)],
+              do: cast
+
+        where(query, [l], l.owner_uuid in ^owners)
+
+      # Any other value matches nothing: fail closed, never open.
+      {:ok, _other} ->
+        where(query, [_l], false)
     end
   end
 
