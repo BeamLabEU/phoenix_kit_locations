@@ -32,9 +32,10 @@ defmodule PhoenixKitLocations.MediaReorganizer do
 
   Also, `Location`/`Space` have no `data_owned_keys`-style scoped update (the
   mechanism catalogue's `write_pointer/2` uses to touch only the pointer key)
-  — `after_move` merges the pointer into the record's own already-loaded
-  `data` map and writes the whole map back, same as `Attachments.
-  inject_files_folder/2` does at upload time.
+  — `after_move` re-reads the record `FOR UPDATE` and merges the pointer
+  into its `data` map before writing the whole map back, same as
+  `Attachments.inject_files_folder/2` does at upload time, except for the
+  fresh locked read (see `write_data_pointer/4`'s comment for why).
   """
 
   import Ecto.Query, warn: false
@@ -228,26 +229,43 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     end
   end
 
-  defp write_pointer(%Location{} = location, folder_uuid) do
-    write_data_pointer(&Locations.update_location/2, location, folder_uuid)
+  defp write_pointer(%Location{uuid: uuid}, folder_uuid) do
+    write_data_pointer(Location, &Locations.update_location/2, uuid, folder_uuid)
   end
 
-  defp write_pointer(%Space{} = space, folder_uuid) do
-    write_data_pointer(&Spaces.update_space/2, space, folder_uuid)
+  defp write_pointer(%Space{uuid: uuid}, folder_uuid) do
+    write_data_pointer(Space, &Spaces.update_space/2, uuid, folder_uuid)
   end
 
   # No `data_owned_keys` scoping here (unlike catalogue) — merges into the
-  # record's own already-loaded `data` map before writing the whole map back,
-  # so other keys (`featured_image_uuid`, translations) already on the record
-  # survive. String-keyed: `Spaces.update_space/3` adds its own
+  # record's own `data` map before writing the whole map back, so other keys
+  # (`featured_image_uuid`, translations) already on the record survive.
+  # Re-reads the row `FOR UPDATE` right here rather than reusing the
+  # plan-time struct closed over by `after_move_fun/3`: `plan/2` may have
+  # loaded that struct long before this action's `after_move` runs (a
+  # multi-thousand-record `--apply` run), and another editor can have
+  # changed a different `data` key in between — merging into the stale
+  # struct would silently discard that edit on the full-map write below.
+  # The lock is only meaningful because `after_move` runs inside the
+  # engine's own per-action transaction (same connection), matching how
+  # catalogue's `data_owned_keys` (`narrow_data_ownership/4`) takes its
+  # own `FOR UPDATE` lock. String-keyed: `Spaces.update_space/3` adds its own
   # `"location_uuid"` key to `attrs` internally, and `Ecto.Changeset.cast/4`
   # raises on a map mixing atom and string keys.
-  defp write_data_pointer(update_fun, record, folder_uuid) do
-    data = Map.put(record.data || %{}, "files_folder_uuid", folder_uuid)
+  defp write_data_pointer(schema, update_fun, uuid, folder_uuid) do
+    query = from(r in schema, where: r.uuid == ^uuid, lock: "FOR UPDATE")
 
-    case update_fun.(record, %{"data" => data}) do
-      {:ok, _updated} -> :ok
-      {:error, reason} -> {:error, reason}
+    case repo().one(query) do
+      nil ->
+        {:error, :not_found}
+
+      record ->
+        data = Map.put(record.data || %{}, "files_folder_uuid", folder_uuid)
+
+        case update_fun.(record, %{"data" => data}) do
+          {:ok, _updated} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 
@@ -294,9 +312,23 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     end
   end
 
+  # Mirrors `counts/1`'s definition of "this folder's content" (own files
+  # plus files reachable via `FolderLink`, same union the reference's
+  # `Attachments.folder_files_query/1` uses) so a folder :report'd purely
+  # because of a linked file still names it — and excludes trashed files
+  # (unlike `counts/1`, which counts every status so a plan-time count
+  # matches the engine's own re-measure at apply time) so a report's file
+  # list only names files someone still needs to act on.
   defp pending_file_names(folder_uuid) do
+    linked_subq =
+      from(fl in FolderLink, where: fl.folder_uuid == ^folder_uuid, select: fl.file_uuid)
+
     File
-    |> where([f], f.folder_uuid == ^folder_uuid)
+    |> where(
+      [f],
+      (f.folder_uuid == ^folder_uuid or f.uuid in subquery(linked_subq)) and
+        f.status != "trashed"
+    )
     |> repo().all()
     |> Enum.map(& &1.original_file_name)
   end

@@ -2,6 +2,7 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
   use PhoenixKitLocations.DataCase, async: false
 
   alias PhoenixKit.Modules.Storage
+  alias PhoenixKit.Modules.Storage.FolderLink
   alias PhoenixKitLocations.LiveCase
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.MediaReorganizer
@@ -162,6 +163,32 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     assert reloaded.data["featured_image_uuid"] == "abc"
   end
 
+  test "after_move re-reads fresh data before merging — a concurrent edit made after plan/2 is not reverted" do
+    location = new_location(%{name: "Tallinn HQ"})
+
+    {:ok, target} = Storage.create_folder(%{name: "Locations"})
+    {:ok, folder} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+    Process.put(:target_folder, target.uuid)
+    Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+    actions = MediaReorganizer.plan(nil, [])
+    action = Enum.find(actions, &(&1.kind == :location))
+    assert is_function(action.after_move, 0)
+
+    # Simulate another editor changing an unrelated `data` key after plan/2
+    # captured this location's struct but before this run's after_move
+    # fires — the back-fill must not revert it.
+    {:ok, _location} =
+      Locations.update_location(location, %{data: %{"featured_image_uuid" => "concurrent"}})
+
+    assert :ok = action.after_move.()
+
+    reloaded = Locations.get_location(location.uuid)
+    assert reloaded.data["files_folder_uuid"] == folder.uuid
+    assert reloaded.data["featured_image_uuid"] == "concurrent"
+  end
+
   test "pointer points at a trashed folder while a live legacy folder exists at root → the live one is used" do
     location = new_location()
 
@@ -298,6 +325,70 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
 
       assert action.op == :report
       assert action.reason =~ "leftover.pdf"
+    end
+
+    test "pending folder holding only a trashed file → counted, but not named in the reason" do
+      user = LiveCase.fixture_user()
+
+      {:ok, folder} =
+        Storage.create_folder(%{name: "location-attachment-pending-#{Ecto.UUID.generate()}"})
+
+      {:ok, _file} =
+        Storage.create_file(%{
+          original_file_name: "trashed.pdf",
+          file_name: "trashed.pdf",
+          mime_type: "application/pdf",
+          file_type: "document",
+          ext: "pdf",
+          file_checksum: "checksum-trashed-pending",
+          user_file_checksum: "user-checksum-trashed-pending",
+          size: 10,
+          status: "trashed",
+          folder_uuid: folder.uuid,
+          user_uuid: user.uuid
+        })
+
+      actions = MediaReorganizer.plan(nil, pending_days: 7)
+      action = Enum.find(actions, &(&1.kind == :pending and &1.folder.uuid == folder.uuid))
+
+      assert action.op == :report
+      assert action.counts == {1, 0}
+      refute action.reason =~ "trashed.pdf"
+    end
+
+    test "pending folder holding only a FolderLink-linked file → named in the reason" do
+      user = LiveCase.fixture_user()
+      {:ok, home_folder} = Storage.create_folder(%{name: "elsewhere"})
+
+      {:ok, folder} =
+        Storage.create_folder(%{name: "location-attachment-pending-#{Ecto.UUID.generate()}"})
+
+      {:ok, file} =
+        Storage.create_file(%{
+          original_file_name: "linked.pdf",
+          file_name: "linked.pdf",
+          mime_type: "application/pdf",
+          file_type: "document",
+          ext: "pdf",
+          file_checksum: "checksum-linked-pending",
+          user_file_checksum: "user-checksum-linked-pending",
+          size: 10,
+          status: "active",
+          folder_uuid: home_folder.uuid,
+          user_uuid: user.uuid
+        })
+
+      {:ok, _link} =
+        %FolderLink{}
+        |> FolderLink.changeset(%{folder_uuid: folder.uuid, file_uuid: file.uuid})
+        |> Repo.insert()
+
+      actions = MediaReorganizer.plan(nil, pending_days: 7)
+      action = Enum.find(actions, &(&1.kind == :pending and &1.folder.uuid == folder.uuid))
+
+      assert action.op == :report
+      assert action.counts == {0, 1}
+      assert action.reason =~ "linked.pdf"
     end
 
     test "pending folder younger than pending_days → no action" do
