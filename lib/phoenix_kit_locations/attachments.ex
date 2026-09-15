@@ -398,6 +398,11 @@ defmodule PhoenixKitLocations.Attachments do
   Merges `files_folder_uuid` and `featured_image_uuid` for `scope`
   into `params["data"]`. Call right before passing params to your
   context's create/update.
+
+  The server-side scope state is the only source: a pointer the client put
+  in `params["data"]` is replaced, or removed when the scope has none. A
+  forged folder uuid would otherwise be stored, and the next mount would aim
+  every file action at another account's folder.
   """
   def inject_attachment_data(params, socket, scope) do
     st = state(socket, scope)
@@ -406,6 +411,17 @@ defmodule PhoenixKitLocations.Attachments do
     |> inject_files_folder(st.folder_uuid)
     |> inject_featured_image(st.featured_image_uuid)
   end
+
+  @doc """
+  Removes any client-sent `files_folder_uuid` / `featured_image_uuid` from
+  `params["data"]`, for create paths that never go through
+  `inject_attachment_data/3` (e.g. a new Space).
+  """
+  def drop_attachment_pointers(%{"data" => %{} = data} = params) do
+    Map.put(params, "data", Map.drop(data, ["files_folder_uuid", "featured_image_uuid"]))
+  end
+
+  def drop_attachment_pointers(params), do: params
 
   @doc """
   Renames a known pending folder UUID to match the resource's
@@ -907,7 +923,10 @@ defmodule PhoenixKitLocations.Attachments do
     end
   end
 
-  defp inject_files_folder(params, nil), do: params
+  defp inject_files_folder(params, nil) do
+    data = ensure_data_map(params)
+    Map.put(params, "data", Map.delete(data, "files_folder_uuid"))
+  end
 
   defp inject_files_folder(params, folder_uuid) when is_binary(folder_uuid) do
     data = ensure_data_map(params)

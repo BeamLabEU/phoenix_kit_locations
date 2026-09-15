@@ -1,7 +1,7 @@
 defmodule PhoenixKitLocations.MixProject do
   use Mix.Project
 
-  @version "0.4.2"
+  @version "0.5.0"
   @source_url "https://github.com/BeamLabEU/phoenix_kit_locations"
 
   def project do
@@ -46,8 +46,8 @@ defmodule PhoenixKitLocations.MixProject do
         "quality.ci"
       ],
       # Schema is applied by `test_helper.exs` on every `mix test` run
-      # via `PhoenixKit.Migration.ensure_current/2` — no `ecto.migrate`
-      # step here.
+      # via `PhoenixKit.Migration.ensure_current/2` plus this module's
+      # `Migrations.up_statements/1` — no `ecto.migrate` step here.
       "test.setup": [
         "ecto.create --quiet -r PhoenixKitLocations.Test.Repo"
       ],
@@ -74,11 +74,12 @@ defmodule PhoenixKitLocations.MixProject do
 
   defp deps do
     [
-      # 1.7.125 first shipped migration V122 (`phoenix_kit_location_spaces`),
-      # the table the Spaces feature reads and writes. Older cores miss the
-      # table entirely; 1.7.105 also introduced
-      # `PhoenixKit.Migration.ensure_current/2` (consumed by
-      # `test/test_helper.exs`), so 1.7.125 covers both floors.
+      # 2.0.0 squashed core's chain to the V135 baseline, which creates all
+      # four location tables (adopted by `PhoenixKitLocations.Migrations` V1)
+      # and ships `PhoenixKit.Migration.ensure_current/2` and the
+      # `migration_module/0` discovery `test/test_helper.exs` and
+      # `mix phoenix_kit.update` rely on. A V2+ that changes shape must raise
+      # this floor to the core release carrying the regenerated manifest.
       pk_dep(:phoenix_kit, "~> 2.0"),
       {:phoenix_live_view, "~> 1.1"},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},

@@ -29,9 +29,18 @@ defmodule PhoenixKitLocations.Web.PlacePickerHarnessLive do
      assign(socket,
        place: nil,
        location_type_uuid: params["location_type_uuid"],
-       selected_space_uuid: params["selected_space_uuid"]
+       selected_space_uuid: params["selected_space_uuid"],
+       owner_attrs: owner_attrs(params)
      )}
   end
+
+  # `?owner_uuid=` forwards to the picker's `:owner_uuid` attr ("none" → nil,
+  # "any" → :any). Without the param the attr is omitted entirely, which is
+  # the picker's "no owner filter" case.
+  defp owner_attrs(%{"owner_uuid" => "none"}), do: %{owner_uuid: nil}
+  defp owner_attrs(%{"owner_uuid" => "any"}), do: %{owner_uuid: :any}
+  defp owner_attrs(%{"owner_uuid" => owner_uuid}), do: %{owner_uuid: owner_uuid}
+  defp owner_attrs(_params), do: %{}
 
   @impl true
   def handle_info({:place_picker_select, _id, place}, socket) do
@@ -47,6 +56,7 @@ defmodule PhoenixKitLocations.Web.PlacePickerHarnessLive do
         id="harness-picker"
         location_type_uuid={@location_type_uuid}
         selected_space_uuid={@selected_space_uuid}
+        {@owner_attrs}
       />
 
       <div :if={@place} id="selected-place">

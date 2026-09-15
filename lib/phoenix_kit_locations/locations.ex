@@ -47,7 +47,13 @@ defmodule PhoenixKitLocations.Locations do
 
   @type opts :: keyword()
   @type status_filter :: [status: String.t()]
-  @type list_locations_opts :: [status: String.t(), type_uuid: String.t()]
+  @typedoc "`owner_uuid:` filter value — an owner's uuid, `nil` (unowned only) or `:any` (owned by anyone)."
+  @type owner_filter :: String.t() | [String.t()] | nil | :any
+  @type list_locations_opts :: [
+          status: String.t(),
+          type_uuid: String.t(),
+          owner_uuid: owner_filter()
+        ]
 
   defp repo, do: PhoenixKit.RepoHelper.repo()
 
@@ -145,6 +151,16 @@ defmodule PhoenixKitLocations.Locations do
 
     * `:status` — filter by status (e.g. `"active"`, `"inactive"`).
     * `:type_uuid` — filter to only locations that have this type assigned.
+    * `:owner_uuid` — ownership filter. A user uuid returns only that owner's
+      locations; a list of uuids returns locations owned by any of them (for
+      example a person and their organization, `Policy.owner_uuids/1`; an
+      empty list returns nothing); `nil` returns only unowned (global) locations; `:any` returns
+      every owned location. **Omitting the option returns every location**,
+      owned or not — so a tenant-facing caller must always pass it. A `nil`
+      that reaches this option by mistake fails closed (global rows only),
+      never open.
+
+  All filters compose.
   """
   @spec list_locations(list_locations_opts) :: [Location.t()]
   def list_locations(opts \\ []) do
@@ -169,7 +185,9 @@ defmodule PhoenixKitLocations.Locations do
           )
       end
 
-    repo().all(query)
+    query
+    |> filter_owner(opts)
+    |> repo().all()
   end
 
   @doc "Fetches a location by UUID with types preloaded. Returns `nil` if not found."
@@ -180,6 +198,36 @@ defmodule PhoenixKitLocations.Locations do
       location -> repo().preload(location, :location_types)
     end
   end
+
+  @doc """
+  Fetches a location by UUID only when it belongs to `owner_uuid` (one uuid, or
+  a list meaning any of them), with types preloaded. Returns `nil` when the
+  location does not exist, belongs to someone else, is unowned, or the uuids
+  are malformed or empty.
+
+  This is the lookup for anything tenant-facing: a user-supplied uuid never
+  resolves to another owner's location.
+  """
+  @spec get_location_for_owner(String.t() | nil, String.t() | [String.t()] | nil) ::
+          Location.t() | nil
+  def get_location_for_owner(uuid, owner_uuid) when is_binary(uuid) and is_binary(owner_uuid),
+    do: get_location_for_owner(uuid, [owner_uuid])
+
+  def get_location_for_owner(uuid, owner_uuids) when is_binary(uuid) and is_list(owner_uuids) do
+    owners =
+      for owner <- owner_uuids, is_binary(owner), {:ok, cast} <- [Ecto.UUID.cast(owner)], do: cast
+
+    with {:ok, uuid} <- Ecto.UUID.cast(uuid),
+         [_ | _] <- owners,
+         %Location{} = location <-
+           repo().one(from(l in Location, where: l.uuid == ^uuid and l.owner_uuid in ^owners)) do
+      repo().preload(location, :location_types)
+    else
+      _ -> nil
+    end
+  end
+
+  def get_location_for_owner(_uuid, _owner_uuid), do: nil
 
   @doc """
   Fetches a location by a field value. Returns `nil` if not found.
@@ -199,8 +247,13 @@ defmodule PhoenixKitLocations.Locations do
     end
   end
 
-  @doc "Returns the total count of locations."
-  @spec count_locations(status_filter) :: non_neg_integer()
+  @doc """
+  Returns the total count of locations.
+
+  Accepts `:status` and `:owner_uuid` with the same meaning as
+  `list_locations/1`.
+  """
+  @spec count_locations(status: String.t(), owner_uuid: owner_filter()) :: non_neg_integer()
   def count_locations(opts \\ []) do
     query = from(l in Location, select: count(l.uuid))
 
@@ -210,7 +263,9 @@ defmodule PhoenixKitLocations.Locations do
         status -> where(query, [l], l.status == ^status)
       end
 
-    repo().one(query)
+    query
+    |> filter_owner(opts)
+    |> repo().one()
   end
 
   @doc """
@@ -219,16 +274,22 @@ defmodule PhoenixKitLocations.Locations do
   Required: `:name`. Optional: `:description`, `:public_notes`, `:address_line_1`,
   `:address_line_2`, `:city`, `:state`, `:postal_code`, `:country`, `:phone`,
   `:email`, `:website`, `:notes`, `:status`, `:features`, `:data`.
+
+  The owner never comes from `attrs`, even when they carry an `owner_uuid`
+  key: pass `owner_uuid:` in `opts` (a `phoenix_kit_users` uuid, or `nil` for
+  a global location). A form that forwards browser params therefore cannot
+  assign the new location to somebody else.
   """
   @spec create_location(map(), opts) :: {:ok, Location.t()} | {:error, Ecto.Changeset.t()}
   def create_location(attrs, opts \\ []) do
     %Location{}
     |> Location.changeset(attrs)
+    |> maybe_put_owner(opts)
     |> repo().insert()
     |> log_activity("location.created", "location", opts, &location_metadata/1)
   end
 
-  @doc "Updates a location with the given attributes."
+  @doc "Updates a location with the given attributes. Never changes the owner — see `set_location_owner/3`."
   @spec update_location(Location.t(), map(), opts) ::
           {:ok, Location.t()} | {:error, Ecto.Changeset.t()}
   def update_location(%Location{} = location, attrs, opts \\ []) do
@@ -250,6 +311,37 @@ defmodule PhoenixKitLocations.Locations do
   @spec change_location(Location.t(), map()) :: Ecto.Changeset.t()
   def change_location(%Location{} = location, attrs \\ %{}) do
     Location.changeset(location, attrs)
+  end
+
+  @doc """
+  Sets or clears a location's owner. `owner_uuid` is a `phoenix_kit_users`
+  uuid (a person or an organization account), or `nil` to make the location
+  global.
+
+  Logs `location.owner_changed` (`owner_from` / `owner_to`) when the owner
+  actually changes. Setting the current owner again is a no-op: it returns
+  `{:ok, location}` with no write and no log entry. An unknown user or a
+  malformed uuid comes back as `{:error, changeset}` with an `:owner_uuid`
+  error.
+  """
+  @spec set_location_owner(Location.t(), String.t() | nil, opts) ::
+          {:ok, Location.t()} | {:error, Ecto.Changeset.t()}
+  def set_location_owner(%Location{} = location, owner_uuid, opts \\ []) do
+    changeset = Location.owner_changeset(location, owner_uuid)
+
+    if changeset.valid? and changeset.changes == %{} do
+      {:ok, location}
+    else
+      changeset
+      |> repo().update()
+      |> log_activity("location.owner_changed", "location", opts, fn updated ->
+        %{
+          "name" => updated.name,
+          "owner_from" => location.owner_uuid,
+          "owner_to" => updated.owner_uuid
+        }
+      end)
+    end
   end
 
   # ═══════════════════════════════════════════════════════════════════
@@ -448,14 +540,21 @@ defmodule PhoenixKitLocations.Locations do
   Returns a list of matching locations, excluding the given `exclude_uuid`.
   Only checks if address_line_1 is non-empty. Returns `[]` on any error
   (with the error logged — treated as a soft-fail so the form still saves).
+
+  ## Options
+
+    * `:owner_uuid` — same meaning as in `list_locations/1`; omitted checks
+      every location. Tenant-facing pages pass the current user's uuid, so the
+      warning can never name another owner's location.
   """
   @spec find_similar_addresses(
           String.t() | nil,
           String.t() | nil,
           String.t() | nil,
-          String.t() | nil
+          String.t() | nil,
+          owner_uuid: owner_filter()
         ) :: [map()]
-  def find_similar_addresses(address_line_1, city, postal_code, exclude_uuid \\ nil) do
+  def find_similar_addresses(address_line_1, city, postal_code, exclude_uuid \\ nil, opts \\ []) do
     address_line_1 = (address_line_1 || "") |> String.trim()
     city = (city || "") |> String.trim()
     postal_code = (postal_code || "") |> String.trim()
@@ -481,12 +580,58 @@ defmodule PhoenixKitLocations.Locations do
           do: where(query, [l], l.uuid != ^exclude_uuid),
           else: query
 
-      repo().all(query)
+      query
+      |> filter_owner(opts)
+      |> repo().all()
     end
   rescue
     error ->
       Logger.warning("find_similar_addresses failed: #{Exception.message(error)}")
       []
+  end
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Ownership helpers
+  # ═══════════════════════════════════════════════════════════════════
+
+  # `Keyword.fetch/2`, not `Keyword.get/2`: an omitted option means "no
+  # filter", while an explicit `nil` means "unowned only".
+  defp filter_owner(query, opts) do
+    case Keyword.fetch(opts, :owner_uuid) do
+      :error ->
+        query
+
+      {:ok, nil} ->
+        where(query, [l], is_nil(l.owner_uuid))
+
+      {:ok, :any} ->
+        where(query, [l], not is_nil(l.owner_uuid))
+
+      {:ok, owner_uuid} when is_binary(owner_uuid) ->
+        filter_owner(query, owner_uuid: [owner_uuid])
+
+      # Malformed entries are dropped rather than raising inside the query; a
+      # list with nothing valid left matches no rows.
+      {:ok, owner_uuids} when is_list(owner_uuids) ->
+        owners =
+          for owner <- owner_uuids,
+              is_binary(owner),
+              {:ok, cast} <- [Ecto.UUID.cast(owner)],
+              do: cast
+
+        where(query, [l], l.owner_uuid in ^owners)
+
+      # Any other value matches nothing: fail closed, never open.
+      {:ok, _other} ->
+        where(query, [_l], false)
+    end
+  end
+
+  defp maybe_put_owner(changeset, opts) do
+    case Keyword.fetch(opts, :owner_uuid) do
+      {:ok, owner_uuid} -> Location.owner_changeset(changeset, owner_uuid)
+      :error -> changeset
+    end
   end
 
   # ═══════════════════════════════════════════════════════════════════
@@ -582,7 +727,8 @@ defmodule PhoenixKitLocations.Locations do
     %{
       "name" => l.name,
       "city" => l.city,
-      "status" => l.status
+      "status" => l.status,
+      "owner_uuid" => l.owner_uuid
     }
   end
 
@@ -592,6 +738,38 @@ defmodule PhoenixKitLocations.Locations do
       "status" => t.status
     }
   end
+
+  @doc """
+  Writes a `location.deleted` activity entry (`mode: "auto"`, metadata
+  `"reason" => "owner_deleted"`) for every location `owner_uuid` owns.
+
+  Called from `PhoenixKitLocations.before_user_delete/1`, before core deletes
+  the user row and the `owner_uuid` foreign key cascades those locations (with
+  their type assignments and space trees) away — the database cascade itself
+  leaves no trace. Best-effort: never raises.
+  """
+  @spec log_owner_deletion(String.t() | nil) :: :ok
+  def log_owner_deletion(owner_uuid) when is_binary(owner_uuid) do
+    from(l in Location, where: l.owner_uuid == ^owner_uuid)
+    |> repo().all()
+    |> Enum.each(fn location ->
+      maybe_log_activity(
+        "location.deleted",
+        "location",
+        location.uuid,
+        [mode: "auto"],
+        Map.put(location_metadata(location), "reason", "owner_deleted")
+      )
+    end)
+
+    :ok
+  rescue
+    error ->
+      Logger.warning("[Locations] owner deletion logging failed: #{Exception.message(error)}")
+      :ok
+  end
+
+  def log_owner_deletion(_owner_uuid), do: :ok
 
   @doc """
   Logs a module enable/disable toggle. Called from the `enable_system` /

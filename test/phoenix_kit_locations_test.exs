@@ -100,11 +100,26 @@ defmodule PhoenixKitLocationsTest do
       end
     end
 
+    test "the Types subtab is hidden behind a scope check" do
+      types = Enum.find(PhoenixKitLocations.admin_tabs(), &(&1.id == :admin_locations_types))
+      assert is_function(types.visible, 1)
+    end
+
     test "visible subtabs include locations and types" do
       tabs = PhoenixKitLocations.admin_tabs()
       visible_ids = tabs |> Enum.filter(&(&1.visible != false)) |> Enum.map(& &1.id)
       assert :admin_locations_list in visible_ids
       assert :admin_locations_types in visible_ids
+    end
+  end
+
+  describe "permission_metadata/0 sub-permissions" do
+    test "declares manage_all under the base locations key" do
+      assert [%{key: "manage_all", label: label, description: desc}] =
+               PhoenixKitLocations.permission_metadata().sub_permissions
+
+      assert is_binary(label) and is_binary(desc)
+      assert PhoenixKitLocations.Policy.manage_all_key() == "locations.manage_all"
     end
   end
 
@@ -129,7 +144,7 @@ defmodule PhoenixKitLocationsTest do
       assert PhoenixKitLocations.settings_tabs() == []
     end
 
-    test "user_dashboard_tabs/0 returns empty list" do
+    test "user_dashboard_tabs/0 returns empty list (core retired /dashboard)" do
       assert PhoenixKitLocations.user_dashboard_tabs() == []
     end
 

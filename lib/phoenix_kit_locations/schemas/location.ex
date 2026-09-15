@@ -34,6 +34,11 @@ defmodule PhoenixKitLocations.Schemas.Location do
     field(:notes, :string)
     field(:status, :string, default: "active")
 
+    # Owner (a `phoenix_kit_users` uuid — a person or an organization
+    # account). `nil` is a global location. Deliberately NOT in the
+    # `changeset/2` cast list: only `owner_changeset/2` sets it.
+    field(:owner_uuid, UUIDv7)
+
     # Features (wheelchair_accessible, elevator, parking, etc.)
     field(:features, :map, default: %{})
 
@@ -89,6 +94,20 @@ defmodule PhoenixKitLocations.Schemas.Location do
     |> validate_inclusion(:status, @statuses)
     |> maybe_validate_email()
     |> maybe_validate_website()
+  end
+
+  @doc """
+  Changeset for a location's owner, kept apart from `changeset/2` so the
+  general create/update path (and any form that forwards browser params into
+  it) can never set it. Accepts a `Location` or an existing changeset;
+  `owner_uuid` is a `phoenix_kit_users` uuid or `nil`. An unknown user comes
+  back from the repo as an `:owner_uuid` error rather than a raise.
+  """
+  @spec owner_changeset(t() | Ecto.Changeset.t(), String.t() | nil) :: Ecto.Changeset.t()
+  def owner_changeset(location_or_changeset, owner_uuid) do
+    location_or_changeset
+    |> cast(%{owner_uuid: owner_uuid}, [:owner_uuid])
+    |> foreign_key_constraint(:owner_uuid)
   end
 
   defp maybe_validate_email(changeset) do

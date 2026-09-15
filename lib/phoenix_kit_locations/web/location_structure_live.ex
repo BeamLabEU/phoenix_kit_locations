@@ -46,8 +46,8 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
   alias PhoenixKitLocations.Attachments
   alias PhoenixKitLocations.Errors
-  alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
+  alias PhoenixKitLocations.Policy
   alias PhoenixKitLocations.Schemas.Space
   alias PhoenixKitLocations.Spaces
 
@@ -56,7 +56,11 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
   @impl true
   def mount(%{"uuid" => uuid}, _session, socket) do
-    case Locations.get_location(uuid) do
+    scope = socket.assigns[:phoenix_kit_current_scope]
+
+    # Through `Policy`: without `locations.manage_all`, only a location the
+    # user owns opens; anything else is a not-found.
+    case Policy.get_location(scope, uuid) do
       nil ->
         Logger.info("Location not found for structure: #{uuid}")
 
@@ -70,6 +74,8 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
          socket
          |> assign(
            location: location,
+           manage_all: Policy.manage_all?(scope),
+           location_rechecked: false,
            tree: Spaces.list_tree(location.uuid),
            expanded: MapSet.new(),
            selected_uuid: nil,
@@ -85,7 +91,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
          )
          |> mount_multilang()
          |> Attachments.init()
-         |> Attachments.allow_attachment_upload()}
+         |> maybe_allow_uploads(Policy.manage_all?(scope))}
     end
   end
 
@@ -93,7 +99,40 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
   # ── Expand / select (mount skeleton) ─────────────────────────────
 
+  # Space writes re-resolve the location through `Policy` against the live
+  # scope before they run, so a location reassigned or deleted while this page
+  # is open stops accepting changes. The flag lets the re-dispatched call fall
+  # through to the real clause below.
+  @location_writes ~w(create_space update_space_form rename_space confirm_delete_space
+                      move_space_up move_space_down)
+
+  @attachment_events ~w(open_featured_image_picker close_media_selector cancel_upload
+                        remove_file clear_featured_image set_active_upload_scope)
+
   @impl true
+  def handle_event(event, params, %{assigns: %{location_rechecked: false}} = socket)
+      when event in @location_writes do
+    scope = socket.assigns[:phoenix_kit_current_scope]
+
+    case Policy.get_location(scope, socket.assigns.location.uuid) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:error, Errors.message(:location_not_found))
+         |> push_navigate(to: Paths.index())}
+
+      location ->
+        {:noreply, socket} =
+          handle_event(
+            event,
+            params,
+            assign(socket, location: location, location_rechecked: true)
+          )
+
+        {:noreply, assign(socket, :location_rechecked, false)}
+    end
+  end
+
   def handle_event("toggle_space_node", %{"uuid" => uuid}, socket) do
     expanded = socket.assigns.expanded
 
@@ -144,7 +183,11 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
     params = Attachments.inject_attachment_data(params, socket, socket.assigns.selected_uuid)
 
-    case Spaces.update_space(socket.assigns.selected_space, params, actor_opts(socket)) do
+    case Spaces.update_space(
+           socket.assigns.selected_space,
+           drop_admin_only_params(params, socket),
+           actor_opts(socket)
+         ) do
       {:ok, updated} ->
         {:noreply,
          socket
@@ -162,23 +205,13 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   # `scope` via phx-value-scope — here that's always the selected
   # Space's uuid.
 
-  def handle_event("open_featured_image_picker", %{"scope" => scope}, socket),
-    do: Attachments.open_featured_image_picker(socket, scope)
-
-  def handle_event("close_media_selector", _params, socket),
-    do: {:noreply, Attachments.close_media_selector(socket)}
-
-  def handle_event("cancel_upload", %{"ref" => ref}, socket),
-    do: Attachments.cancel_attachment_upload(socket, ref)
-
-  def handle_event("remove_file", %{"scope" => scope, "uuid" => uuid}, socket),
-    do: Attachments.trash_file(socket, scope, uuid)
-
-  def handle_event("clear_featured_image", %{"scope" => scope}, socket),
-    do: Attachments.clear_featured_image(socket, scope)
-
-  def handle_event("set_active_upload_scope", %{"scope" => scope}, socket),
-    do: {:noreply, Attachments.set_active_upload_scope(socket, scope)}
+  # `locations.manage_all` only, checked against the live scope: hiding the
+  # Files card is not the gate.
+  def handle_event(event, params, socket) when event in @attachment_events do
+    if Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope]),
+      do: attachment_event(event, params, socket),
+      else: {:noreply, socket}
+  end
 
   # ── Add root / child space ───────────────────────────────────────
 
@@ -186,8 +219,15 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
     {:noreply, assign(socket, adding_parent_uuid: :root, new_space_form: new_space_form())}
   end
 
+  # Only a node of this location's tree can be a parent; a forged or
+  # malformed uuid is ignored.
   def handle_event("open_add_child", %{"parent_uuid" => parent_uuid}, socket) do
-    {:noreply, assign(socket, adding_parent_uuid: parent_uuid, new_space_form: new_space_form())}
+    if find_node(socket.assigns.tree, parent_uuid) do
+      {:noreply,
+       assign(socket, adding_parent_uuid: parent_uuid, new_space_form: new_space_form())}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("cancel_add_space", _params, socket) do
@@ -206,7 +246,12 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   def handle_event("create_space", %{"space" => params}, socket) do
     location = socket.assigns.location
     parent_uuid = normalize_parent_uuid(socket.assigns.adding_parent_uuid)
-    attrs = Map.merge(params, %{"location_uuid" => location.uuid, "parent_uuid" => parent_uuid})
+
+    attrs =
+      params
+      |> drop_admin_only_params(socket)
+      |> Attachments.drop_attachment_pointers()
+      |> Map.merge(%{"location_uuid" => location.uuid, "parent_uuid" => parent_uuid})
 
     case Spaces.create_space(attrs, actor_opts(socket)) do
       {:ok, space} ->
@@ -229,7 +274,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   # ── Inline rename ────────────────────────────────────────────────
 
   def handle_event("start_rename_space", %{"uuid" => uuid}, socket) do
-    case Spaces.get_space(uuid) do
+    case space_in_location(socket, uuid) do
       nil ->
         {:noreply, put_flash(socket, :error, Errors.message(:space_not_found))}
 
@@ -247,7 +292,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   end
 
   def handle_event("rename_space", %{"uuid" => uuid, "name" => name}, socket) do
-    case Spaces.get_space(uuid) do
+    case space_in_location(socket, uuid) do
       nil ->
         {:noreply,
          socket
@@ -277,7 +322,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   # here, so the modal's copy and every re-render agree on the same
   # count instead of re-querying on every paint.
   def handle_event("delete_space", %{"uuid" => uuid}, socket) do
-    case Spaces.get_space(uuid) do
+    case space_in_location(socket, uuid) do
       nil ->
         {:noreply, put_flash(socket, :error, Errors.message(:space_not_found))}
 
@@ -308,7 +353,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
       %{uuid: uuid} ->
         socket = assign(socket, :confirm_delete, nil)
 
-        case Spaces.get_space(uuid) do
+        case space_in_location(socket, uuid) do
           nil -> {:noreply, put_flash(socket, :error, Errors.message(:space_not_found))}
           space -> {:noreply, submit_delete(socket, space)}
         end
@@ -340,6 +385,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
            — `scope_folder_id` pulls the folder of whichever scope
            opened it (set on click in `open_featured_image_picker/2`). --%>
       <.live_component
+        :if={@manage_all}
         module={PhoenixKitWeb.Live.Components.MediaSelectorModal}
         id="location-structure-media-selector"
         show={@show_media_selector}
@@ -491,6 +537,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
               />
 
               <.textarea
+                :if={@manage_all}
                 field={@space_form[:notes]}
                 label={gettext("Internal notes (admin-only)")}
                 rows="2"
@@ -501,7 +548,9 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
                    `PkLocationsUploadScope` (colocated with
                    `files_card_body/1`) is already compiled into the
                    shared JS manifest — nothing to wire here. --%>
-              <div class="border-t border-base-300 pt-4 flex flex-col gap-4">
+              <%!-- Files need `manage_all`: the media picker only confines
+                   browsing to a folder once one exists. --%>
+              <div :if={@manage_all} class="border-t border-base-300 pt-4 flex flex-col gap-4">
                 <.files_card_body
                   scope={@selected_uuid}
                   state={Attachments.state(%{assigns: assigns}, @selected_uuid)}
@@ -516,7 +565,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
                 <button
                   type="submit"
                   class="btn btn-primary btn-sm phx-submit-loading:opacity-75"
-                  disabled={@uploads.attachment_files.entries != []}
+                  disabled={uploads_in_flight?(assigns)}
                   phx-disable-with={gettext("Saving...")}
                 >
                   {gettext("Save")}
@@ -554,6 +603,44 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
       _ -> []
     end
   end
+
+  # Space internal notes need `locations.manage_all`, checked against the live
+  # scope like every write.
+  defp drop_admin_only_params(params, socket) do
+    if Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope]),
+      do: params,
+      else: Map.delete(params, "notes")
+  end
+
+  # Scope is always the selected Space's uuid here.
+  defp attachment_event("open_featured_image_picker", %{"scope" => scope}, socket),
+    do: Attachments.open_featured_image_picker(socket, scope)
+
+  defp attachment_event("close_media_selector", _params, socket),
+    do: {:noreply, Attachments.close_media_selector(socket)}
+
+  defp attachment_event("cancel_upload", %{"ref" => ref}, socket),
+    do: Attachments.cancel_attachment_upload(socket, ref)
+
+  defp attachment_event("remove_file", %{"scope" => scope, "uuid" => uuid}, socket),
+    do: Attachments.trash_file(socket, scope, uuid)
+
+  defp attachment_event("clear_featured_image", %{"scope" => scope}, socket),
+    do: Attachments.clear_featured_image(socket, scope)
+
+  defp attachment_event("set_active_upload_scope", %{"scope" => scope}, socket),
+    do: {:noreply, Attachments.set_active_upload_scope(socket, scope)}
+
+  defp attachment_event(_event, _params, socket), do: {:noreply, socket}
+
+  # Uploads exist only for a site-wide manager; without `manage_all` there is
+  # no upload config for a forged upload to arrive on.
+  defp maybe_allow_uploads(socket, true), do: Attachments.allow_attachment_upload(socket)
+  defp maybe_allow_uploads(socket, false), do: socket
+
+  # `@uploads` has no `:attachment_files` entry when uploads were never allowed.
+  defp uploads_in_flight?(assigns),
+    do: match?(%{attachment_files: %{entries: [_ | _]}}, assigns[:uploads])
 
   defp new_space_form, do: to_form(Spaces.change_space(%Space{}), as: :space)
 
@@ -672,6 +759,20 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
     list
     |> List.replace_at(i, vj)
     |> List.replace_at(j, vi)
+  end
+
+  # Resolves a client-supplied space uuid only when the space belongs to the
+  # location this page loaded (itself resolved through `Policy`), so a forged
+  # uuid can't rename or delete a space in another location.
+  defp space_in_location(socket, uuid) do
+    location_uuid = socket.assigns.location.uuid
+
+    with {:ok, _} <- Ecto.UUID.cast(uuid),
+         %Space{location_uuid: ^location_uuid} = space <- Spaces.get_space(uuid) do
+      space
+    else
+      _ -> nil
+    end
   end
 
   defp find_node(tree, uuid) do

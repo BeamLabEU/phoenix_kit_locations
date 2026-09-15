@@ -13,13 +13,28 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
   alias PhoenixKitLocations.Errors
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
+  alias PhoenixKitLocations.Policy
   alias PhoenixKitLocations.Schemas.LocationType
 
   @translatable_fields ["name", "description"]
   @preserve_fields %{"status" => :status}
 
+  # Location types are site-wide configuration: `locations.manage_all` only.
+  # The tab keeps the base permission (core maps one key per LiveView), so the
+  # page refuses everyone else itself.
   @impl true
   def mount(params, _session, socket) do
+    if Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope]) do
+      mount_type(params, socket)
+    else
+      {:ok,
+       socket
+       |> put_flash(:error, Errors.message(:not_allowed))
+       |> push_navigate(to: Paths.index())}
+    end
+  end
+
+  defp mount_type(params, socket) do
     action = socket.assigns.live_action
 
     case load_type(action, params) do

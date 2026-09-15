@@ -9,6 +9,11 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
   the project's Modules panel) — no FK, no dependency on the projects
   package. Read-only address cards with link-outs to the locations admin.
 
+  Not owner-scoped: it shows every location the project config names to
+  anyone the hub lets view the project, including locations owned by an
+  account the viewer can't open under `/admin/locations`. The gate is who may
+  edit the project's config.
+
   Off-router-mountable: no `handle_params/3` (the hub's hard requirement).
   """
 

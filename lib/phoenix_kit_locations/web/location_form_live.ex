@@ -1,5 +1,22 @@
 defmodule PhoenixKitLocations.Web.LocationFormLive do
-  @moduledoc "Create/edit form for locations with multilang, type toggles, and feature checkboxes."
+  @moduledoc """
+  Create/edit form for locations with multilang, type toggles, and feature
+  checkboxes. What it offers depends on the scope (`PhoenixKitLocations.Policy`):
+
+    * **`locations.manage_all`** (`@mode == :all`) — any location, the owner
+      card (`OwnerComponents.owner_picker_card/1`, applied on save), the Files
+      card and internal notes.
+    * **base `locations` only** (`@mode == :own`) — only locations owned by the
+      user or their organization: edit resolves through `Policy.get_location/2`
+      at mount AND again on save, create owns the new location to the user's
+      organization when they belong to one (else the user), and the
+      duplicate-address warning only considers the user's own locations. No
+      owner card, Files card or internal notes (the `notes` param is dropped
+      server-side).
+
+  `@mode` only drives rendering. Every write re-reads the live scope, so a
+  mid-session role switch can never widen what a save does.
+  """
 
   use Phoenix.LiveView
   use Gettext, backend: PhoenixKitWeb.Gettext
@@ -14,12 +31,18 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   import PhoenixKitWeb.Components.Core.Textarea
   import PhoenixKitLocations.Web.Components.FilesCard, only: [files_card_body: 1]
   import PhoenixKitLocations.Web.Components.LocationTabs, only: [location_tabs: 1]
+  import PhoenixKitLocations.Web.Components.OwnerComponents, only: [owner_picker_card: 1]
 
+  alias PhoenixKit.Users.Auth
   alias PhoenixKitLocations.Attachments
   alias PhoenixKitLocations.Errors
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
+  alias PhoenixKitLocations.Policy
   alias PhoenixKitLocations.Schemas.Location
+
+  @attachment_events ~w(open_featured_image_picker close_media_selector cancel_upload
+                        remove_file clear_featured_image set_active_upload_scope)
 
   @translatable_fields ["name", "description", "public_notes"]
   @preserve_fields %{"status" => :status}
@@ -43,10 +66,12 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   @impl true
   def mount(params, _session, socket) do
     action = socket.assigns.live_action
+    scope = socket.assigns[:phoenix_kit_current_scope]
+    mode = if Policy.manage_all?(scope), do: :all, else: :own
 
-    case load_location(action, params) do
+    case load_location(action, params, scope, mode) do
       {:not_found, uuid} ->
-        Logger.info("Location not found for edit: #{uuid}")
+        Logger.info("Location not found for edit: #{inspect(uuid)}")
 
         {:ok,
          socket
@@ -54,13 +79,22 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
          |> push_navigate(to: Paths.index())}
 
       {location, changeset, linked_type_uuids} ->
+        all_types = safe_list_location_types()
+
         {:ok,
          socket
          |> assign(
            page_title: page_title(action, location),
+           mode: mode,
            action: action,
            location: location,
-           all_types: safe_list_location_types(),
+           owner: load_owner(mode, location),
+           owner_query: "",
+           owner_matches: [],
+           all_types: all_types,
+           # Types a `toggle_type` may name: the active ones offered, plus
+           # whatever is already linked (an inactive type survives a save).
+           allowed_type_uuids: MapSet.new(Enum.map(all_types, & &1.uuid) ++ linked_type_uuids),
            linked_type_uuids: MapSet.new(linked_type_uuids),
            features: location.features || %{},
            feature_keys: @feature_keys,
@@ -69,7 +103,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
          |> assign_form(changeset)
          |> mount_multilang()
          |> Attachments.init()
-         |> Attachments.allow_attachment_upload()
+         |> maybe_allow_uploads(mode)
          |> Attachments.mount(scope: location_scope(), resource: location)}
     end
   end
@@ -78,13 +112,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   # only ever one Location per page.
   defp location_scope, do: "location"
 
-  defp load_location(:new, _params) do
-    location = %Location{}
-    {location, Locations.change_location(location), []}
+  # A new location needs someone to own it unless the scope manages every
+  # location. An edit resolves through `Policy`: a foreign, unowned or
+  # malformed uuid is a not-found for anyone without `manage_all`.
+  defp load_location(:new, _params, scope, mode) do
+    if mode == :all or Policy.user_uuid(scope) do
+      location = %Location{}
+      {location, Locations.change_location(location), []}
+    else
+      {:not_found, nil}
+    end
   end
 
-  defp load_location(:edit, params) do
-    case Locations.get_location(params["uuid"]) do
+  defp load_location(:edit, params, scope, _mode) do
+    case Policy.get_location(scope, params["uuid"]) do
       nil ->
         {:not_found, params["uuid"]}
 
@@ -92,6 +133,17 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         {location, Locations.change_location(location), safe_linked_type_uuids(location)}
     end
   end
+
+  defp load_owner(:all, %Location{owner_uuid: owner_uuid}) when is_binary(owner_uuid) do
+    case Auth.get_user(owner_uuid) do
+      %{uuid: uuid, email: email} -> %{uuid: uuid, email: email}
+      _ -> %{uuid: owner_uuid, email: owner_uuid}
+    end
+  rescue
+    _ -> %{uuid: owner_uuid, email: owner_uuid}
+  end
+
+  defp load_owner(_mode, _location), do: nil
 
   defp safe_linked_type_uuids(location) do
     Locations.linked_type_uuids(location.uuid)
@@ -144,14 +196,18 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   def handle_event("toggle_type", %{"uuid" => uuid}, socket) do
-    linked = socket.assigns.linked_type_uuids
+    if MapSet.member?(socket.assigns.allowed_type_uuids, uuid) do
+      linked = socket.assigns.linked_type_uuids
 
-    linked =
-      if MapSet.member?(linked, uuid),
-        do: MapSet.delete(linked, uuid),
-        else: MapSet.put(linked, uuid)
+      linked =
+        if MapSet.member?(linked, uuid),
+          do: MapSet.delete(linked, uuid),
+          else: MapSet.put(linked, uuid)
 
-    {:noreply, assign(socket, :linked_type_uuids, linked)}
+      {:noreply, assign(socket, :linked_type_uuids, linked)}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("toggle_feature", %{"key" => key}, socket) do
@@ -179,7 +235,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         Ecto.Changeset.get_field(changeset, :address_line_1),
         Ecto.Changeset.get_field(changeset, :city),
         Ecto.Changeset.get_field(changeset, :postal_code),
-        exclude_uuid
+        exclude_uuid,
+        Policy.similar_address_opts(socket.assigns[:phoenix_kit_current_scope])
       )
 
     warning =
@@ -202,36 +259,106 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       params
       |> Map.put("features", socket.assigns.features)
       |> Attachments.inject_attachment_data(socket, location_scope())
+      |> drop_admin_only_params(socket)
 
     save_location(socket, socket.assigns.action, params)
   end
 
-  # ── Attachments (featured image modal + inline files dropzone) ──
-  # All events take a `scope` via phx-value-scope so multiple Files
-  # cards on the same page route to their own state.
+  # ── Owner picker (`locations.manage_all` only) ──
+  # The chosen owner is pending until save. `pick_owner` only accepts a uuid
+  # from the current search results, so a forged payload can't pick an
+  # arbitrary uuid; without `manage_all` every owner event is ignored.
 
-  def handle_event("open_featured_image_picker", %{"scope" => scope}, socket),
+  def handle_event(event, params, socket)
+      when event in ["search_owner", "pick_owner", "clear_owner"] do
+    if manage_all?(socket), do: owner_event(event, params, socket), else: {:noreply, socket}
+  end
+
+  # ── Attachments (featured image modal + inline files dropzone) ──
+  # `locations.manage_all` only, checked against the live scope: hiding the
+  # Files card is not the gate. Without it every file event is ignored and
+  # the upload was never allowed (`maybe_allow_uploads/2`).
+
+  def handle_event(event, params, socket) when event in @attachment_events do
+    if manage_all?(socket), do: attachment_event(event, params, socket), else: {:noreply, socket}
+  end
+
+  defp owner_event("search_owner", %{"owner_search" => query}, socket) do
+    {:noreply, assign(socket, owner_query: query, owner_matches: safe_search_users(query))}
+  end
+
+  defp owner_event("pick_owner", %{"uuid" => uuid}, socket) do
+    case Enum.find(socket.assigns.owner_matches, &(to_string(&1.uuid) == uuid)) do
+      nil ->
+        {:noreply, socket}
+
+      user ->
+        {:noreply,
+         assign(socket,
+           owner: %{uuid: to_string(user.uuid), email: user.email},
+           owner_query: "",
+           owner_matches: []
+         )}
+    end
+  end
+
+  defp owner_event("clear_owner", _params, socket) do
+    {:noreply, assign(socket, :owner, nil)}
+  end
+
+  defp owner_event(_event, _params, socket), do: {:noreply, socket}
+
+  # All take a `scope` via phx-value-scope so multiple Files cards on the
+  # same page route to their own state.
+  defp attachment_event("open_featured_image_picker", %{"scope" => scope}, socket),
     do: Attachments.open_featured_image_picker(socket, scope)
 
-  def handle_event("close_media_selector", _params, socket),
+  defp attachment_event("close_media_selector", _params, socket),
     do: {:noreply, Attachments.close_media_selector(socket)}
 
-  def handle_event("cancel_upload", %{"ref" => ref}, socket),
+  defp attachment_event("cancel_upload", %{"ref" => ref}, socket),
     do: Attachments.cancel_attachment_upload(socket, ref)
 
-  def handle_event("remove_file", %{"scope" => scope, "uuid" => uuid}, socket),
+  defp attachment_event("remove_file", %{"scope" => scope, "uuid" => uuid}, socket),
     do: Attachments.trash_file(socket, scope, uuid)
 
-  def handle_event("clear_featured_image", %{"scope" => scope}, socket),
+  defp attachment_event("clear_featured_image", %{"scope" => scope}, socket),
     do: Attachments.clear_featured_image(socket, scope)
 
-  # Marks which Files card the next upload is for. Wired to phx-click
-  # on each dropzone label.
-  def handle_event("set_active_upload_scope", %{"scope" => scope}, socket),
+  # Marks which Files card the next upload is for. Wired to phx-click on each
+  # dropzone label.
+  defp attachment_event("set_active_upload_scope", %{"scope" => scope}, socket),
     do: {:noreply, Attachments.set_active_upload_scope(socket, scope)}
 
+  defp attachment_event(_event, _params, socket), do: {:noreply, socket}
+
+  # Uploads exist only for a site-wide manager: a scope without
+  # `manage_all` never gets the upload config, so a forged upload has no
+  # channel to arrive on.
+  defp maybe_allow_uploads(socket, :all), do: Attachments.allow_attachment_upload(socket)
+  defp maybe_allow_uploads(socket, _mode), do: socket
+
+  # `@uploads` has no `:attachment_files` entry when uploads were never allowed.
+  defp uploads_in_flight?(assigns),
+    do: match?(%{attachment_files: %{entries: [_ | _]}}, assigns[:uploads])
+
+  # Without `manage_all` a new location must have the signed-in user to own
+  # it; with neither, nothing is created (fail closed, never a global row).
   defp save_location(socket, :new, params) do
-    case Locations.create_location(params, actor_opts(socket)) do
+    if manage_all?(socket) or Policy.user_uuid(socket.assigns[:phoenix_kit_current_scope]) do
+      create_location(socket, params)
+    else
+      {:noreply,
+       socket
+       |> put_flash(:error, Errors.message(:not_allowed))
+       |> push_navigate(to: Paths.index())}
+    end
+  end
+
+  defp save_location(socket, :edit, params), do: update_location(socket, params)
+
+  defp create_location(socket, params) do
+    case Locations.create_location(params, actor_opts(socket) ++ owner_opts(socket)) do
       {:ok, location} ->
         location_folder = Attachments.state(socket, location_scope()).folder_uuid
         _ = Attachments.maybe_rename_pending_folder_for(location_folder, location)
@@ -243,13 +370,44 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     end
   end
 
-  defp save_location(socket, :edit, params) do
-    case Locations.update_location(socket.assigns.location, params, actor_opts(socket)) do
-      {:ok, location} ->
-        sync_types_and_redirect(socket, location.uuid, gettext("Location updated."))
+  defp update_location(socket, params) do
+    case location_for_save(socket) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:error, Errors.message(:location_not_found))
+         |> push_navigate(to: Paths.index())}
 
-      {:error, changeset} ->
-        {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+      current ->
+        case Locations.update_location(current, params, actor_opts(socket)) do
+          {:ok, location} ->
+            socket
+            |> maybe_apply_owner(location)
+            |> sync_types_and_redirect(location.uuid, gettext("Location updated."))
+
+          {:error, changeset} ->
+            {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+        end
+    end
+  end
+
+  # Re-resolved through `Policy` against the live scope at save time: the
+  # location may have been reassigned or deleted, or the role switched, since
+  # this page mounted.
+  defp location_for_save(socket) do
+    Policy.get_location(socket.assigns[:phoenix_kit_current_scope], socket.assigns.location.uuid)
+  end
+
+  defp maybe_apply_owner(socket, location) do
+    owner_uuid = socket.assigns.owner && socket.assigns.owner.uuid
+
+    if not manage_all?(socket) or owner_uuid == location.owner_uuid do
+      socket
+    else
+      case Locations.set_location_owner(location, owner_uuid, actor_opts(socket)) do
+        {:ok, _location} -> socket
+        {:error, _changeset} -> put_flash(socket, :warning, Errors.message(:owner_update_failed))
+      end
     end
   end
 
@@ -305,6 +463,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
            pulls the folder of whichever scope opened the modal (set
            on click in `open_featured_image_picker/2`). --%>
       <.live_component
+        :if={@mode == :all}
         module={PhoenixKitWeb.Live.Components.MediaSelectorModal}
         id="location-form-media-selector"
         show={@show_media_selector}
@@ -324,6 +483,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       <div class="max-w-5xl mx-auto w-full">
         <%!-- Structure tab needs a persisted uuid; :new has none. --%>
         <.location_tabs :if={@action == :edit} location={@location} active={:details} />
+        <%!-- Outside #location-form: the picker carries its own search form. --%>
+        <.owner_picker_card
+          :if={@mode == :all}
+          owner={@owner}
+          query={@owner_query}
+          matches={@owner_matches}
+        />
         <.form
           for={@form}
           id="location-form"
@@ -499,7 +665,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         <%!-- ═══════════════════════════════════════════════════════ --%>
         <%!-- FILES & FEATURED IMAGE — Location scope                --%>
         <%!-- ═══════════════════════════════════════════════════════ --%>
-        <div class="card bg-base-100 shadow-lg mt-6">
+        <div :if={@mode == :all} class="card bg-base-100 shadow-lg mt-6">
           <div class="card-body flex flex-col gap-4">
             <.files_card_body
               scope={location_scope()}
@@ -517,12 +683,14 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         <%!-- ═══════════════════════════════════════════════════════ --%>
         <div class="card bg-base-100 shadow-lg mt-6">
           <div class="card-body flex flex-col gap-5">
-            <.section_heading icon="hero-lock-closed">{gettext("Internal")}</.section_heading>
-            <p class="text-sm text-base-content/50 -mt-3">
+            <.section_heading :if={@mode == :all} icon="hero-lock-closed">{gettext("Internal")}</.section_heading>
+            <.section_heading :if={@mode == :own} icon="hero-adjustments-horizontal">{gettext("Status")}</.section_heading>
+            <p :if={@mode == :all} class="text-sm text-base-content/50 -mt-3">
               {gettext("This information is only visible to administrators.")}
             </p>
 
             <.textarea
+              :if={@mode == :all}
               field={@form[:notes]}
               label={gettext("Internal Notes")}
               rows="3"
@@ -577,11 +745,11 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               <button
                 type="submit"
                 class="btn btn-primary phx-submit-loading:opacity-75"
-                disabled={@uploads.attachment_files.entries != []}
+                disabled={uploads_in_flight?(assigns)}
                 phx-disable-with={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
               >
                 {cond do
-                  @uploads.attachment_files.entries != [] -> gettext("Waiting for uploads...")
+                  uploads_in_flight?(assigns) -> gettext("Waiting for uploads...")
                   @action == :new -> gettext("Create Location")
                   true -> gettext("Save Changes")
                 end}
@@ -615,6 +783,34 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       %{user: %{uuid: uuid}} -> [actor_uuid: uuid]
       _ -> []
     end
+  end
+
+  # Every security decision reads the LIVE scope, never the mount-time `@mode`.
+  defp manage_all?(socket), do: Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope])
+
+  # A new location's owner: the picked owner (or nil = global) for a
+  # site-wide manager, otherwise the user's organization when they belong to
+  # one (so teammates share it), else the user (`Policy.new_owner_uuid/1`).
+  defp owner_opts(socket) do
+    if manage_all?(socket) do
+      [owner_uuid: socket.assigns.owner && socket.assigns.owner.uuid]
+    else
+      [owner_uuid: Policy.new_owner_uuid(socket.assigns[:phoenix_kit_current_scope])]
+    end
+  end
+
+  # Internal notes need `locations.manage_all`; anyone else's submit must not
+  # write them.
+  defp drop_admin_only_params(params, socket) do
+    if manage_all?(socket), do: params, else: Map.delete(params, "notes")
+  end
+
+  defp safe_search_users(query) do
+    Auth.search_users(query)
+  rescue
+    error ->
+      Logger.error("Owner search failed: #{inspect(error)}")
+      []
   end
 
   # Translatable feature labels. Each literal string is picked up by

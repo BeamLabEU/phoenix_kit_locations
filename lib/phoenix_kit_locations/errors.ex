@@ -37,6 +37,11 @@ defmodule PhoenixKitLocations.Errors do
   def message(:type_assignment_failed),
     do: gettext("Saved but failed to update type assignments.")
 
+  def message(:not_allowed), do: gettext("You don't have permission to do that.")
+
+  def message(:owner_update_failed),
+    do: gettext("Saved, but failed to change the owner.")
+
   def message(:space_not_found), do: gettext("Space not found.")
 
   def message(:parent_in_other_location),

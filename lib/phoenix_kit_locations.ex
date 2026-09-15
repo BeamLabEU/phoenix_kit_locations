@@ -19,6 +19,16 @@ defmodule PhoenixKitLocations do
 
   - **Location Types** — user-created categories (e.g., "Showroom", "Storage", "Office")
   - **Locations** — physical places with name, address, contact info, and an assigned type
+
+  ## Ownership
+
+  A location may belong to a `phoenix_kit_users` account (a person or an
+  organization); without an owner it is global. Admins see and assign
+  everything under `/admin/locations` (`locations.manage_all`); a user holding
+  only the base `locations` permission sees and manages just their own
+  locations on the same pages (`PhoenixKitLocations.Policy`). Tenant-facing code filters
+  with `Locations.list_locations(owner_uuid: uuid)` and resolves single rows
+  with `Locations.get_location_for_owner/2`.
   """
 
   use PhoenixKit.Module
@@ -37,6 +47,13 @@ defmodule PhoenixKitLocations do
 
   @impl PhoenixKit.Module
   def module_name, do: "Locations"
+
+  # Module-owned migration chain. Core's V135 baseline still CREATES the four
+  # location tables on every install; V1 of this chain ADOPTS them (stamps the
+  # `pkloc_schema:` marker without changing shape) and owns their future
+  # evolution. The V2+ shape-change protocol is in the coordinator's moduledoc.
+  @impl PhoenixKit.Module
+  def migration_module, do: PhoenixKitLocations.Migrations
 
   @impl PhoenixKit.Module
   def enabled? do
@@ -111,7 +128,18 @@ defmodule PhoenixKitLocations do
       key: module_key(),
       label: "Locations",
       icon: "hero-map-pin",
-      description: "Physical location management with custom types"
+      description:
+        "Physical location management with custom types. The base permission covers only " <>
+          "locations the user owns.",
+      sub_permissions: [
+        %{
+          key: "manage_all",
+          label: "Manage all locations",
+          description:
+            "Site-wide: every location (not just own), ownership, internal notes, attachments " <>
+              "and the location Types pages"
+        }
+      ]
     }
   end
 
@@ -163,6 +191,11 @@ defmodule PhoenixKitLocations do
         priority: 672,
         level: :admin,
         permission: module_key(),
+        # Types need `locations.manage_all`. Core maps each LiveView to ONE
+        # permission key and `LocationsLive` also serves the list, so the
+        # tab keeps the base key; `visible:` hides it and `LocationsLive` /
+        # `LocationTypeFormLive` refuse it (the bookings settings pattern).
+        visible: fn scope -> PhoenixKitLocations.Policy.manage_all?(scope) end,
         parent: :admin_locations,
         gettext_backend: PhoenixKitLocations.Gettext,
         gettext_domain: "default",
@@ -244,5 +277,13 @@ defmodule PhoenixKitLocations do
         live_view: {PhoenixKitLocations.Web.LocationStructureLive, :edit}
       }
     ]
+  end
+
+  # A user's locations cascade away with the user row (`owner_uuid` FK,
+  # `ON DELETE CASCADE`). The cascade leaves no audit trail, so log each one
+  # first. Core runs this best-effort and never lets it abort the deletion.
+  @impl PhoenixKit.Module
+  def before_user_delete(user_uuid) do
+    PhoenixKitLocations.Locations.log_owner_deletion(user_uuid)
   end
 end
