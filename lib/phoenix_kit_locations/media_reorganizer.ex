@@ -23,7 +23,20 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     * **A hook that raises, exits, or returns anything but `{:ok, uuid}` or
       an explicit `nil`** is a hook FAILURE: the record is skipped (no
       move planned for it) and counted into one `kind: :hook_error` report
-      for the whole plan. Only an explicit `nil` means "root".
+      for the whole plan. Only an explicit `nil` means "root". Every
+      `{:ok, uuid}` answer is cast through `Ecto.UUID.cast/1` and
+      downcased before use — a non-UUID answer is a failure too, and an
+      upper-case answer never looks "different" from the same answer
+      lower-cased on the next run. A configured `{mod, fun}` that isn't
+      actually callable is reported the same way, once, distinct from "no
+      hook configured". The (optional) `:attachments_folder_name` hook is
+      held to the same standard — a raising/garbage-returning name hook
+      also counts into `:hook_error`, not a silent legacy-name fallback.
+    * **An explicit `nil`/`{:ok, nil}` answer never pulls a folder that is
+      currently live under a real parent out to root.** For such a
+      candidate, `nil` yields only a pointer back-fill (if any); the
+      folder's actual parent and name are left untouched and the record is
+      counted into one `kind: :hook_nil` report for the whole plan.
     * **Current-folder lookup mirrors `Attachments.find_resource_folder/2`:**
       host-named folder under the resolved parent (unclaimed by another
       record's live pointer), then the legacy deterministic name under the
@@ -45,6 +58,9 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     * **A legacy-named folder live somewhere other than root or the
       resolved parent** (e.g. an old container from a previous layout) is
       left alone and reported `kind: :relocated` — never adopted or moved.
+      Every such stray copy gets its own report, not only the first one,
+      unless the copy is itself another record's claimed (adopted or
+      pointed-at) folder.
     * **Two records whose resolved *targets* would coincide** (same
       `{parent, desired name}`) are reported `kind: :duplicate` instead of
       both being planned as moves (the second would collide at apply
@@ -81,6 +97,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
 
   import Ecto.Query
 
+  require Logger
+
   alias PhoenixKit.Modules.Storage.{Folder, FolderLink}
   alias PhoenixKitLocations.Attachments
   alias PhoenixKitLocations.Schemas.{Location, Space}
@@ -109,7 +127,6 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   @spec plan(String.t() | nil, keyword()) :: [map()]
   def plan(actor_uuid, opts \\ []) do
     pending_days = Keyword.get(opts, :pending_days, @default_pending_days)
-    hook_on? = hook_configured?()
 
     # R10: locations before their spaces, each ordered inserted_at/uuid —
     # a deterministic, readable report order.
@@ -119,11 +136,19 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     # record's pointer names is never a pending-trash/orphan candidate.
     pointer_claims = live_pointer_claims(tagged_records)
 
-    {resource_actions, resolved_claims, resolved_parents} =
-      if hook_on? do
-        build_resource_plan(tagged_records, pointer_claims, actor_uuid)
-      else
-        {[], claimed_folder_uuids([], [], [], []), []}
+    {resource_actions, resolved_claims, resolved_parents, hook_on?} =
+      case hook_status() do
+        :ok ->
+          {actions, claims, parents} =
+            build_resource_plan(tagged_records, pointer_claims, actor_uuid)
+
+          {actions, claims, parents, true}
+
+        {:not_callable, mod, fun} ->
+          {[not_callable_hook_action(mod, fun)], claimed_folder_uuids([], [], [], []), [], false}
+
+        :none ->
+          {[], claimed_folder_uuids([], [], [], []), [], false}
       end
 
     claimed_uuids = MapSet.union(pointer_claims, resolved_claims)
@@ -135,18 +160,38 @@ defmodule PhoenixKitLocations.MediaReorganizer do
 
   # ── Locations / spaces ──────────────────────────────────────────
 
-  defp hook_configured? do
+  # T3: a configured `{mod, fun}` that is not actually callable (a typo,
+  # a removed function) is a distinct failure from "no hook configured at
+  # all" — it must not silently degrade to report-only (E1) without
+  # telling the owner why nothing moved.
+  defp hook_status do
     case Application.get_env(:phoenix_kit_locations, :attachments_parent_folder) do
       {mod, fun} when is_atom(mod) and is_atom(fun) ->
-        Code.ensure_loaded?(mod) and
-          (function_exported?(mod, fun, 3) or function_exported?(mod, fun, 2))
+        if callable?(mod, fun), do: :ok, else: {:not_callable, mod, fun}
 
       _ ->
-        false
+        :none
     end
   end
 
-  defp tag(records, kind), do: Enum.map(records, &{&1, kind})
+  defp callable?(mod, fun) do
+    Code.ensure_loaded?(mod) and
+      (function_exported?(mod, fun, 3) or function_exported?(mod, fun, 2))
+  end
+
+  defp not_callable_hook_action(mod, fun) do
+    %{
+      source: "locations",
+      kind: :hook_error,
+      op: :report,
+      label: "attachments parent hook",
+      counts: nil,
+      reason: "configured parent hook {#{inspect(mod)}, #{inspect(fun)}} is not callable"
+    }
+  end
+
+  defp tag(records, kind),
+    do: Enum.map(records, fn {record, pointer} -> {record, pointer, kind} end)
 
   # E1/D1: candidate detection needs no hook call, so build_resource_plan
   # is only reached at all when a parent hook is configured (see plan/2).
@@ -156,11 +201,11 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     {mod, fun} = Application.get_env(:phoenix_kit_locations, :attachments_parent_folder)
 
     prelim =
-      Enum.map(tagged_records, fn {record, kind} ->
+      Enum.map(tagged_records, fn {record, pointer, kind} ->
         %{
           record: record,
           kind: kind,
-          pointer: valid_uuid(pointer_uuid(record)),
+          pointer: valid_uuid(pointer),
           legacy_name: legacy_name(record)
         }
       end)
@@ -168,6 +213,10 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     by_pointer = preload_by_uuid(Enum.map(prelim, & &1.pointer))
     by_name = preload_by_name_anywhere(Enum.map(prelim, & &1.legacy_name))
 
+    # R10/T6: candidates keep the light query's deterministic order
+    # (location → space, each by inserted_at/uuid) via `order_index` —
+    # splitting into pointer/name tracks below and re-merging them must
+    # not scramble it.
     candidates =
       prelim
       |> Enum.filter(fn p ->
@@ -175,29 +224,28 @@ defmodule PhoenixKitLocations.MediaReorganizer do
           Map.has_key?(by_name, p.legacy_name)
       end)
       |> hydrate_candidate_records()
+      |> Enum.with_index()
+      |> Enum.map(fn {c, idx} -> Map.put(c, :order_index, idx) end)
 
     {resolved_all, hook_error_count} =
       resolve_candidates(candidates, by_pointer, by_name, mod, fun, pointer_claims, actor_uuid)
 
-    {relocated, resolved} = Enum.split_with(resolved_all, & &1.relocated)
-    relocated_actions = Enum.map(relocated, &build_relocated_action/1)
+    resolved_all =
+      resolved_all
+      |> Enum.sort_by(& &1.order_index)
+      |> Enum.map(&apply_nil_root_guard/1)
 
-    # A record whose current folder was resolved (via pointer or a
-    # host/legacy match) can still leave a SEPARATE legacy-named folder
-    # live somewhere else entirely (e.g. an old container from a previous
-    # layout) — that stray twin is neither this record's current folder
-    # nor an orphan (the record is alive), so it gets its own `:relocated`
-    # report alongside whatever action the record itself gets.
-    stray_actions =
-      resolved
-      |> Enum.filter(& &1.stray_legacy)
-      |> Enum.map(&build_relocated_action(%{&1 | relocated: &1.stray_legacy}))
+    hook_nil_count = Enum.count(resolved_all, & &1.hook_nil)
 
     resolved_parents =
-      resolved |> Enum.map(& &1.parent_uuid) |> Enum.reject(&is_nil/1) |> Enum.uniq()
+      resolved_all
+      |> Enum.filter(& &1.folder)
+      |> Enum.map(& &1.parent_uuid)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
 
-    {ambiguous, normal} = Enum.split_with(resolved, & &1.ambiguous)
-    {with_folder, _without_folder} = Enum.split_with(normal, & &1.folder)
+    {ambiguous, normal} = Enum.split_with(resolved_all, & &1.ambiguous)
+    {with_folder, without_folder} = Enum.split_with(normal, & &1.folder)
 
     {shared, unique} = split_shared(with_folder)
     {converging, solo} = split_converging(unique)
@@ -207,17 +255,54 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     shared_actions = Enum.map(shared, &build_shared_duplicate_action/1)
     converging_actions = Enum.map(converging, &build_converging_duplicate_action/1)
     hook_error_actions = hook_error_action(hook_error_count)
+    hook_nil_actions = hook_nil_action(hook_nil_count)
+
+    claimed = claimed_folder_uuids(unique, ambiguous, shared, converging)
+    all_claimed = MapSet.union(claimed, pointer_claims)
+
+    # F5/T5: every live legacy-named copy other than the record's adopted
+    # current folder (if any) gets its own `:relocated` report — all of
+    # them, not only the first — except a copy that is itself another
+    # record's claimed (adopted) folder, which is never also reported as
+    # relocated.
+    stray_actions =
+      Enum.flat_map(with_folder ++ without_folder, &stray_relocated_actions(&1, all_claimed))
 
     all_actions =
       move_actions ++
         dup_actions ++
         shared_actions ++
-        converging_actions ++ relocated_actions ++ stray_actions ++ hook_error_actions
-
-    claimed = claimed_folder_uuids(unique, ambiguous, shared, converging)
+        converging_actions ++ stray_actions ++ hook_error_actions ++ hook_nil_actions
 
     {finalize_counts(all_actions), claimed, resolved_parents}
   end
+
+  # F5/T5: a live legacy-named copy of a record other than its adopted
+  # current folder — one `:relocated` report per copy, all of them, never
+  # just the first. A copy that is itself claimed by another record (its
+  # own resolved current folder, or a live pointer) is excluded — a
+  # claimed folder is never also reported `:relocated`.
+  defp stray_relocated_actions(entry, claimed) do
+    entry.stray_legacy
+    |> Enum.reject(&MapSet.member?(claimed, &1.uuid))
+    |> Enum.map(&build_relocated_action(%{record: entry.record, kind: entry.kind, relocated: &1}))
+  end
+
+  # F1: an explicit `nil`/`{:ok, nil}` answer from the parent hook never
+  # pulls a folder that currently lives under a real parent out to root —
+  # only a pointer back-fill (if any) is kept; the parent and name stay
+  # exactly as they are (no rename either). Named/pointer resolution above
+  # already guarantees `entry.folder` is the record's actual current
+  # folder when set, so this is safe regardless of resolution route.
+  defp apply_nil_root_guard(%{folder: %Folder{parent_uuid: parent_uuid}} = entry)
+       when not is_nil(parent_uuid) and is_nil(entry.parent_uuid) do
+    entry
+    |> Map.put(:parent_uuid, parent_uuid)
+    |> Map.put(:name, nil)
+    |> Map.put(:hook_nil, true)
+  end
+
+  defp apply_nil_root_guard(entry), do: Map.put(entry, :hook_nil, false)
 
   defp legacy_name(record) do
     case Attachments.folder_name_for(record) do
@@ -281,13 +366,21 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         sort_candidate(p, by_pointer, mod, fun, actor_uuid, acc)
       end)
 
-    pointer_entries =
+    pointer_results =
       pointer_track |> Enum.reverse() |> Enum.map(&resolve_pointer_entry(&1, by_name, actor_uuid))
 
-    name_entries =
+    {pointer_entries, pointer_error_count} = split_hook_errors(pointer_results)
+
+    {name_entries, name_error_count} =
       resolve_name_entries(Enum.reverse(name_track), by_name, pointer_claims, actor_uuid)
 
-    {pointer_entries ++ name_entries, hook_error_count}
+    total_errors = hook_error_count + pointer_error_count + name_error_count
+    {pointer_entries ++ name_entries, total_errors}
+  end
+
+  defp split_hook_errors(results) do
+    {ok, errors} = Enum.split_with(results, &(&1 != :hook_error))
+    {ok, length(errors)}
   end
 
   defp sort_candidate(p, by_pointer, mod, fun, actor_uuid, {ptrs, names, errs}) do
@@ -320,17 +413,40 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     end
   end
 
+  # T1: every answer is cast through `Ecto.UUID.cast/1` and downcased —
+  # `{:ok, ""}` / `{:ok, "not-a-uuid"}` are hook FAILURES (`:error`), never
+  # sent into a later `in ^uuids` query (which would raise a CastError and
+  # take down the whole plan). This also normalises case, so an upper-case
+  # parent answer never looks "different" from the same lower-case answer
+  # on the next run. F2: an explicit `{:ok, nil}` or bare `nil` means root.
   defp guarded_hook_call(fun) do
     case fun.() do
-      {:ok, uuid} when is_binary(uuid) -> {:ok, uuid}
-      {:ok, nil} -> {:ok, nil}
-      nil -> {:ok, nil}
-      _other -> :error
+      {:ok, uuid} when is_binary(uuid) ->
+        case valid_uuid(uuid) do
+          nil -> :error
+          cast -> {:ok, cast}
+        end
+
+      {:ok, nil} ->
+        {:ok, nil}
+
+      nil ->
+        {:ok, nil}
+
+      _other ->
+        :error
     end
   rescue
-    _ -> :error
+    error ->
+      Logger.warning(
+        "Attachments parent hook raised: " <> Exception.format(:error, error, __STACKTRACE__)
+      )
+
+      :error
   catch
-    _, _ -> :error
+    kind, reason ->
+      Logger.warning("Attachments parent hook #{kind}: #{inspect(reason)}")
+      :error
   end
 
   # D6/E2: a folder found through the record's live pointer keeps its own
@@ -338,32 +454,45 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # which case it gets the host name like any other candidate (R8: the
   # name hook is skipped entirely otherwise).
   defp resolve_pointer_entry(%{pointer_folder: folder} = d, by_name, actor_uuid) do
-    name = if folder.name == d.legacy_name, do: safe_folder_name(d.record, actor_uuid)
+    name_result =
+      if folder.name == d.legacy_name do
+        resolve_folder_name(d.record, actor_uuid)
+      else
+        {:ok, nil}
+      end
 
-    %{
-      record: d.record,
-      kind: d.kind,
-      pointer: d.pointer,
-      legacy_name: d.legacy_name,
-      parent_uuid: d.parent_uuid,
-      name: name,
-      folder: folder,
-      via: :pointer,
-      ambiguous: nil,
-      relocated: nil,
-      stray_legacy: stray_legacy_twin(d.legacy_name, by_name, folder.uuid)
-    }
+    case name_result do
+      :error ->
+        :hook_error
+
+      {:ok, name} ->
+        %{
+          record: d.record,
+          kind: d.kind,
+          pointer: d.pointer,
+          legacy_name: d.legacy_name,
+          parent_uuid: d.parent_uuid,
+          order_index: d.order_index,
+          name: name,
+          folder: folder,
+          via: :pointer,
+          ambiguous: nil,
+          stray_legacy: stray_legacy_matches(d.legacy_name, by_name, folder.uuid)
+        }
+    end
   end
 
-  # A live record's actual current folder (its pointer, or a host/legacy
-  # match) can still leave a SEPARATE legacy-named folder live somewhere
-  # else entirely — not this record's current folder, and not an orphan
-  # either (the record is alive) — so it gets its own report so it is
-  # never silently dropped.
-  defp stray_legacy_twin(legacy_name, by_name, current_folder_uuid) do
+  # F5/T5: every live match for the legacy name other than the record's
+  # own current folder — a list, not just the first one. A live record's
+  # actual current folder (its pointer, or a host/legacy match) can still
+  # leave SEPARATE legacy-named folders live somewhere else entirely — not
+  # this record's current folder, and not an orphan either (the record is
+  # alive) — so each of them gets its own report so none is silently
+  # dropped.
+  defp stray_legacy_matches(legacy_name, by_name, current_folder_uuid) do
     by_name
     |> Map.get(legacy_name, [])
-    |> Enum.find(&(&1.uuid != current_folder_uuid))
+    |> Enum.reject(&(&1.uuid == current_folder_uuid))
   end
 
   # R3: the module's own lookup order for a record with no live pointer —
@@ -372,14 +501,25 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # under the resolved parent, then the legacy name at root. Host-named
   # and legacy-named both live at once (or two legacy matches) are
   # unresolvable duplicates. A legacy match that is live under neither the
-  # resolved parent nor root is left alone and reported `:relocated`.
+  # resolved parent nor root is left alone and reported `:relocated`. F3:
+  # a candidate whose name hook fails is skipped entirely (counted as a
+  # hook error) before the batched host-name lookup even runs for it.
   defp resolve_name_entries(candidates, by_name, pointer_claims, actor_uuid) do
-    with_host_name =
-      Enum.map(candidates, &Map.put(&1, :host_name, safe_folder_name(&1.record, actor_uuid)))
+    {ok_candidates, error_count} =
+      Enum.reduce(candidates, {[], 0}, fn c, {acc, errs} ->
+        case resolve_folder_name(c.record, actor_uuid) do
+          {:ok, name} -> {[Map.put(c, :host_name, name) | acc], errs}
+          :error -> {acc, errs + 1}
+        end
+      end)
 
+    with_host_name = Enum.reverse(ok_candidates)
     host_map = preload_host_named_under_parent(with_host_name)
 
-    Enum.map(with_host_name, &resolve_name_entry(&1, by_name, host_map, pointer_claims))
+    entries =
+      Enum.map(with_host_name, &resolve_name_entry(&1, by_name, host_map, pointer_claims))
+
+    {entries, error_count}
   end
 
   # Only host names that actually differ from the deterministic legacy
@@ -451,19 +591,21 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       pointer: d.pointer,
       legacy_name: d.legacy_name,
       parent_uuid: d.parent_uuid,
+      order_index: d.order_index,
       folder: nil,
       via: nil,
       name: nil,
       ambiguous: nil,
-      relocated: nil,
-      stray_legacy: nil
+      stray_legacy: []
     }
 
-    # A third live legacy-named match — left over once the chosen
+    # F5: every match live under neither the resolved parent nor root —
+    # all of them, not only the first — left over once the chosen
     # `legacy_folder` (if any) is accounted for. Only meaningful for the
-    # "host wins" / "legacy wins" branches below; the ambiguous/relocated
-    # branches already consume every match into their own report.
-    stray_legacy = Enum.find(matches, &(&1 != legacy_folder))
+    # "host wins" / "legacy wins" / "nothing resolves" branches below; the
+    # ambiguous branches already consume every match into their own
+    # report.
+    stray_legacy = Enum.reject(matches, &(&1 == legacy_folder))
 
     resolve_name_entry_result(
       base,
@@ -533,6 +675,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     %{base | folder: legacy_folder, via: :name, name: name, stray_legacy: stray_legacy}
   end
 
+  # Nothing resolves as the current folder at all — every live match is a
+  # stray copy, reported `:relocated` (F5: every one of them).
   defp resolve_name_entry_result(
          base,
          _name,
@@ -540,25 +684,10 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          _legacy_folder,
          _under,
          _root,
-         [
-           first | _
-         ],
-         _stray
-       ) do
-    %{base | relocated: first}
-  end
-
-  defp resolve_name_entry_result(
-         base,
-         _name,
-         _host_folder,
-         _legacy_folder,
-         _under,
-         _root,
-         [],
+         matches,
          _stray
        ),
-       do: base
+       do: %{base | stray_legacy: matches}
 
   # Splits entries whose current folder is claimed by exactly one record
   # (`unique`) from those two or more records resolve to the very same
@@ -704,19 +833,53 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     }
   end
 
-  # Defensive: `Attachments.folder_name/2` already falls back to the
-  # deterministic legacy name when the host hook is missing or returns an
-  # invalid value; this only guards against the hook itself raising.
-  defp safe_folder_name(record, actor_uuid) do
-    Attachments.folder_name(record, actor_uuid)
-  rescue
-    _ -> legacy_name(record)
-  catch
-    _, _ -> legacy_name(record)
+  # F3: the (optional) `:attachments_folder_name` hook, called directly
+  # (not through `Attachments.folder_name/2`, which is deliberately
+  # defensive for the live UI) so a raising/garbage-returning hook is a
+  # reportable failure here instead of a silent legacy-name fallback. Not
+  # configured, or configured but not callable, is NOT a failure — it is
+  # simply "no host name", same as `Attachments.folder_name/2` treats it.
+  defp resolve_folder_name(record, actor_uuid) do
+    case Application.get_env(:phoenix_kit_locations, :attachments_folder_name) do
+      {mod, fun} when is_atom(mod) and is_atom(fun) ->
+        resolve_configured_folder_name(mod, fun, record, actor_uuid)
+
+      _ ->
+        {:ok, legacy_name(record)}
+    end
   end
 
-  defp pointer_uuid(%{data: data}) when is_map(data), do: Map.get(data, "files_folder_uuid")
-  defp pointer_uuid(_), do: nil
+  defp resolve_configured_folder_name(mod, fun, record, actor_uuid) do
+    if Code.ensure_loaded?(mod) and function_exported?(mod, fun, 2) do
+      case guarded_name_hook_call(mod, fun, record, actor_uuid) do
+        {:ok, nil} -> {:ok, legacy_name(record)}
+        {:ok, name} -> {:ok, name}
+        :error -> :error
+      end
+    else
+      {:ok, legacy_name(record)}
+    end
+  end
+
+  defp guarded_name_hook_call(mod, fun, record, actor_uuid) do
+    case apply(mod, fun, [record, actor_uuid]) do
+      {:ok, name} when is_binary(name) and name != "" -> {:ok, name}
+      nil -> {:ok, nil}
+      _other -> :error
+    end
+  rescue
+    error ->
+      Logger.warning(
+        "Attachments name hook #{inspect(mod)}.#{fun} raised: " <>
+          Exception.format(:error, error, __STACKTRACE__)
+      )
+
+      :error
+  catch
+    kind, reason ->
+      Logger.warning("Attachments name hook #{inspect(mod)}.#{fun} #{kind}: #{inspect(reason)}")
+      :error
+  end
 
   # R5/X3: a pointer that is not a well-formed UUID is treated as absent,
   # never sent into an `in ^uuids` query (which would raise a CastError).
@@ -772,7 +935,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   defp live_pointer_claims(tagged_records) do
     pointers =
       tagged_records
-      |> Enum.map(fn {record, _kind} -> valid_uuid(pointer_uuid(record)) end)
+      |> Enum.map(fn {_record, pointer, _kind} -> valid_uuid(pointer) end)
       |> Enum.reject(&is_nil/1)
       |> Enum.uniq()
 
@@ -850,8 +1013,26 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         label: "attachments parent hook",
         counts: nil,
         reason:
-          "#{count} record(s) skipped: the configured parent hook raised, exited, or " <>
-            "returned neither {:ok, uuid} nor nil"
+          "#{count} record(s) skipped: the configured parent or name hook raised, exited, " <>
+            "or returned neither {:ok, uuid} nor nil"
+      }
+    ]
+  end
+
+  # F1: a plain count, not one report per record — mirrors hook_error_action.
+  defp hook_nil_action(0), do: []
+
+  defp hook_nil_action(count) do
+    [
+      %{
+        source: "locations",
+        kind: :hook_nil,
+        op: :report,
+        label: "attachments parent hook",
+        counts: nil,
+        reason:
+          "#{count} record(s): the parent hook answered root for a folder living under a " <>
+            "parent — left in place"
       }
     ]
   end
@@ -1140,23 +1321,29 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   end
 
   # R9/R10: only the columns a plan needs (never the full jsonb-heavy
-  # row) — including the FKs a resource-aware host hook might reasonably
-  # need (`location_uuid`/`parent_uuid` for a space) — ordered by
-  # `inserted_at`/`uuid` for a deterministic, readable report order.
+  # `data` column) — including the FKs a resource-aware host hook might
+  # reasonably need once a candidate's record is swapped for its FULL row
+  # (`location_uuid`/`parent_uuid` for a space) — ordered by
+  # `inserted_at`/`uuid` for a deterministic, readable report order. T8:
+  # the pointer is extracted via a jsonb fragment instead of selecting the
+  # whole `data` column — a light row returns `{struct, pointer_uuid_or_nil}`.
   defp light_locations do
     Location
     |> order_by([l], asc: l.inserted_at, asc: l.uuid)
-    |> select([l], struct(l, [:uuid, :name, :status, :data, :inserted_at]))
+    |> select([l], {
+      struct(l, [:uuid, :name, :status, :inserted_at]),
+      fragment("?->>'files_folder_uuid'", l.data)
+    })
     |> repo().all()
   end
 
   defp light_spaces do
     Space
     |> order_by([s], asc: s.inserted_at, asc: s.uuid)
-    |> select(
-      [s],
-      struct(s, [:uuid, :name, :status, :data, :location_uuid, :parent_uuid, :kind, :inserted_at])
-    )
+    |> select([s], {
+      struct(s, [:uuid, :name, :status, :location_uuid, :parent_uuid, :kind, :inserted_at]),
+      fragment("?->>'files_folder_uuid'", s.data)
+    })
     |> repo().all()
   end
 
