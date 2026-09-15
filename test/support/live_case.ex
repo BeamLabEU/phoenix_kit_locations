@@ -42,29 +42,45 @@ defmodule PhoenixKitLocations.LiveCase do
     pid = Sandbox.start_owner!(TestRepo, shared: not tags[:async])
     on_exit(fn -> Sandbox.stop_owner(pid) end)
 
+    enable_locations()
+
+    # Every conn starts as a site-wide locations admin (base +
+    # `locations.manage_all`). Tests for location-scoped users replace it with
+    # `put_test_scope(conn, fake_scope(permissions: ["locations"], ...))`.
     conn =
       Phoenix.ConnTest.build_conn()
-      |> Plug.Test.init_test_session(%{})
+      |> Plug.Test.init_test_session(%{"phoenix_kit_test_scope" => fake_scope()})
 
     {:ok, conn: conn}
   end
 
   @doc """
+  Turns the module on inside the test's sandbox. `Scope.can?/2` requires the
+  base module to be enabled, so `locations.manage_all` is inert without it.
+  Core's settings cache isn't started in this suite, so the write stays in the
+  sandbox transaction.
+  """
+  def enable_locations do
+    PhoenixKit.Settings.update_boolean_setting("locations_enabled", true)
+  end
+
+  @doc """
   Returns a real `PhoenixKit.Users.Auth.Scope` struct for testing.
 
-  Locations LVs read `socket.assigns[:phoenix_kit_current_scope]` only
-  to thread the user UUID into `actor_opts/1`. They do not call
-  `Scope.admin?/1` or `has_module_access?/2`, so the role/permission
-  fields are present but unused here. (Per workspace AGENTS.md:1175,
-  `cached_roles` must be a list of role-name strings if `admin?/1`
-  ever gets called — locations doesn't, but we follow the convention.)
+  Locations LVs read `socket.assigns[:phoenix_kit_current_scope]` for the
+  user UUID (`actor_opts/1`, ownership) and, through
+  `PhoenixKitLocations.Policy`, for `Scope.can?(scope, "locations.manage_all")`.
+  (`cached_roles` is a list of role-name strings, per the workspace
+  convention.)
 
   ## Options
 
     * `:user_uuid` — defaults to a fresh UUIDv4
     * `:email` — defaults to a unique-suffix string
     * `:roles` — list of role-name strings; defaults to `["Owner"]`
-    * `:permissions` — list of module-key strings; defaults to `["locations"]`
+    * `:permissions` — list of permission keys; defaults to
+      `["locations", "locations.manage_all"]` (a site-wide admin). Pass
+      `["locations"]` for a user scoped to their own locations.
     * `:authenticated?` — defaults to `true`
 
   ## Example
@@ -76,7 +92,7 @@ defmodule PhoenixKitLocations.LiveCase do
     user_uuid = Keyword.get(opts, :user_uuid, Ecto.UUID.generate())
     email = Keyword.get(opts, :email, "test-#{System.unique_integer([:positive])}@example.com")
     roles = Keyword.get(opts, :roles, ["Owner"])
-    permissions = Keyword.get(opts, :permissions, ["locations"])
+    permissions = Keyword.get(opts, :permissions, ["locations", "locations.manage_all"])
     authenticated? = Keyword.get(opts, :authenticated?, true)
 
     user = %{uuid: user_uuid, email: email}
@@ -106,6 +122,25 @@ defmodule PhoenixKitLocations.LiveCase do
       )
 
     type
+  end
+
+  @doc """
+  Inserts a real `phoenix_kit_users` row, so `owner_uuid` foreign keys are
+  satisfied. Goes through the schema rather than `Auth.register_user/1`, which
+  needs core's rate-limiter process (not started in this suite) and a bcrypt
+  round per call.
+  """
+  def fixture_user(attrs \\ %{}) do
+    n = System.unique_integer([:positive])
+
+    defaults = %{
+      email: "owner-#{n}@example.com",
+      username: "owner_#{n}",
+      hashed_password: "$2b$12$notarealhashjustenoughtosatisfythecolumn",
+      is_active: true
+    }
+
+    TestRepo.insert!(struct(PhoenixKit.Users.Auth.User, Map.merge(defaults, attrs)))
   end
 
   @doc "Creates a Location fixture with a unique name."

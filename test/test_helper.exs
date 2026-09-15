@@ -62,11 +62,25 @@ repo_available =
     try do
       {:ok, _} = PhoenixKitLocations.Test.Repo.start_link()
 
-      # Use core's `ensure_current/2` so the test schema tracks whatever
-      # V-migrations core ships; no module-side DDL. See `PhoenixKit.Migration`
-      # for re-runnable semantics. Accumulates rows in `schema_migrations`
+      # Core's `ensure_current/2` first, so the test schema tracks whatever
+      # V-migrations core ships (users, settings, activities, the
+      # `uuid_generate_v7()` function, and — until core's next baseline
+      # squash — the four location tables). See `PhoenixKit.Migration` for
+      # re-runnable semantics. Accumulates rows in `schema_migrations`
       # between resets — cleared by `mix test.reset`.
       PhoenixKit.Migration.ensure_current(PhoenixKitLocations.Test.Repo, log: false)
+
+      # Then this module's own chain, through the same statements a host's
+      # generated wrapper runs. `up/1` uses `execute/1`, which only works
+      # inside an `Ecto.Migration` run, so replay `up_statements/1` through
+      # the repo instead. Every statement is idempotent; the version check
+      # just skips the replay on an already-current database.
+      if PhoenixKitLocations.Migrations.migrated_version_runtime(prefix: "public") <
+           PhoenixKitLocations.Migrations.current_version() do
+        for stmt <- PhoenixKitLocations.Migrations.up_statements("public") do
+          PhoenixKitLocations.Test.Repo.query!(stmt, [], log: false)
+        end
+      end
 
       Ecto.Adapters.SQL.Sandbox.mode(PhoenixKitLocations.Test.Repo, :manual)
       true
@@ -92,6 +106,12 @@ repo_available =
   end
 
 Application.put_env(:phoenix_kit_locations, :test_repo_available, repo_available)
+
+# Core's ModuleRegistry backs `Scope.can?/2` for `locations.manage_all`: it
+# resolves the sub-permission's base key and the module-enabled check.
+# Mirrors phoenix_kit_bookings' test helper.
+{:ok, _pid} = PhoenixKit.PubSub.Manager.start_link([])
+{:ok, _pid} = PhoenixKit.ModuleRegistry.start_link([])
 
 # Exclude integration tests when DB is not available
 exclude = if repo_available, do: [], else: [:integration]

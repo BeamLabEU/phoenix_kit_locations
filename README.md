@@ -26,7 +26,7 @@ def deps do
 end
 ```
 
-The module is auto-discovered by PhoenixKit — no manual router configuration needed. Run the PhoenixKit migrations to create the required database tables.
+The module is auto-discovered by PhoenixKit — no manual router configuration needed. Run `mix phoenix_kit.update`: it applies core's migrations, then this module's own chain (`PhoenixKitLocations.Migrations`), generating a wrapper migration in your repo's migrations directory. Commit that file.
 
 ## Usage
 
@@ -48,6 +48,23 @@ Routes are registered automatically:
 | `/admin/locations/types/new` | Create type |
 | `/admin/locations/types/:uuid/edit` | Edit type |
 
+The list shows each location's **Owner** and filters by All / Global / Owned; the location form has an owner picker.
+
+### Permissions: own locations vs. all locations
+
+A location can belong to a user (a person or an organization account). Without an owner it is global. The same `/admin/locations` pages serve both kinds of user:
+
+| Permission | Grants |
+|------------|--------|
+| `locations` | The Locations pages, scoped to locations the user owns: list, create (owned by the creator), edit, delete, Structure |
+| `locations.manage_all` | Every location (owned or global), assigning owners, internal notes, attachments, and the Types pages |
+
+Grant `locations` alone to a role (for example "Seller") so its users manage only their own sites; grant `locations.manage_all` as well to staff who manage everything. Admin receives both automatically, and Owner holds every permission.
+
+⚠️ **Upgrading:** before this change, `locations` opened every location. A custom role that holds `locations` now sees only its own locations until it is also granted `locations.manage_all`. Admin and Owner are unaffected.
+
+Deleting a user deletes the locations they own, with their spaces.
+
 ### Programmatic Access
 
 All business logic lives in the `PhoenixKitLocations.Locations` context:
@@ -67,7 +84,18 @@ Locations.create_location_type(%{name: "Office"})
 # Type assignments (take location_uuid, not the struct)
 Locations.sync_location_types(location.uuid, [type_uuid_1, type_uuid_2])
 Locations.has_type?(location.uuid, type_uuid)
+
+# Ownership — the owner is never taken from attrs, only from these calls
+{:ok, site} = Locations.create_location(%{name: "North Depot"}, owner_uuid: user.uuid)
+Locations.set_location_owner(site, other_user.uuid, actor_uuid: admin.uuid)  # or nil for global
+Locations.list_locations(owner_uuid: user.uuid)   # only this owner's locations
+Locations.list_locations(owner_uuid: nil)         # only global locations
+Locations.list_locations(owner_uuid: :any)        # every owned location
+Locations.list_locations()                        # everything — never for tenant-facing pages
+Locations.get_location_for_owner(uuid, user.uuid) # nil unless user owns it
 ```
+
+`PlacePicker` takes the same filter as an attr (`owner_uuid={@current_user.uuid}`) and enforces it on selection.
 
 ### Error Handling
 
@@ -82,7 +110,7 @@ end
 
 ### Activity Logging
 
-Every mutating context function logs a business-level activity to `PhoenixKit.Activity` when an `actor_uuid:` opt is passed. Logging is fire-and-forget — failures (e.g. host hasn't run core's V90 migration) never crash the primary operation. The action format is `"resource.verb"`: `location.created`, `location.updated`, `location.deleted`, `location.types_synced`, `location_type.created`, etc.
+Every mutating context function logs a business-level activity to `PhoenixKit.Activity` when an `actor_uuid:` opt is passed. Logging is fire-and-forget — failures (e.g. host hasn't run core's V90 migration) never crash the primary operation. The action format is `"resource.verb"`: `location.created`, `location.updated`, `location.deleted`, `location.owner_changed`, `location.types_synced`, `location_type.created`, etc.
 
 ### Location Features
 
@@ -99,13 +127,14 @@ Locations.create_location(%{
 
 ## Database Schemas
 
-All schemas use UUIDv7 primary keys. Tables are created by PhoenixKit migrations.
+All schemas use UUIDv7 primary keys. The tables belong to this module's versioned migration chain, `PhoenixKitLocations.Migrations` (version tracked as a `pkloc_schema:<N>` comment on `phoenix_kit_locations`). Core's baseline also still creates them on existing installs; V1 of the chain adopts those tables without changing their shape, and rolling the chain back never drops a table.
 
 | Table | Description |
 |-------|-------------|
-| `phoenix_kit_locations` | Locations with address, contact, features, and multilang data |
+| `phoenix_kit_locations` | Locations with address, contact, features, multilang data, and an optional `owner_uuid` (chain V2) |
 | `phoenix_kit_location_types` | User-defined location categories |
 | `phoenix_kit_location_type_assignments` | Many-to-many join table |
+| `phoenix_kit_location_spaces` | Per-location tree of floors, rooms, zones, sections, aisles, shelves |
 
 ## Development
 

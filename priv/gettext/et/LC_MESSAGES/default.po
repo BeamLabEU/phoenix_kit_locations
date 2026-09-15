@@ -11,47 +11,47 @@ msgstr ""
 "Language: et\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:135
+#: lib/phoenix_kit_locations/schemas/space.ex:136
 #, elixir-autogen, elixir-format
 msgid "Aisle"
 msgstr "Vahekäik"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:131
+#: lib/phoenix_kit_locations/schemas/space.ex:132
 #, elixir-autogen, elixir-format
 msgid "Floor"
 msgstr "Korrus"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:132
+#: lib/phoenix_kit_locations/schemas/space.ex:133
 #, elixir-autogen, elixir-format
 msgid "Room"
 msgstr "Ruum"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:134
+#: lib/phoenix_kit_locations/schemas/space.ex:135
 #, elixir-autogen, elixir-format
 msgid "Section"
 msgstr "Sektsioon"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:136
+#: lib/phoenix_kit_locations/schemas/space.ex:137
 #, elixir-autogen, elixir-format
 msgid "Shelf"
 msgstr "Riiul"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:133
+#: lib/phoenix_kit_locations/schemas/space.ex:134
 #, elixir-autogen, elixir-format
 msgid "Zone"
 msgstr "Tsoon"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:92
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:97
 #, elixir-autogen, elixir-format
 msgid "%{name} — Structure"
 msgstr "%{name} — Struktuur"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:460
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:474
 #, elixir-autogen, elixir-format
 msgid "Active"
 msgstr "Aktiivne"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:404
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:418
 #, elixir-autogen, elixir-format
 msgid "Add"
 msgstr "Lisa"
@@ -62,58 +62,58 @@ msgid "Add child"
 msgstr "Lisa alamelement"
 
 #: lib/phoenix_kit_locations/web/components/space_tree.ex:126
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:586
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:611
 #, elixir-autogen, elixir-format
 msgid "Add root space"
 msgstr "Lisa juurkoht"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:590
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:615
 #, elixir-autogen, elixir-format
 msgid "Add space"
 msgstr "Lisa koht"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:591
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:616
 #, elixir-autogen, elixir-format
 msgid "Add space under %{name}"
 msgstr "Lisa alamkoht: %{name}"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:407
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:421
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Tühista"
 
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:265
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:358
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "Muuda"
 
 #: lib/phoenix_kit_locations/web/components/space_tree.ex:290
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:542
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:559
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Kustuta"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:574
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:599
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{name}\" and its %{count} descendants? This cannot be undone."
 msgstr "Kustutada «%{name}» ja selle %{count} alamelementi? Seda ei saa tagasi võtta."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:570
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:595
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{name}\"? This cannot be undone."
 msgstr "Kustutada «%{name}»? Seda ei saa tagasi võtta."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:539
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:556
 #, elixir-autogen, elixir-format
 msgid "Delete Space"
 msgstr "Kustuta koht"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:488
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:502
 #, elixir-autogen, elixir-format
 msgid "Description"
 msgstr "Kirjeldus"
 
-#: lib/phoenix_kit_locations/web/components/location_tabs.ex:28
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:33
 #, elixir-autogen, elixir-format
 msgid "Details"
 msgstr "Üksikasjad"
@@ -128,29 +128,29 @@ msgstr "Muuda asukohta"
 msgid "Edit Type"
 msgstr "Muuda tüüpi"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:637
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:662
 #, elixir-autogen, elixir-format
 msgid "Failed to delete space"
 msgstr "Koha kustutamine ebaõnnestus"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:612
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:637
 #, elixir-autogen, elixir-format
 msgid "Failed to rename space"
 msgstr "Koha ümbernimetamine ebaõnnestus"
 
 #: lib/phoenix_kit_locations/web/components/space_tree.ex:237
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:460
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:474
 #, elixir-autogen, elixir-format
 msgid "Inactive"
 msgstr "Mitteaktiivne"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:495
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:510
 #, elixir-autogen, elixir-format
 msgid "Internal notes (admin-only)"
 msgstr "Sisemärkmed (ainult administraatoritele)"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:389
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:453
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:403
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:467
 #, elixir-autogen, elixir-format
 msgid "Kind"
 msgstr "Tüüp"
@@ -171,8 +171,8 @@ msgstr "Teisalda alla"
 msgid "Move up"
 msgstr "Teisalda üles"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:396
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:474
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:410
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:488
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "Nimi"
@@ -187,7 +187,7 @@ msgstr "Uus asukoht"
 msgid "New Type"
 msgstr "Uus tüüp"
 
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:340
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:433
 #, elixir-autogen, elixir-format
 msgid "No locations found"
 msgstr "Asukohti ei leitud"
@@ -197,12 +197,12 @@ msgstr "Asukohti ei leitud"
 msgid "No spaces yet."
 msgstr "Kohti pole veel."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:510
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:527
 #, elixir-autogen, elixir-format
 msgid "Photos, layouts, anything specific to this space."
 msgstr "Fotod, plaanid ja kõik muu selle koha kohta."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:511
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:528
 #, elixir-autogen, elixir-format
 msgid "Remove this file from the space?"
 msgstr "Eemaldada see fail selle koha juurest?"
@@ -212,33 +212,32 @@ msgstr "Eemaldada see fail selle koha juurest?"
 msgid "Rename"
 msgstr "Nimeta ümber"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:522
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:539
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "Salvesta"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:520
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:537
 #, elixir-autogen, elixir-format
 msgid "Saving..."
 msgstr "Salvestamine..."
 
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:299
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:392
 #, elixir-autogen, elixir-format
 msgid "Search locations…"
 msgstr "Otsi asukohti…"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:509
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:526
 #, elixir-autogen, elixir-format
 msgid "Shown for this space."
 msgstr "Kuvatakse selle koha juures."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:459
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:473
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Olek"
 
-#: lib/phoenix_kit_locations.ex:232
-#: lib/phoenix_kit_locations/web/components/location_tabs.ex:35
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:36
 #, elixir-autogen, elixir-format
 msgid "Structure"
 msgstr "Struktuur"
@@ -248,7 +247,59 @@ msgstr "Struktuur"
 msgid "Types"
 msgstr "Tüübid"
 
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:277
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:370
 #, elixir-autogen, elixir-format
 msgid "Use this location (no specific space)"
 msgstr "Kasuta seda asukohta (ilma konkreetse kohata)"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:80
+#, elixir-autogen, elixir-format
+msgid "A location with an owner is private to that account; without one it is global. The change applies when you save."
+msgstr "Omanikuga asukoht on selle konto privaatne; ilma omanikuta on see üldine. Muudatus rakendub salvestamisel."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:46
+#, elixir-autogen, elixir-format
+msgid "All"
+msgstr "Kõik"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:52
+#, elixir-autogen, elixir-format
+msgid "Filter by owner"
+msgstr "Filtreeri omaniku järgi"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:25
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:47
+#, elixir-autogen, elixir-format
+msgid "Global"
+msgstr "Üldine"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:92
+#, elixir-autogen, elixir-format
+msgid "No owner (global)"
+msgstr "Omanik puudub (üldine)"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:120
+#, elixir-autogen, elixir-format
+msgid "No users found."
+msgstr "Kasutajaid ei leitud."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:48
+#, elixir-autogen, elixir-format
+msgid "Owned"
+msgstr "Omanikuga"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:21
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:77
+#, elixir-autogen, elixir-format
+msgid "Owner"
+msgstr "Omanik"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:89
+#, elixir-autogen, elixir-format
+msgid "Remove owner"
+msgstr "Eemalda omanik"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:101
+#, elixir-autogen, elixir-format
+msgid "Search users by email or name…"
+msgstr "Otsi kasutajaid e-posti või nime järgi…"

@@ -17,10 +17,13 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   import PhoenixKitWeb.Components.Core.Modal, only: [confirm_modal: 1]
   import PhoenixKitWeb.Components.Core.TableDefault
   import PhoenixKitWeb.Components.Core.TableRowMenu
+  import PhoenixKitLocations.Web.Components.OwnerComponents
 
+  alias PhoenixKit.Users.Auth
   alias PhoenixKitLocations.Errors
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
+  alias PhoenixKitLocations.Policy
 
   @impl true
   def mount(_params, _session, socket) do
@@ -29,29 +32,57 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
        page_title: gettext("Locations"),
        locations: [],
        location_types: [],
+       manage_all: false,
+       owner_filter: :all,
+       owner_emails: %{},
        confirm_delete: nil
      )}
   end
 
   @impl true
-  def handle_params(_params, _uri, socket) do
+  def handle_params(params, _uri, socket) do
     action = socket.assigns.live_action || :index
+    manage_all? = Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope])
 
-    socket =
-      socket
-      |> assign(:active_tab, action)
-      |> assign(:page_title, tab_title(action))
-      |> assign(:confirm_delete, nil)
-      |> load_data(action)
+    if action == :types and not manage_all? do
+      # Types need `locations.manage_all`; the tab keeps the base key only
+      # because this LiveView also serves the list (see `admin_tabs/0`).
+      {:noreply,
+       socket
+       |> put_flash(:error, Errors.message(:not_allowed))
+       |> push_navigate(to: Paths.index())}
+    else
+      socket =
+        socket
+        |> assign(:active_tab, action)
+        |> assign(:page_title, tab_title(action))
+        |> assign(:confirm_delete, nil)
+        |> assign(:manage_all, manage_all?)
+        |> assign(
+          :owner_filter,
+          if(manage_all?, do: parse_owner_filter(params["owner"]), else: :all)
+        )
+        |> load_data(action)
 
-    {:noreply, socket}
+      {:noreply, socket}
+    end
   end
 
   defp tab_title(:index), do: gettext("Locations")
   defp tab_title(:types), do: gettext("Location Types")
 
   defp load_data(socket, :index) do
-    assign(socket, :locations, Locations.list_locations())
+    # `Policy` pins a user without `manage_all` to their own locations; the
+    # owner filter (always `:all` for them) only narrows a site-wide list.
+    locations =
+      Policy.list_locations(
+        socket.assigns[:phoenix_kit_current_scope],
+        owner_filter_opts(socket.assigns.owner_filter)
+      )
+
+    emails = if socket.assigns.manage_all, do: owner_emails(locations), else: %{}
+
+    assign(socket, locations: locations, owner_emails: emails)
   rescue
     error ->
       Logger.error("Failed to load locations: #{inspect(error)}")
@@ -74,6 +105,16 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         :error,
         gettext("Failed to load location types.")
       )
+  end
+
+  # One batched user lookup for every owner on the page.
+  defp owner_emails(locations) do
+    locations
+    |> Enum.map(& &1.owner_uuid)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> Auth.get_users_by_uuids()
+    |> Map.new(&{to_string(&1.uuid), &1.email})
   end
 
   # ── Event handlers ──────────────────────────────────────────────
@@ -121,7 +162,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   defp do_delete_location_type(socket, uuid), do: do_delete_item(socket, :location_type, uuid)
 
   defp do_delete_item(socket, kind, uuid) do
-    with %{} = record <- fetch_for_delete(kind, uuid),
+    with %{} = record <- fetch_for_delete(kind, uuid, socket),
          {:ok, _} <- delete_for_kind(kind, record, socket) do
       {:noreply,
        socket
@@ -155,8 +196,16 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
        |> assign(:confirm_delete, nil)}
   end
 
-  defp fetch_for_delete(:location, uuid), do: Locations.get_location(uuid)
-  defp fetch_for_delete(:location_type, uuid), do: Locations.get_location_type(uuid)
+  # The uuid comes from the client: resolve it against the scope. A location
+  # the user may not act on, or a type without `manage_all`, is a not-found.
+  defp fetch_for_delete(:location, uuid, socket),
+    do: Policy.get_location(socket.assigns[:phoenix_kit_current_scope], uuid)
+
+  defp fetch_for_delete(:location_type, uuid, socket) do
+    if Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope]),
+      do: Locations.get_location_type(uuid),
+      else: nil
+  end
 
   defp delete_for_kind(:location, record, socket) do
     Locations.delete_location(record, actor_opts(socket))
@@ -222,8 +271,9 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
       </.admin_page_header>
 
       <%!-- Locations tab content --%>
-      <div :if={@active_tab == :index}>
-        <.locations_table locations={@locations} />
+      <div :if={@active_tab == :index} class="flex flex-col gap-4">
+        <.owner_filter :if={@manage_all} active={@owner_filter} />
+        <.locations_table locations={@locations} owner_emails={@owner_emails} manage_all={@manage_all} />
       </div>
 
       <%!-- Types tab content --%>
@@ -269,7 +319,8 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         variant="zebra" size="sm" toggleable={true}
         id="locations-list" items={@locations}
         card_fields={fn l -> [
-          %{label: gettext("Address"), value: l.address_line_1 || "—"},
+          %{label: gettext("Address"), value: l.address_line_1 || "—"}
+        ] ++ owner_card_field(l, @manage_all, @owner_emails) ++ [
           %{label: gettext("Types"), value: type_names(l)},
           %{label: gettext("Status"), value: status_label(l.status)}
         ] end}
@@ -279,6 +330,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             <.table_default_header_cell>{gettext("Name")}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("Address")}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("City")}</.table_default_header_cell>
+            <.table_default_header_cell :if={@manage_all}>{owner_column_title()}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("Type")}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("Status")}</.table_default_header_cell>
             <.table_default_header_cell class="text-right whitespace-nowrap">{gettext("Actions")}</.table_default_header_cell>
@@ -293,6 +345,11 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             </.table_default_cell>
             <.table_default_cell class="text-sm text-base-content/60">{location.address_line_1 || "—"}</.table_default_cell>
             <.table_default_cell class="text-sm text-base-content/60">{location.city || "—"}</.table_default_cell>
+            <.table_default_cell :if={@manage_all} class="text-sm">
+              <span class={if location.owner_uuid, do: "", else: "text-base-content/40"}>
+                {owner_text(location.owner_uuid, @owner_emails)}
+              </span>
+            </.table_default_cell>
             <.table_default_cell>
               <div :if={location.location_types != []} class="flex flex-wrap gap-1">
                 <span :for={t <- location.location_types} class="badge badge-sm badge-outline">{t.name}</span>
@@ -390,6 +447,13 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   end
 
   defp type_names(_), do: "—"
+
+  # The owner card field only for a site-wide manager; a user scoped to their
+  # own locations owns every row they see.
+  defp owner_card_field(location, true, emails),
+    do: [%{label: owner_column_title(), value: owner_text(location.owner_uuid, emails)}]
+
+  defp owner_card_field(_location, _manage_all, _emails), do: []
 
   defp status_label("active"), do: gettext("Active")
   defp status_label("inactive"), do: gettext("Inactive")

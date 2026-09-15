@@ -26,12 +26,15 @@ mirroring how `phoenix_kit_locations.data` is used.
 shelf`. Floor and room are the top-level subdivisions of a location;
 zone/section/aisle/shelf are finer-grained subdivisions (production
 zones/sections, warehouse addressable storage). The DB CHECK constraint
-(`phoenix_kit_location_spaces_kind_check`, in core's baseline migration)
-intentionally still allows a wider set (`hall`, `suite`, `corner`) reserved for
-future growth without an immediate migration; narrowing to the app-layer list
-happens in the schema. Adding one of the reserved kinds is a schema-only change:
-extend `@kinds`, `kind_label/1` and `kind_icon/1`. Adding a kind outside the
-CHECK list is a core migration first.
+(`phoenix_kit_location_spaces_kind_check`, created by core's baseline and
+adopted by V1 of `PhoenixKitLocations.Migrations`) intentionally still allows a
+wider set (`hall`, `suite`, `corner`) reserved for future growth without an
+immediate migration; narrowing to the app-layer list happens in the schema.
+Adding one of the reserved kinds is a schema-only change: extend `@kinds`,
+`kind_label/1` and `kind_icon/1`. Adding a kind outside the CHECK list is a new
+version of this module's chain, which, because it changes a constraint core's
+`ExpectedSchema` audits, needs the core manifest-exclusion step first (see the
+`PhoenixKitLocations.Migrations` moduledoc).
 
 `Space.kind_label/1` translates the label through the module's own Gettext
 backend and falls back to the raw kind string for anything outside `@kinds`.

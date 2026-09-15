@@ -49,6 +49,13 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
       manages the highlight itself. `:selected_location_uuid` is
       accepted for symmetry but not currently consumed — the Location
       half is always driven by the search-combobox in this version.
+    * `:owner_uuid` — restricts the picker to one owner's locations, with
+      `Locations.list_locations/1`'s meaning: a user uuid (that owner's
+      locations), `nil` (global locations only) or `:any` (every owned
+      location). **Omit the attr** to search every location. When given, it
+      is enforced on selection too: a forged `select_location` for a
+      location outside the filter is ignored. A picker shown to a tenant
+      must always pass it.
     * `:locale` — when given, Location names (search results and the
       selected-location heading) show the translated name, same
       `_name`/`name` fallback chain as `Spaces.full_path/2`. `nil`
@@ -93,6 +100,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
        selected_location_uuid: nil,
        selected_space_uuid: nil,
        locale: nil,
+       owner_filter: :none,
        initialized?: false
      )}
   end
@@ -108,6 +116,14 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
       |> assign(:id, assigns.id)
       |> assign(:location_type_uuid, Map.get(assigns, :location_type_uuid))
       |> assign(:locale, Map.get(assigns, :locale))
+
+    # `Map.fetch/2`: an omitted attr means "no owner filter", while an
+    # explicit `nil` means "global locations only".
+    socket =
+      case Map.fetch(assigns, :owner_uuid) do
+        {:ok, owner_uuid} -> assign(socket, :owner_filter, {:only, owner_uuid})
+        :error -> socket
+      end
 
     socket =
       if socket.assigns.initialized? do
@@ -147,7 +163,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   end
 
   def handle_event("select_location", %{"uuid" => uuid}, socket) do
-    case Locations.get_location(uuid) do
+    case selectable_location(uuid, socket.assigns.owner_filter) do
       nil ->
         {:noreply, socket}
 
@@ -225,11 +241,32 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   defp run_search(socket) do
     matches =
       [status: "active", type_uuid: socket.assigns.location_type_uuid]
+      |> put_owner_opt(socket.assigns.owner_filter)
       |> Locations.list_locations()
       |> filter_by_query(socket.assigns.query)
 
     assign(socket, :matches, matches)
   end
+
+  # The event payload's uuid is client-supplied: resolve it and re-apply the
+  # owner filter, so a forged `select_location` can't reach a location the
+  # search would never have offered.
+  defp selectable_location(uuid, owner_filter) do
+    case Locations.get_location(uuid) do
+      %Location{} = location -> if owner_allowed?(location, owner_filter), do: location
+      nil -> nil
+    end
+  end
+
+  defp put_owner_opt(opts, :none), do: opts
+  defp put_owner_opt(opts, {:only, owner_uuid}), do: Keyword.put(opts, :owner_uuid, owner_uuid)
+
+  # Same semantics as `Locations.list_locations/1`'s `owner_uuid:` option,
+  # applied to one already-loaded row.
+  defp owner_allowed?(_location, :none), do: true
+  defp owner_allowed?(%Location{owner_uuid: owner}, {:only, nil}), do: is_nil(owner)
+  defp owner_allowed?(%Location{owner_uuid: owner}, {:only, :any}), do: not is_nil(owner)
+  defp owner_allowed?(%Location{owner_uuid: owner}, {:only, owner_uuid}), do: owner == owner_uuid
 
   defp filter_by_query(locations, query) do
     case String.trim(query || "") do
