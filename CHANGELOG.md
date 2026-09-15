@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.5.0 - 2026-09-15
+
+⚠️ **Breaking for hosts with custom roles:** the `locations` permission now
+covers only the locations a user (or their organization) owns. Grant the new
+`locations.manage_all` sub-permission to roles that should manage every
+location. Admin receives it automatically at boot; Owner holds every key.
+Run `mix phoenix_kit.update` after upgrading: this release ships its own
+migrations. Deploy the new version only after that migration has run:
+`Location` now reads `owner_uuid`, and every location query fails until the
+column exists.
+
+### Added
+
+- **Module-owned migrations** (`PhoenixKitLocations.Migrations`, returned from
+  `migration_module/0`; version tracked as a `pkloc_schema:<N>` comment on
+  `phoenix_kit_locations`). `mix phoenix_kit.update` discovers the chain and
+  generates the host migration.
+  - **V1** adopts the four tables core's V135 baseline creates, with identical
+    DDL and object names. On existing installs only the version marker is new;
+    no core release is required.
+  - **V2** adds a nullable `owner_uuid` to `phoenix_kit_locations` (foreign key
+    to `phoenix_kit_users`, `ON DELETE CASCADE`) and its index.
+  - `down/1` never drops a table.
+- **Location ownership.** A location can belong to a person or an organization
+  account; without an owner it is global.
+  - Set the owner with `create_location(attrs, owner_uuid: uuid)` or change it
+    with `set_location_owner/3` (logs `location.owner_changed`). An
+    `owner_uuid` inside `attrs` is ignored, so forms can't reassign ownership.
+  - `list_locations/1`, `count_locations/1` and `find_similar_addresses/5`
+    take an `owner_uuid:` filter: a uuid, a list of uuids, `nil` (global only)
+    or `:any` (every owned location). Omitting it keeps returning everything.
+  - `get_location_for_owner/2` resolves a location only for its owner(s).
+  - Deleting a user deletes the locations they own; `before_user_delete/1` logs
+    a `location.deleted` entry for each first.
+- **Owner-scoped access** (`PhoenixKitLocations.Policy`, the bookings pattern):
+  the same `/admin/locations` pages serve both kinds of user.
+  - Base `locations`: list, create, edit, delete and Structure for locations
+    owned by the user or by the user's organization.
+  - Sub-permission `locations.manage_all`: every location, assigning owners,
+    internal notes, attachments and the Types pages.
+- **Organization sharing.** A person who belongs to an organization account
+  sees and manages its locations, and locations they create belong to the
+  organization (`Policy.owner_uuids/1`, `Policy.new_owner_uuid/1`).
+- **Admin owner controls:** an Owner column and All / Global / Owned filter on
+  the list, and an owner picker on the location form.
+- **`PlacePicker` `:owner_uuid` attr** (uuid, list, `nil` or `:any`), enforced
+  on selection as well as search.
+
+### Fixed
+
+- The Structure page renamed or deleted a space from a forged event even when
+  the space belonged to a different location. Space actions now accept only
+  spaces in the loaded location, and every Structure write re-checks access to
+  the location first.
+- A client-sent `files_folder_uuid` / `featured_image_uuid` in a location's or
+  space's `data` could be stored and aim later file actions at another folder.
+  Attachment pointers now come only from server-side state.
+- A malformed uuid in a Structure page or `PlacePicker` event no longer crashes
+  the LiveView.
+- `toggle_type` accepts only types the form offered (or that are already
+  linked).
+
 ## 0.4.2 - 2026-08-22
 
 ### Changed
