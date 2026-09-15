@@ -27,6 +27,32 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     def parent(_, _, _), do: nil
   end
 
+  # R9: a host hook is opaque — it may read any column off the resource,
+  # not just the light-select set (uuid/name/status/pointer/data). These
+  # two hooks only resolve a target when a column OUTSIDE that light set
+  # is actually populated, proving the plan hands the hook the FULL row.
+  defmodule LocationCityHook do
+    def parent(:location, _actor, %Location{city: city}) when is_binary(city) do
+      {:ok, Process.get(:target_folder)}
+    end
+
+    def parent(:location, _actor, %Location{}) do
+      raise "missing struct key: city not loaded on the record handed to the hook"
+    end
+
+    def parent(_, _, _), do: nil
+  end
+
+  defmodule SpaceLocationUuidHook do
+    def parent(:space, _actor, %Space{location_uuid: location_uuid})
+        when is_binary(location_uuid) do
+      {:ok, Process.get(:target_folder)}
+    end
+
+    def parent(:space, _actor, %Space{}), do: nil
+    def parent(_, _, _), do: nil
+  end
+
   setup do
     on_exit(fn ->
       Application.delete_env(:phoenix_kit_locations, :attachments_parent_folder)
@@ -986,6 +1012,60 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
       refute is_nil(relocated)
       assert relocated.folder.uuid == twin.uuid
+    end
+  end
+
+  describe "the parent hook always sees the FULL record (R9)" do
+    test "hook reads a column outside the light select and raises when it's missing → fixed by loading full rows" do
+      location = new_location(%{name: "Tallinn HQ", city: "Tallinn"})
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, folder} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      Process.put(:target_folder, target.uuid)
+
+      Application.put_env(
+        :phoenix_kit_locations,
+        :attachments_parent_folder,
+        {LocationCityHook, :parent}
+      )
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      # If the hook only ever saw the light select (no `city` column), it
+      # would raise for every candidate and this plan would report nothing
+      # but a `hook_error` — proving `city` really reached the hook.
+      refute Enum.any?(actions, &(&1.kind == :hook_error))
+
+      action = Enum.find(actions, &(&1.kind == :location and &1.label == location.name))
+      refute is_nil(action)
+      assert action.op == :move
+      assert action.folder.uuid == folder.uuid
+      assert action.parent_uuid == target.uuid
+    end
+
+    test "space hook resolves a target only when resource.location_uuid is set" do
+      location = new_location(%{name: "Tallinn HQ"})
+      space = new_space(location, %{name: "Floor 1"})
+
+      {:ok, target} = Storage.create_folder(%{name: "Spaces"})
+      {:ok, folder} = Storage.create_folder(%{name: "location-space-#{space.uuid}"})
+
+      Process.put(:target_folder, target.uuid)
+
+      Application.put_env(
+        :phoenix_kit_locations,
+        :attachments_parent_folder,
+        {SpaceLocationUuidHook, :parent}
+      )
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      action = Enum.find(actions, &(&1.kind == :space and &1.label == space.name))
+      refute is_nil(action)
+      assert action.op == :move
+      assert action.folder.uuid == folder.uuid
+      assert action.parent_uuid == target.uuid
     end
   end
 end

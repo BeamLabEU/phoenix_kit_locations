@@ -52,6 +52,15 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     * Only records that already have SOME live folder (a live pointer, or
       a folder anywhere matching the legacy name) are *candidates* — a
       record with neither never triggers a (possibly writing) host hook.
+    * **Candidate detection runs against the light select** (uuid/name/
+      status/pointer only), but a host hook is opaque — it may read any
+      column (Andi's location hook reads `space.location_uuid` and other
+      fields the same way a light `Category` select without `parent_uuid`
+      once made a catalogue hook plan wrong moves). Every candidate's
+      record is swapped for its FULL row — one batched
+      `where uuid in ^candidate_uuids` query per kind — before it ever
+      reaches `attachments_parent_folder`, `attachments_folder_name`, or
+      `after_move`.
 
   Also covers stale `location-attachment-pending-*` upload folders and
   orphaned legacy folders whose record is gone — see the section comments
@@ -160,10 +169,12 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     by_name = preload_by_name_anywhere(Enum.map(prelim, & &1.legacy_name))
 
     candidates =
-      Enum.filter(prelim, fn p ->
+      prelim
+      |> Enum.filter(fn p ->
         (p.pointer && Map.has_key?(by_pointer, p.pointer)) ||
           Map.has_key?(by_name, p.legacy_name)
       end)
+      |> hydrate_candidate_records()
 
     {resolved_all, hook_error_count} =
       resolve_candidates(candidates, by_pointer, by_name, mod, fun, pointer_claims, actor_uuid)
@@ -213,6 +224,48 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       {:ok, name} -> name
       :pending -> nil
     end
+  end
+
+  # R9: candidate detection above only needed the light select — a host
+  # hook is opaque and may read any column, so every candidate's `record`
+  # is swapped here for its FULL row before it can ever reach a hook (or
+  # `after_move`'s closure). One batched `where uuid in ^uuids` query per
+  # kind, ordered deterministically. A candidate whose row vanished
+  # between the light load and here (hard-deleted mid-plan) simply keeps
+  # its light record — it will fail candidacy checks downstream the same
+  # way a genuinely-gone record would.
+  defp hydrate_candidate_records(candidates) do
+    full_by_key = full_records_by_kind_and_uuid(candidates)
+
+    Enum.map(candidates, fn p ->
+      case Map.get(full_by_key, {p.kind, p.record.uuid}) do
+        nil -> p
+        full_record -> %{p | record: full_record}
+      end
+    end)
+  end
+
+  defp full_records_by_kind_and_uuid(candidates) do
+    {location_uuids, space_uuids} =
+      Enum.reduce(candidates, {[], []}, fn
+        %{kind: :location, record: %{uuid: uuid}}, {locs, spaces} -> {[uuid | locs], spaces}
+        %{kind: :space, record: %{uuid: uuid}}, {locs, spaces} -> {locs, [uuid | spaces]}
+      end)
+
+    Map.merge(
+      full_records_by_uuid(Location, :location, location_uuids),
+      full_records_by_uuid(Space, :space, space_uuids)
+    )
+  end
+
+  defp full_records_by_uuid(_schema, _kind, []), do: %{}
+
+  defp full_records_by_uuid(schema, kind, uuids) do
+    schema
+    |> where([r], r.uuid in ^Enum.uniq(uuids))
+    |> order_by([r], asc: r.inserted_at, asc: r.uuid)
+    |> repo().all()
+    |> Map.new(&{{kind, &1.uuid}, &1})
   end
 
   # R2: resolves the desired parent for every candidate via the host's
