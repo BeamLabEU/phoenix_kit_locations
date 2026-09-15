@@ -361,7 +361,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     case Locations.create_location(params, actor_opts(socket) ++ owner_opts(socket)) do
       {:ok, location} ->
         location_folder = Attachments.state(socket, location_scope()).folder_uuid
-        _ = Attachments.maybe_rename_pending_folder_for(location_folder, location)
+
+        _ =
+          Attachments.maybe_rename_pending_folder_for(
+            location_folder,
+            location,
+            actor_opts(socket)[:actor_uuid]
+          )
 
         sync_types_and_redirect(socket, location.uuid, gettext("Location created."))
 

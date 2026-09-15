@@ -8,7 +8,19 @@
   (`:attachments_parent_folder`); the host can also name them
   (`:attachments_folder_name`). Lookups check the host name under the
   parent, then the deterministic name under the parent, then the root.
-  The pending-folder rename now writes the parent too.
+
+### Fixed
+
+- A folder found by its host name is adopted only when no other location or
+  space points at it, so a same-named location (possibly another account's)
+  never shows or stores another location's files. A host name already taken
+  under the parent falls back to the deterministic `location-<uuid>` name.
+- The pending-folder rename changes only the name again. It passed no actor,
+  so an actor-dependent parent hook moved freshly uploaded files to the
+  storage root.
+- A raising parent or name hook is logged and treated as `nil` instead of
+  crashing the form mid-upload.
+
 ## 0.5.0 - 2026-09-15
 
 ⚠️ **Breaking for hosts with custom roles:** the `locations` permission now
