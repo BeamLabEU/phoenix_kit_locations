@@ -997,6 +997,7 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
       relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
       refute is_nil(relocated)
+      assert relocated.reason =~ "live under #{elsewhere.name}"
     end
 
     test "pointer already correct AND a live legacy-named twin exists elsewhere → the twin is reported :relocated" do
@@ -1020,6 +1021,30 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
       refute is_nil(relocated)
       assert relocated.folder.uuid == twin.uuid
+      assert relocated.reason =~ "live at the media root"
+    end
+
+    test "stray legacy-named twin already lives under the resolved target parent → reason warns about the eventual move colliding there" do
+      location = new_location(%{name: "Kesklinna kontor"})
+
+      {:ok, real_folder} = Storage.create_folder(%{name: "Somewhere real"})
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+      {:ok, twin} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: target.uuid})
+
+      {:ok, _location} =
+        Locations.update_location(location, %{data: %{"files_folder_uuid" => real_folder.uuid}})
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
+      refute is_nil(relocated)
+      assert relocated.folder.uuid == twin.uuid
+      assert relocated.reason =~ "already live as a twin under the target parent"
     end
   end
 
