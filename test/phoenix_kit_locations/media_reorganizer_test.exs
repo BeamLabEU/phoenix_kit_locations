@@ -18,6 +18,7 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
 
   defmodule RaisingHook do
     def parent(:location, _actor, %Location{}), do: raise("boom")
+    def parent(:space, _actor, %Space{}), do: raise("boom")
     def parent(_, _, _), do: nil
   end
 
@@ -59,6 +60,17 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     {:ok, _location} =
       Locations.update_location(location, %{data: %{"files_folder_uuid" => folder.uuid}})
 
+    actions = MediaReorganizer.plan(nil, [])
+    refute Enum.any?(actions, &(&1.kind == :location and &1.label == location.name))
+  end
+
+  test "no hooks configured, legacy folder at root, pointer missing → not even a back-fill is planned" do
+    location = new_location()
+
+    {:ok, _folder} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+    # D1: a host without a configured parent hook is untouched — no move,
+    # no pointer back-fill either, even though one would otherwise apply.
     actions = MediaReorganizer.plan(nil, [])
     refute Enum.any?(actions, &(&1.kind == :location and &1.label == location.name))
   end
@@ -600,6 +612,30 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       actions = MediaReorganizer.plan(nil, pending_days: 7)
       refute Enum.any?(actions, &(&1.kind == :pending and &1.folder.uuid == folder.uuid))
     end
+
+    test "pending folder a live record currently points at is never independently reported/trashed, hook configured too (X4)" do
+      location = new_location()
+
+      {:ok, folder} =
+        Storage.create_folder(%{name: "location-attachment-pending-#{Ecto.UUID.generate()}"})
+
+      {:ok, _location} =
+        Locations.update_location(location, %{data: %{"files_folder_uuid" => folder.uuid}})
+
+      old_time =
+        DateTime.utc_now() |> DateTime.add(-10 * 86_400, :second) |> DateTime.truncate(:second)
+
+      Repo.update_all(
+        from(f in Storage.Folder, where: f.uuid == ^folder.uuid),
+        set: [inserted_at: old_time]
+      )
+
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, pending_days: 7)
+
+      refute Enum.any?(actions, &(&1.kind == :pending and &1.folder.uuid == folder.uuid))
+    end
   end
 
   describe "orphan folders" do
@@ -731,6 +767,30 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
       assert Enum.any?(actions, &(&1.kind == :hook_error))
     end
+
+    test "hook raises for a space → space skipped, hook_error report, never planned as root" do
+      location = new_location(%{name: "Tallinn HQ"})
+      space = new_space(location, %{name: "1st floor"})
+
+      {:ok, folder} = Storage.create_folder(%{name: "location-space-#{space.uuid}"})
+
+      {:ok, _space} =
+        Spaces.update_space(space, %{"data" => %{"files_folder_uuid" => folder.uuid}})
+
+      Application.put_env(
+        :phoenix_kit_locations,
+        :attachments_parent_folder,
+        {RaisingHook, :parent}
+      )
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :space))
+      error = Enum.find(actions, &(&1.kind == :hook_error))
+      refute is_nil(error)
+      assert error.op == :report
+      assert error.reason =~ "1 record"
+    end
   end
 
   describe "host-named folder under parent (R3)" do
@@ -747,7 +807,7 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       # unambiguously the current folder.
       {:ok, elsewhere} = Storage.create_folder(%{name: "Somewhere else entirely"})
 
-      {:ok, _legacy} =
+      {:ok, legacy} =
         Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: elsewhere.uuid})
 
       Process.put(:target_folder, target.uuid)
@@ -763,6 +823,12 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       assert action.parent_uuid == target.uuid
       assert is_function(action.after_move, 0)
       refute Enum.any?(actions, &(&1.kind == :duplicate))
+
+      # The stray legacy twin under the third-party parent is never
+      # adopted, but it must not go unreported either.
+      relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
+      refute is_nil(relocated)
+      assert relocated.folder.uuid == legacy.uuid
     end
 
     test "host-named folder AND a live legacy folder both under the resolved parent → duplicate, no move" do
@@ -878,6 +944,48 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
         )
 
       refute is_nil(dup)
+    end
+  end
+
+  describe "legacy folder relocated elsewhere (locations-specific)" do
+    test "legacy folder live under a parent that isn't root or the resolved parent → reported :relocated, not adopted" do
+      location = new_location(%{name: "Tallinn HQ"})
+
+      {:ok, elsewhere} = Storage.create_folder(%{name: "Some other container"})
+
+      {:ok, _legacy} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: elsewhere.uuid})
+
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
+      relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
+      refute is_nil(relocated)
+    end
+
+    test "pointer already correct AND a live legacy-named twin exists elsewhere → the twin is reported :relocated" do
+      location = new_location(%{name: "Kesklinna kontor"})
+
+      {:ok, real_folder} = Storage.create_folder(%{name: "Somewhere real"})
+      {:ok, twin} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      {:ok, _location} =
+        Locations.update_location(location, %{data: %{"files_folder_uuid" => real_folder.uuid}})
+
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      # The record's actual (pointer) folder is untouched...
+      refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
+      # ...but the stray legacy-named twin is neither silently dropped
+      # nor mistaken for an orphan (the record is alive).
+      refute Enum.any?(actions, &(&1.kind == :orphan and &1.folder.uuid == twin.uuid))
+      relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
+      refute is_nil(relocated)
+      assert relocated.folder.uuid == twin.uuid
     end
   end
 end

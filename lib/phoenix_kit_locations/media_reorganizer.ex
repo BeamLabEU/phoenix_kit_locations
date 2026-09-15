@@ -171,6 +171,17 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     {relocated, resolved} = Enum.split_with(resolved_all, & &1.relocated)
     relocated_actions = Enum.map(relocated, &build_relocated_action/1)
 
+    # A record whose current folder was resolved (via pointer or a
+    # host/legacy match) can still leave a SEPARATE legacy-named folder
+    # live somewhere else entirely (e.g. an old container from a previous
+    # layout) — that stray twin is neither this record's current folder
+    # nor an orphan (the record is alive), so it gets its own `:relocated`
+    # report alongside whatever action the record itself gets.
+    stray_actions =
+      resolved
+      |> Enum.filter(& &1.stray_legacy)
+      |> Enum.map(&build_relocated_action(%{&1 | relocated: &1.stray_legacy}))
+
     resolved_parents =
       resolved |> Enum.map(& &1.parent_uuid) |> Enum.reject(&is_nil/1) |> Enum.uniq()
 
@@ -189,7 +200,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     all_actions =
       move_actions ++
         dup_actions ++
-        shared_actions ++ converging_actions ++ relocated_actions ++ hook_error_actions
+        shared_actions ++
+        converging_actions ++ relocated_actions ++ stray_actions ++ hook_error_actions
 
     claimed = claimed_folder_uuids(unique, ambiguous, shared, converging)
 
@@ -217,7 +229,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       end)
 
     pointer_entries =
-      pointer_track |> Enum.reverse() |> Enum.map(&resolve_pointer_entry(&1, actor_uuid))
+      pointer_track |> Enum.reverse() |> Enum.map(&resolve_pointer_entry(&1, by_name, actor_uuid))
 
     name_entries =
       resolve_name_entries(Enum.reverse(name_track), by_name, pointer_claims, actor_uuid)
@@ -272,7 +284,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # name — UNLESS that name is still the legacy deterministic one, in
   # which case it gets the host name like any other candidate (R8: the
   # name hook is skipped entirely otherwise).
-  defp resolve_pointer_entry(%{pointer_folder: folder} = d, actor_uuid) do
+  defp resolve_pointer_entry(%{pointer_folder: folder} = d, by_name, actor_uuid) do
     name = if folder.name == d.legacy_name, do: safe_folder_name(d.record, actor_uuid)
 
     %{
@@ -285,8 +297,20 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       folder: folder,
       via: :pointer,
       ambiguous: nil,
-      relocated: nil
+      relocated: nil,
+      stray_legacy: stray_legacy_twin(d.legacy_name, by_name, folder.uuid)
     }
+  end
+
+  # A live record's actual current folder (its pointer, or a host/legacy
+  # match) can still leave a SEPARATE legacy-named folder live somewhere
+  # else entirely — not this record's current folder, and not an orphan
+  # either (the record is alive) — so it gets its own report so it is
+  # never silently dropped.
+  defp stray_legacy_twin(legacy_name, by_name, current_folder_uuid) do
+    by_name
+    |> Map.get(legacy_name, [])
+    |> Enum.find(&(&1.uuid != current_folder_uuid))
   end
 
   # R3: the module's own lookup order for a record with no live pointer —
@@ -378,8 +402,15 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       via: nil,
       name: nil,
       ambiguous: nil,
-      relocated: nil
+      relocated: nil,
+      stray_legacy: nil
     }
+
+    # A third live legacy-named match — left over once the chosen
+    # `legacy_folder` (if any) is accounted for. Only meaningful for the
+    # "host wins" / "legacy wins" branches below; the ambiguous/relocated
+    # branches already consume every match into their own report.
+    stray_legacy = Enum.find(matches, &(&1 != legacy_folder))
 
     resolve_name_entry_result(
       base,
@@ -388,7 +419,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       legacy_folder,
       under_parent,
       at_root,
-      matches
+      matches,
+      stray_legacy
     )
   end
 
@@ -399,7 +431,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          legacy_folder,
          _under,
          _root,
-         _matches
+         _matches,
+         _stray
        )
        when not is_nil(host_folder) and not is_nil(legacy_folder) do
     %{base | ambiguous: {host_folder, legacy_folder}}
@@ -412,7 +445,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          _legacy_folder,
          under_parent,
          at_root,
-         _matches
+         _matches,
+         _stray
        )
        when not is_nil(under_parent) and not is_nil(at_root) do
     %{base | ambiguous: {under_parent, at_root}}
@@ -425,10 +459,11 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          _legacy_folder,
          _under,
          _root,
-         _matches
+         _matches,
+         stray_legacy
        )
        when not is_nil(host_folder) do
-    %{base | folder: host_folder, via: :name, name: name}
+    %{base | folder: host_folder, via: :name, name: name, stray_legacy: stray_legacy}
   end
 
   defp resolve_name_entry_result(
@@ -438,15 +473,25 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          legacy_folder,
          _under,
          _root,
-         _matches
+         _matches,
+         stray_legacy
        )
        when not is_nil(legacy_folder) do
-    %{base | folder: legacy_folder, via: :name, name: name}
+    %{base | folder: legacy_folder, via: :name, name: name, stray_legacy: stray_legacy}
   end
 
-  defp resolve_name_entry_result(base, _name, _host_folder, _legacy_folder, _under, _root, [
-         first | _
-       ]) do
+  defp resolve_name_entry_result(
+         base,
+         _name,
+         _host_folder,
+         _legacy_folder,
+         _under,
+         _root,
+         [
+           first | _
+         ],
+         _stray
+       ) do
     %{base | relocated: first}
   end
 
@@ -457,7 +502,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          _legacy_folder,
          _under,
          _root,
-         []
+         [],
+         _stray
        ),
        do: base
 
@@ -949,11 +995,15 @@ defmodule PhoenixKitLocations.MediaReorganizer do
 
   defp load_records(_schema, _kind, []), do: %{}
 
+  # R9: only the uuid column — an orphan report needs nothing else off the
+  # record (existence alone decides it; Location/Space are hard-deleted),
+  # never the full jsonb-heavy row.
   defp load_records(schema, kind, uuids) do
     schema
     |> where([r], r.uuid in ^uuids)
+    |> select([r], r.uuid)
     |> repo().all()
-    |> Map.new(&{{kind, &1.uuid}, &1})
+    |> Map.new(&{{kind, &1}, true})
   end
 
   defp orphan_action({folder, {kind, uuid}}, records_by_key, counts) do
