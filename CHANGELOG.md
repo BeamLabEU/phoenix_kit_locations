@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `PhoenixKitLocations.MediaReorganizer.plan/2` — a media-reorganizer plan
+  source (registered via `PhoenixKitLocations.media_reorganizer/0`) that
+  finds locations' and spaces' legacy attachment folders that don't yet sit
+  where the `:attachments_parent_folder` / `:attachments_folder_name` hooks
+  now put new ones, plus stale pending-upload folders and orphaned legacy
+  folders. Read-only — plans are applied by phoenix_kit core's (forthcoming)
+  reorganizer engine.
+
 ## 0.5.1 - 2026-09-15
 
 ### Added
