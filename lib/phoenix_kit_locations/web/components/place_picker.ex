@@ -51,7 +51,9 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
       half is always driven by the search-combobox in this version.
     * `:owner_uuid` — restricts the picker to one owner's locations, with
       `Locations.list_locations/1`'s meaning: a user uuid (that owner's
-      locations), `nil` (global locations only) or `:any` (every owned
+      locations), a list of uuids (any of them, e.g.
+      `Policy.owner_uuids(@phoenix_kit_current_scope)` for a person and their
+      organization), `nil` (global locations only) or `:any` (every owned
       location). **Omit the attr** to search every location. When given, it
       is enforced on selection too: a forged `select_location` for a
       location outside the filter is ignored. A picker shown to a tenant
@@ -266,6 +268,11 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   defp owner_allowed?(_location, :none), do: true
   defp owner_allowed?(%Location{owner_uuid: owner}, {:only, nil}), do: is_nil(owner)
   defp owner_allowed?(%Location{owner_uuid: owner}, {:only, :any}), do: not is_nil(owner)
+
+  defp owner_allowed?(%Location{owner_uuid: owner}, {:only, owner_uuids})
+       when is_list(owner_uuids),
+       do: not is_nil(owner) and owner in owner_uuids
+
   defp owner_allowed?(%Location{owner_uuid: owner}, {:only, owner_uuid}), do: owner == owner_uuid
 
   defp filter_by_query(locations, query) do

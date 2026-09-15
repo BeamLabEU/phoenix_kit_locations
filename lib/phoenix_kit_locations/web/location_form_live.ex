@@ -6,9 +6,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     * **`locations.manage_all`** (`@mode == :all`) — any location, the owner
       card (`OwnerComponents.owner_picker_card/1`, applied on save), the Files
       card and internal notes.
-    * **base `locations` only** (`@mode == :own`) — only locations the user
-      owns: edit resolves through `Policy.get_location/2` at mount AND again on
-      save, create always owns the new location to the current user, and the
+    * **base `locations` only** (`@mode == :own`) — only locations owned by the
+      user or their organization: edit resolves through `Policy.get_location/2`
+      at mount AND again on save, create owns the new location to the user's
+      organization when they belong to one (else the user), and the
       duplicate-address warning only considers the user's own locations. No
       owner card, Files card or internal notes (the `notes` param is dropped
       server-side).
@@ -757,12 +758,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   defp manage_all?(socket), do: Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope])
 
   # A new location's owner: the picked owner (or nil = global) for a
-  # site-wide manager, otherwise always the signed-in user.
+  # site-wide manager, otherwise the user's organization when they belong to
+  # one (so teammates share it), else the user (`Policy.new_owner_uuid/1`).
   defp owner_opts(socket) do
     if manage_all?(socket) do
       [owner_uuid: socket.assigns.owner && socket.assigns.owner.uuid]
     else
-      [owner_uuid: Policy.user_uuid(socket.assigns[:phoenix_kit_current_scope])]
+      [owner_uuid: Policy.new_owner_uuid(socket.assigns[:phoenix_kit_current_scope])]
     end
   end
 

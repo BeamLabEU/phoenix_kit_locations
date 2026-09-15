@@ -56,10 +56,12 @@ A location can belong to a user (a person or an organization account). Without a
 
 | Permission | Grants |
 |------------|--------|
-| `locations` | The Locations pages, scoped to locations the user owns: list, create (owned by the creator), edit, delete, Structure |
+| `locations` | The Locations pages, scoped to locations owned by the user or by the user's organization: list, create, edit, delete, Structure |
 | `locations.manage_all` | Every location (owned or global), assigning owners, internal notes, attachments, and the Types pages |
 
-Grant `locations` alone to a role (for example "Seller") so its users manage only their own sites; grant `locations.manage_all` as well to staff who manage everything. Admin receives both automatically, and Owner holds every permission.
+**Organizations:** a person who belongs to an organization account shares that organization's locations with its other members, and the locations they create belong to the organization. Teammates at one company therefore see and manage the same warehouses. A person without an organization owns what they create.
+
+Grant `locations` alone to a role (for example "Seller") so its users manage only their own (or their company's) sites; grant `locations.manage_all` as well to staff who manage everything. Admin receives both automatically, and Owner holds every permission.
 
 ⚠️ **Upgrading:** before this change, `locations` opened every location. A custom role that holds `locations` now sees only its own locations until it is also granted `locations.manage_all`. Admin and Owner are unaffected.
 
@@ -89,6 +91,7 @@ Locations.has_type?(location.uuid, type_uuid)
 {:ok, site} = Locations.create_location(%{name: "North Depot"}, owner_uuid: user.uuid)
 Locations.set_location_owner(site, other_user.uuid, actor_uuid: admin.uuid)  # or nil for global
 Locations.list_locations(owner_uuid: user.uuid)   # only this owner's locations
+Locations.list_locations(owner_uuid: PhoenixKitLocations.Policy.owner_uuids(user))  # a person + their organization
 Locations.list_locations(owner_uuid: nil)         # only global locations
 Locations.list_locations(owner_uuid: :any)        # every owned location
 Locations.list_locations()                        # everything — never for tenant-facing pages

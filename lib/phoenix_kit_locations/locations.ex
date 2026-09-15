@@ -48,7 +48,7 @@ defmodule PhoenixKitLocations.Locations do
   @type opts :: keyword()
   @type status_filter :: [status: String.t()]
   @typedoc "`owner_uuid:` filter value — an owner's uuid, `nil` (unowned only) or `:any` (owned by anyone)."
-  @type owner_filter :: String.t() | nil | :any
+  @type owner_filter :: String.t() | [String.t()] | nil | :any
   @type list_locations_opts :: [
           status: String.t(),
           type_uuid: String.t(),
@@ -152,7 +152,9 @@ defmodule PhoenixKitLocations.Locations do
     * `:status` — filter by status (e.g. `"active"`, `"inactive"`).
     * `:type_uuid` — filter to only locations that have this type assigned.
     * `:owner_uuid` — ownership filter. A user uuid returns only that owner's
-      locations; `nil` returns only unowned (global) locations; `:any` returns
+      locations; a list of uuids returns locations owned by any of them (for
+      example a person and their organization, `Policy.owner_uuids/1`; an
+      empty list returns nothing); `nil` returns only unowned (global) locations; `:any` returns
       every owned location. **Omitting the option returns every location**,
       owned or not — so a tenant-facing caller must always pass it. A `nil`
       that reaches this option by mistake fails closed (global rows only),
@@ -198,18 +200,27 @@ defmodule PhoenixKitLocations.Locations do
   end
 
   @doc """
-  Fetches a location by UUID only when it belongs to `owner_uuid`, with types
-  preloaded. Returns `nil` when the location does not exist, belongs to
-  someone else, is unowned, or either uuid is malformed.
+  Fetches a location by UUID only when it belongs to `owner_uuid` (one uuid, or
+  a list meaning any of them), with types preloaded. Returns `nil` when the
+  location does not exist, belongs to someone else, is unowned, or the uuids
+  are malformed or empty.
 
   This is the lookup for anything tenant-facing: a user-supplied uuid never
   resolves to another owner's location.
   """
-  @spec get_location_for_owner(String.t() | nil, String.t() | nil) :: Location.t() | nil
-  def get_location_for_owner(uuid, owner_uuid) when is_binary(uuid) and is_binary(owner_uuid) do
+  @spec get_location_for_owner(String.t() | nil, String.t() | [String.t()] | nil) ::
+          Location.t() | nil
+  def get_location_for_owner(uuid, owner_uuid) when is_binary(uuid) and is_binary(owner_uuid),
+    do: get_location_for_owner(uuid, [owner_uuid])
+
+  def get_location_for_owner(uuid, owner_uuids) when is_binary(uuid) and is_list(owner_uuids) do
+    owners =
+      for owner <- owner_uuids, is_binary(owner), {:ok, cast} <- [Ecto.UUID.cast(owner)], do: cast
+
     with {:ok, uuid} <- Ecto.UUID.cast(uuid),
-         {:ok, owner_uuid} <- Ecto.UUID.cast(owner_uuid),
-         %Location{} = location <- repo().get_by(Location, uuid: uuid, owner_uuid: owner_uuid) do
+         [_ | _] <- owners,
+         %Location{} = location <-
+           repo().one(from(l in Location, where: l.uuid == ^uuid and l.owner_uuid in ^owners)) do
       repo().preload(location, :location_types)
     else
       _ -> nil
@@ -598,6 +609,9 @@ defmodule PhoenixKitLocations.Locations do
 
       {:ok, owner_uuid} when is_binary(owner_uuid) ->
         where(query, [l], l.owner_uuid == ^owner_uuid)
+
+      {:ok, owner_uuids} when is_list(owner_uuids) ->
+        where(query, [l], l.owner_uuid in ^owner_uuids)
     end
   end
 

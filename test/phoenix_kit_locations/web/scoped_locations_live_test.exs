@@ -280,4 +280,68 @@ defmodule PhoenixKitLocations.Web.ScopedLocationsLiveTest do
       assert Spaces.get_space(their_space.uuid).name == "Their Floor"
     end
   end
+
+  describe "organization members" do
+    setup do
+      org = fixture_user(%{account_type: "organization", organization_name: "Trinity Wood"})
+      member = fixture_user(%{organization_uuid: org.uuid})
+      teammate = fixture_user(%{organization_uuid: org.uuid})
+
+      %{org: org, member: member, teammate: teammate}
+    end
+
+    defp member_conn(conn, user) do
+      put_test_scope(
+        conn,
+        fake_scope(
+          user_uuid: user.uuid,
+          email: user.email,
+          organization_uuid: user.organization_uuid,
+          permissions: ["locations"]
+        )
+      )
+    end
+
+    test "a location a member creates belongs to the organization, and a teammate can edit it",
+         %{conn: conn, org: org, member: member, teammate: teammate} do
+      {:ok, view, _html} = live(member_conn(conn, member), Paths.location_new())
+
+      {:error, {:live_redirect, _}} =
+        render_submit(view, "save", %{"location" => %{"name" => "Shared Warehouse"}})
+
+      created = Locations.get_location_by(:name, "Shared Warehouse")
+      assert created.owner_uuid == org.uuid
+
+      teammate_conn = member_conn(build_conn(), teammate)
+
+      {:ok, _view, html} = live(teammate_conn, Paths.index())
+      assert html =~ "Shared Warehouse"
+
+      {:ok, view, _html} = live(teammate_conn, Paths.location_edit(created.uuid))
+
+      {:error, {:live_redirect, _}} =
+        view
+        |> form("#location-form", location: %{"name" => "Renamed By Teammate"})
+        |> render_submit()
+
+      assert TestRepo.get!(Location, created.uuid).name == "Renamed By Teammate"
+      assert TestRepo.get!(Location, created.uuid).owner_uuid == org.uuid
+    end
+
+    test "another organization's location stays out of reach",
+         %{conn: conn, member: member} do
+      rival_org = fixture_user(%{account_type: "organization", organization_name: "Rival"})
+      {:ok, rival} = Locations.create_location(%{name: "Rival Yard"}, owner_uuid: rival_org.uuid)
+
+      member_conn = member_conn(conn, member)
+
+      {:ok, _view, html} = live(member_conn, Paths.index())
+      refute html =~ "Rival Yard"
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(member_conn, Paths.location_edit(rival.uuid))
+
+      assert to == Paths.index()
+    end
+  end
 end

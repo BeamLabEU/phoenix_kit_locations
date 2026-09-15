@@ -85,10 +85,68 @@ defmodule PhoenixKitLocations.PolicyTest do
     end
   end
 
-  test "similar_address_opts/1 scopes the duplicate warning to the user's own" do
+  test "similar_address_opts/1 scopes the duplicate warning to the user's owners" do
     user = fixture_user()
 
     assert Policy.similar_address_opts(fake_scope()) == []
-    assert Policy.similar_address_opts(base_scope(user)) == [owner_uuid: user.uuid]
+    assert Policy.similar_address_opts(base_scope(user)) == [owner_uuid: [user.uuid]]
+  end
+
+  describe "organizations" do
+    setup do
+      org = fixture_user(%{account_type: "organization", organization_name: "Trinity Wood"})
+      member = fixture_user(%{organization_uuid: org.uuid})
+      teammate = fixture_user(%{organization_uuid: org.uuid})
+      rival_org = fixture_user(%{account_type: "organization", organization_name: "Rival"})
+
+      %{org: org, member: member, teammate: teammate, rival_org: rival_org}
+    end
+
+    defp member_scope(user),
+      do:
+        fake_scope(
+          user_uuid: user.uuid,
+          organization_uuid: user.organization_uuid,
+          permissions: ["locations"]
+        )
+
+    test "owner_uuids/1 is the user plus their organization", %{org: org, member: member} do
+      assert Policy.owner_uuids(member_scope(member)) == [member.uuid, org.uuid]
+      assert Policy.owner_uuids(member) == [member.uuid, org.uuid]
+      assert Policy.owner_uuids(org) == [org.uuid]
+      assert Policy.owner_uuids(nil) == []
+    end
+
+    test "new_owner_uuid/1 is the organization when there is one", %{org: org, member: member} do
+      solo = fixture_user()
+
+      assert Policy.new_owner_uuid(member_scope(member)) == org.uuid
+      assert Policy.new_owner_uuid(base_scope(solo)) == solo.uuid
+      assert Policy.new_owner_uuid(nil) == nil
+    end
+
+    test "a member sees their own and their organization's locations, not a teammate's personal ones",
+         %{org: org, member: member, teammate: teammate, rival_org: rival_org} do
+      owned(org, "Company Warehouse")
+      owned(member, "Member Personal")
+      owned(teammate, "Teammate Personal")
+      owned(rival_org, "Rival Warehouse")
+
+      assert names(Policy.list_locations(member_scope(member))) ==
+               ["Company Warehouse", "Member Personal"]
+
+      assert names(Policy.list_locations(member_scope(teammate))) ==
+               ["Company Warehouse", "Teammate Personal"]
+    end
+
+    test "get_location/2 resolves the organization's location for every member",
+         %{org: org, member: member, teammate: teammate, rival_org: rival_org} do
+      company = owned(org, "Company Warehouse")
+      rival = owned(rival_org, "Rival Warehouse")
+
+      assert Policy.get_location(member_scope(member), company.uuid).uuid == company.uuid
+      assert Policy.get_location(member_scope(teammate), company.uuid).uuid == company.uuid
+      assert Policy.get_location(member_scope(member), rival.uuid) == nil
+    end
   end
 end

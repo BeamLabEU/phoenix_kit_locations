@@ -85,6 +85,19 @@ defmodule PhoenixKitLocations.LocationOwnerTest do
       assert names(Locations.list_locations(owner_uuid: nil)) == ~w(G1)
     end
 
+    test "a list of uuids returns locations owned by any of them", %{owner_a: owner_a} do
+      owner_b_uuid =
+        Locations.list_locations(owner_uuid: :any)
+        |> Enum.find(&(&1.name == "B1"))
+        |> Map.fetch!(:owner_uuid)
+
+      assert names(Locations.list_locations(owner_uuid: [owner_a.uuid, owner_b_uuid])) ==
+               ~w(A1 A2 B1)
+
+      assert Locations.list_locations(owner_uuid: []) == []
+      assert Locations.count_locations(owner_uuid: [owner_a.uuid]) == 2
+    end
+
     test ":any returns every owned location" do
       assert names(Locations.list_locations(owner_uuid: :any)) == ~w(A1 A2 B1)
     end
@@ -119,6 +132,16 @@ defmodule PhoenixKitLocations.LocationOwnerTest do
 
       assert found.uuid == mine.uuid
       assert found.location_types == []
+    end
+
+    test "accepts a list of owners, any of which may match",
+         %{owner: owner, other: other, mine: mine} do
+      assert Locations.get_location_for_owner(mine.uuid, [other.uuid, owner.uuid]).uuid ==
+               mine.uuid
+
+      assert Locations.get_location_for_owner(mine.uuid, [other.uuid]) == nil
+      assert Locations.get_location_for_owner(mine.uuid, []) == nil
+      assert Locations.get_location_for_owner(mine.uuid, ["nope", nil]) == nil
     end
 
     test "is nil for another owner, an unowned location, or malformed input",

@@ -77,6 +77,8 @@ defmodule PhoenixKitLocations.LiveCase do
 
     * `:user_uuid` — defaults to a fresh UUIDv4
     * `:email` — defaults to a unique-suffix string
+    * `:organization_uuid` — the organization account the user belongs to;
+      defaults to `nil`
     * `:roles` — list of role-name strings; defaults to `["Owner"]`
     * `:permissions` — list of permission keys; defaults to
       `["locations", "locations.manage_all"]` (a site-wide admin). Pass
@@ -95,7 +97,11 @@ defmodule PhoenixKitLocations.LiveCase do
     permissions = Keyword.get(opts, :permissions, ["locations", "locations.manage_all"])
     authenticated? = Keyword.get(opts, :authenticated?, true)
 
-    user = %{uuid: user_uuid, email: email}
+    user = %{
+      uuid: user_uuid,
+      email: email,
+      organization_uuid: Keyword.get(opts, :organization_uuid)
+    }
 
     %PhoenixKit.Users.Auth.Scope{
       user: user,
