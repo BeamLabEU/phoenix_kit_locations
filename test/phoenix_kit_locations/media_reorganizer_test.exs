@@ -74,7 +74,8 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     assert action.op == :move
     assert action.folder.uuid == folder.uuid
     assert action.parent_uuid == target.uuid
-    assert action.name == "Nice"
+    # D6: found via a live pointer → kept as-is, never renamed
+    assert is_nil(action.name)
     assert action.on_conflict == :suffix
     assert action.counts == {0, 0}
     assert action.label == location.name
@@ -199,11 +200,155 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     {:ok, location} =
       Locations.update_location(location, %{data: %{"files_folder_uuid" => trashed.uuid}})
 
+    # D1: a hook must be configured (even one that resolves to root) for
+    # the Source to plan anything at all.
+    Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
     actions = MediaReorganizer.plan(nil, [])
     action = Enum.find(actions, &(&1.kind == :location and &1.label == location.name))
 
     refute is_nil(action)
     assert action.folder.uuid == live.uuid
+  end
+
+  test "trashed folder sharing the legacy name at root does not hide the live folder under the resolved parent" do
+    location = new_location()
+
+    {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+    {:ok, trashed_at_root} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+    {:ok, _trashed_at_root} = Storage.trash_folder(trashed_at_root)
+
+    {:ok, live} =
+      Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: target.uuid})
+
+    Process.put(:target_folder, target.uuid)
+    Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+    actions = MediaReorganizer.plan(nil, [])
+    action = Enum.find(actions, &(&1.kind == :location and &1.label == location.name))
+
+    refute Enum.any?(actions, &(&1.kind == :duplicate))
+    refute is_nil(action)
+    assert action.folder.uuid == live.uuid
+  end
+
+  test "invalid pointer values ('' and 'abc') are treated as absent, never raise" do
+    location1 = new_location(%{name: "First", data: %{"files_folder_uuid" => "abc"}})
+    location2 = new_location(%{name: "Second", data: %{"files_folder_uuid" => ""}})
+
+    {:ok, folder1} = Storage.create_folder(%{name: "location-#{location1.uuid}"})
+    {:ok, folder2} = Storage.create_folder(%{name: "location-#{location2.uuid}"})
+
+    Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+    actions = MediaReorganizer.plan(nil, [])
+
+    action1 = Enum.find(actions, &(&1.kind == :location and &1.label == location1.name))
+    action2 = Enum.find(actions, &(&1.kind == :location and &1.label == location2.name))
+
+    refute is_nil(action1)
+    refute is_nil(action2)
+    assert action1.folder.uuid == folder1.uuid
+    assert action2.folder.uuid == folder2.uuid
+  end
+
+  describe "duplicate folders (X5/X11)" do
+    test "legacy folder live at both root and under the resolved parent → one duplicate report, no move" do
+      location = new_location()
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, at_root} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      {:ok, _under_parent} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: target.uuid})
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
+      dup = Enum.find(actions, &(&1.kind == :duplicate and &1.label == location.name))
+      refute is_nil(dup)
+      assert dup.op == :report
+      assert dup.reason =~ at_root.uuid
+    end
+
+    test "two records whose current folder resolves to the same live folder → one duplicate report, no move" do
+      location1 = new_location(%{name: "First"})
+      location2 = new_location(%{name: "Second"})
+
+      {:ok, shared} = Storage.create_folder(%{name: "shared-folder"})
+
+      {:ok, location1} =
+        Locations.update_location(location1, %{data: %{"files_folder_uuid" => shared.uuid}})
+
+      {:ok, location2} =
+        Locations.update_location(location2, %{data: %{"files_folder_uuid" => shared.uuid}})
+
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
+      dup = Enum.find(actions, &(&1.kind == :duplicate and &1.label == shared.name))
+      refute is_nil(dup)
+      assert dup.op == :report
+      assert dup.reason =~ location1.name
+      assert dup.reason =~ location2.name
+    end
+  end
+
+  test "after_move writes the pointer with a direct repo update — no Activity log, no context call (X10/D7)" do
+    location = new_location(%{name: "Tallinn HQ"})
+
+    {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+    {:ok, folder} =
+      Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: target.uuid})
+
+    Process.put(:target_folder, target.uuid)
+    Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+    actions = MediaReorganizer.plan(nil, [])
+    action = Enum.find(actions, &(&1.kind == :location and &1.label == location.name))
+
+    refute is_nil(action)
+    assert :ok = action.after_move.()
+
+    reloaded = Locations.get_location(location.uuid)
+    assert reloaded.data["files_folder_uuid"] == folder.uuid
+    refute_activity_logged("location.updated", resource_uuid: location.uuid)
+  end
+
+  test "host name taken by a folder another live record's pointer already claims falls back to the legacy name (D3)" do
+    location1 = new_location(%{name: "Claimed"})
+    location2 = new_location(%{name: "Other"})
+
+    {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+    {:ok, claimed_folder} =
+      Storage.create_folder(%{name: "Nice", parent_uuid: target.uuid})
+
+    {:ok, _location1} =
+      Locations.update_location(location1, %{data: %{"files_folder_uuid" => claimed_folder.uuid}})
+
+    {:ok, legacy_folder} = Storage.create_folder(%{name: "location-#{location2.uuid}"})
+
+    Process.put(:target_folder, target.uuid)
+    Process.put(:target_name, "Nice")
+    Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+    Application.put_env(:phoenix_kit_locations, :attachments_folder_name, {Hook, :name})
+
+    actions = MediaReorganizer.plan(nil, [])
+    action = Enum.find(actions, &(&1.kind == :location and &1.label == location2.name))
+
+    refute is_nil(action)
+    assert action.folder.uuid == legacy_folder.uuid
+    # "Nice" is already claimed by location1's live pointer — falls back
+    # to the deterministic legacy name instead of colliding with it.
+    assert action.name == "location-#{location2.uuid}"
   end
 
   test "folder already at the right parent/name but pointer missing → move action with after_move" do
@@ -269,6 +414,8 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     location = new_location()
     space = new_space(location, %{name: "Second Floor"})
     {:ok, folder} = Storage.create_folder(%{name: "location-space-#{space.uuid}"})
+
+    Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
 
     actions = MediaReorganizer.plan(nil, [])
     action = Enum.find(actions, &(&1.kind == :space and &1.label == space.name))
