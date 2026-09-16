@@ -147,6 +147,9 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         {:not_callable, mod, fun} ->
           {[not_callable_hook_action(mod, fun)], claimed_folder_uuids([], [], [], []), [], false}
 
+        {:bad_config, other} ->
+          {[bad_config_hook_action(other)], claimed_folder_uuids([], [], [], []), [], false}
+
         :none ->
           {[], claimed_folder_uuids([], [], [], []), [], false}
       end
@@ -163,14 +166,19 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # T3: a configured `{mod, fun}` that is not actually callable (a typo,
   # a removed function) is a distinct failure from "no hook configured at
   # all" — it must not silently degrade to report-only (E1) without
-  # telling the owner why nothing moved.
+  # telling the owner why nothing moved. U7/V3: anything configured that
+  # is not even a `{mod, fun}` shape (garbage config) is the SAME
+  # failure — never silently treated as "no hook configured" either.
   defp hook_status do
     case Application.get_env(:phoenix_kit_locations, :attachments_parent_folder) do
+      nil ->
+        :none
+
       {mod, fun} when is_atom(mod) and is_atom(fun) ->
         if callable?(mod, fun), do: :ok, else: {:not_callable, mod, fun}
 
-      _ ->
-        :none
+      other ->
+        {:bad_config, other}
     end
   end
 
@@ -187,6 +195,19 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       label: "attachments parent hook",
       counts: nil,
       reason: "configured parent hook {#{inspect(mod)}, #{inspect(fun)}} is not callable"
+    }
+  end
+
+  defp bad_config_hook_action(other) do
+    %{
+      source: "locations",
+      kind: :hook_error,
+      op: :report,
+      label: "attachments parent hook",
+      counts: nil,
+      reason:
+        "configured parent hook #{inspect(other)} is not a {module, function} tuple — " <>
+          "invalid config, not callable"
     }
   end
 
@@ -287,8 +308,11 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     # current folder (if any) gets its own `:relocated` report — all of
     # them, not only the first — except a copy that is itself another
     # record's claimed (adopted) folder, which is never also reported as
-    # relocated.
-    stray_actions = stray_relocated_actions(with_folder ++ without_folder, all_claimed)
+    # relocated. U9: includes `ambiguous` too — a THIRD live copy beyond
+    # the two the duplicate report already names must still surface here,
+    # not be dropped.
+    stray_actions =
+      stray_relocated_actions(with_folder ++ without_folder ++ ambiguous, all_claimed)
 
     all_actions =
       move_actions ++
@@ -736,6 +760,11 @@ defmodule PhoenixKitLocations.MediaReorganizer do
 
   defp apply_name_track_f1(result, _hook_parent_uuid, _matches), do: result
 
+  # U9/F5: the ambiguous pair claims two folders, but any FURTHER live
+  # legacy-named copy is not part of the ambiguity at all — it must still
+  # get its own `:relocated` report (via `stray_relocated_actions/2`
+  # downstream), never silently dropped just because this record already
+  # has a duplicate report.
   defp resolve_name_entry_result(
          base,
          _name,
@@ -743,11 +772,12 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          legacy_folder,
          _under,
          _root,
-         _matches,
+         matches,
          _stray
        )
        when not is_nil(host_folder) and not is_nil(legacy_folder) do
-    %{base | ambiguous: {host_folder, legacy_folder}}
+    stray = Enum.reject(matches, &(&1.uuid in [host_folder.uuid, legacy_folder.uuid]))
+    %{base | ambiguous: {host_folder, legacy_folder}, stray_legacy: stray}
   end
 
   defp resolve_name_entry_result(
@@ -757,11 +787,12 @@ defmodule PhoenixKitLocations.MediaReorganizer do
          _legacy_folder,
          under_parent,
          at_root,
-         _matches,
+         matches,
          _stray
        )
        when not is_nil(under_parent) and not is_nil(at_root) do
-    %{base | ambiguous: {under_parent, at_root}}
+    stray = Enum.reject(matches, &(&1.uuid in [under_parent.uuid, at_root.uuid]))
+    %{base | ambiguous: {under_parent, at_root}, stray_legacy: stray}
   end
 
   defp resolve_name_entry_result(
@@ -984,15 +1015,21 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # (not through `Attachments.folder_name/2`, which is deliberately
   # defensive for the live UI) so a raising/garbage-returning hook is a
   # reportable failure here instead of a silent legacy-name fallback. Not
-  # configured, or configured but not callable, is NOT a failure — it is
-  # simply "no host name", same as `Attachments.folder_name/2` treats it.
+  # configured (unset) is NOT a failure — it is simply "no host name",
+  # same as `Attachments.folder_name/2` treats it. U7/V3: configured but
+  # not a `{mod, fun}` shape, or a `{mod, fun}` that is not actually
+  # callable, are BOTH the same failure — parity with the parent hook.
   defp resolve_folder_name(record, actor_uuid, kind) do
     case Application.get_env(:phoenix_kit_locations, :attachments_folder_name) do
+      nil ->
+        {:ok, legacy_name(record)}
+
       {mod, fun} when is_atom(mod) and is_atom(fun) ->
         resolve_configured_folder_name(mod, fun, record, actor_uuid, kind)
 
-      _ ->
-        {:ok, legacy_name(record)}
+      other ->
+        log_bad_hook_config(kind, other)
+        :error
     end
   end
 
@@ -1004,8 +1041,18 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         :error -> :error
       end
     else
-      {:ok, legacy_name(record)}
+      Logger.warning(
+        "Attachments name hook {#{inspect(mod)}, #{inspect(fun)}} (#{kind}) is not callable"
+      )
+
+      :error
     end
+  end
+
+  defp log_bad_hook_config(kind, other) do
+    Logger.warning(
+      "Attachments name hook #{inspect(other)} (#{kind}) is not a {module, function} tuple"
+    )
   end
 
   # U6: mirrors `guarded_hook_call/4` — every log line names the hook

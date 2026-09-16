@@ -1119,6 +1119,67 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     end
   end
 
+  describe "ambiguous entries still report every extra live copy (U9)" do
+    test "host-named + legacy-under-target ambiguity still reports a THIRD live copy as :relocated" do
+      location = new_location(%{name: "Tallinn HQ"})
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, _host_folder} = Storage.create_folder(%{name: "Nice", parent_uuid: target.uuid})
+
+      {:ok, _legacy_under_target} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: target.uuid})
+
+      {:ok, elsewhere} = Storage.create_folder(%{name: "Somewhere else"})
+
+      {:ok, third_copy} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: elsewhere.uuid})
+
+      Process.put(:target_folder, target.uuid)
+      Process.put(:target_name, "Nice")
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+      Application.put_env(:phoenix_kit_locations, :attachments_folder_name, {Hook, :name})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      dup = Enum.find(actions, &(&1.kind == :duplicate and &1.label == location.name))
+      refute is_nil(dup)
+
+      relocated =
+        Enum.find(actions, &(&1.kind == :relocated and &1.folder.uuid == third_copy.uuid))
+
+      refute is_nil(relocated)
+    end
+
+    test "legacy-under-target + legacy-at-root ambiguity still reports a THIRD live copy as :relocated" do
+      location = new_location(%{name: "Tallinn HQ"})
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+      {:ok, _under_target} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: target.uuid})
+
+      {:ok, _at_root} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      {:ok, elsewhere} = Storage.create_folder(%{name: "Somewhere else"})
+
+      {:ok, third_copy} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: elsewhere.uuid})
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      dup = Enum.find(actions, &(&1.kind == :duplicate and &1.label == location.name))
+      refute is_nil(dup)
+
+      relocated =
+        Enum.find(actions, &(&1.kind == :relocated and &1.folder.uuid == third_copy.uuid))
+
+      refute is_nil(relocated)
+    end
+  end
+
   describe "the parent hook always sees the FULL record (R9)" do
     test "hook reads a column outside the light select and raises when it's missing → fixed by loading full rows" do
       location = new_location(%{name: "Tallinn HQ", city: "Tallinn"})
@@ -1243,6 +1304,42 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       error = Enum.find(actions, &(&1.kind == :hook_error))
       refute is_nil(error)
       assert error.reason =~ "not callable"
+    end
+  end
+
+  describe "hook config validation is uniform for parent AND name hooks (U7/V3)" do
+    test "a garbage (non-tuple) parent hook config → hook_error, never silently 'no hook'" do
+      location = new_location(%{name: "Tallinn HQ"})
+      {:ok, _folder} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, :not_a_tuple)
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
+      error = Enum.find(actions, &(&1.kind == :hook_error))
+      refute is_nil(error)
+      assert error.reason =~ "not a {module, function} tuple"
+    end
+
+    test "a garbage (non-tuple) name hook config → hook_error, record skipped" do
+      location = new_location(%{name: "Tallinn HQ"})
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, folder} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      {:ok, _location} =
+        Locations.update_location(location, %{data: %{"files_folder_uuid" => folder.uuid}})
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+      Application.put_env(:phoenix_kit_locations, :attachments_folder_name, :not_a_tuple)
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :location))
+      error = Enum.find(actions, &(&1.kind == :hook_error))
+      refute is_nil(error)
     end
   end
 
