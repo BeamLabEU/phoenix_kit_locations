@@ -766,7 +766,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
             stray_legacy: Enum.reject(matches, &(&1 == folder))
         }
 
-      [folder1, folder2 | _rest] = elsewhere ->
+      [folder1, folder2 | _rest] ->
         %{
           result
           | ambiguous: {folder1, folder2},
