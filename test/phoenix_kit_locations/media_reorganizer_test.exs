@@ -1441,6 +1441,40 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       assert dup.reason =~ copy1.uuid
       assert dup.reason =~ copy2.uuid
     end
+
+    test "no pointer, THREE live legacy copies under three real parents; hook answers nil → :duplicate names two, the third is still reported :relocated (R6-1)" do
+      location = new_location(%{name: "Tallinn HQ"})
+
+      {:ok, parent1} = Storage.create_folder(%{name: "Container one"})
+      {:ok, parent2} = Storage.create_folder(%{name: "Container two"})
+      {:ok, parent3} = Storage.create_folder(%{name: "Container three"})
+
+      copies =
+        for parent <- [parent1, parent2, parent3] do
+          {:ok, copy} =
+            Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: parent.uuid})
+
+          copy
+        end
+
+      Process.put(:target_folder, nil)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
+      refute Enum.any?(actions, &(&1.kind == :hook_nil))
+
+      dup = Enum.find(actions, &(&1.kind == :duplicate and &1.label == location.name))
+      refute is_nil(dup)
+
+      named_in_dup = Enum.filter(copies, &(dup.reason =~ &1.uuid))
+      assert length(named_in_dup) == 2
+
+      [third] = copies -- named_in_dup
+      relocated = Enum.filter(actions, &(&1.kind == :relocated))
+      assert Enum.any?(relocated, &(&1.folder.uuid == third.uuid))
+    end
   end
 
   describe "every stray legacy copy is reported, not only the first (F5)" do
