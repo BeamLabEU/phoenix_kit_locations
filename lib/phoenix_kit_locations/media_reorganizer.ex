@@ -2,13 +2,14 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   @moduledoc """
   Locations' media-reorganizer plan source.
 
-  Not compiled against a core `PhoenixKit.Modules.Storage.Reorganizer.Source`
-  behaviour — today's hex core (2.23.x) does not ship the engine yet. This
-  module declares no `@behaviour` and returns plain maps; see
-  `PhoenixKitLocations.media_reorganizer/0` for the registration comment.
-  Once core ships the engine, `plan/2`'s contract (`plan(actor_uuid, opts)
-  :: [map()]`) already matches `Source.plan/2` — the only follow-up is
-  adding `@behaviour`/`@impl`.
+  Implements core's `PhoenixKit.Modules.Storage.Reorganizer.Source` contract
+  (`plan(actor_uuid, opts) :: [map()]`, shipped in core 2.24.0) without
+  declaring `@behaviour`: the `:phoenix_kit` requirement stays `~> 2.0`, and
+  on an older core the behaviour module does not exist. Core finds this
+  module through `PhoenixKitLocations.media_reorganizer/0` by name and
+  validates each map with `Reorganizer.Action.new!/1`, so the plain maps are
+  the whole contract. Add `@behaviour`/`@impl` once the core floor is raised
+  to 2.24.
 
   Contract (design §9/§10 of `2026-09-15-media-reorganizer-design.md`):
 
@@ -248,21 +249,15 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       |> Enum.with_index()
       |> Enum.map(fn {c, idx} -> Map.put(c, :order_index, idx) end)
 
-    {resolved_all, hook_error_labels} =
-      resolve_candidates(candidates, by_pointer, by_name, mod, fun, pointer_claims, actor_uuid)
-
     # U4: orphan scope = every parent a hook call for ANY candidate
     # actually returned, regardless of that candidate's outcome (moved,
-    # relocated, duplicate, hook_nil) — captured from the raw hook
-    # answers, before `apply_nil_root_guard` below can rewrite a
-    # hook-nil entry's `parent_uuid` to its folder's own (a value the
-    # hook never returned). Never derived from where a folder happens to
-    # end up living.
-    resolved_parents =
-      resolved_all
-      |> Enum.map(& &1.parent_uuid)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
+    # relocated, duplicate, hook_nil, or skipped because its NAME hook
+    # failed) — captured from the raw parent-hook answers, before
+    # `apply_nil_root_guard` below can rewrite a hook-nil entry's
+    # `parent_uuid` to its folder's own (a value the hook never returned).
+    # Never derived from where a folder happens to end up living.
+    {resolved_all, hook_error_labels, resolved_parents} =
+      resolve_candidates(candidates, by_pointer, by_name, mod, fun, pointer_claims, actor_uuid)
 
     resolved_all =
       resolved_all
@@ -455,6 +450,15 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         sort_candidate(p, by_pointer, mod, fun, actor_uuid, acc)
       end)
 
+    # Every parent a successful parent-hook call answered — taken before
+    # the name hook runs, so a record skipped for a failing name hook
+    # still keeps its parent in the orphan scope.
+    resolved_parents =
+      (pointer_track ++ name_track)
+      |> Enum.map(& &1.parent_uuid)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
     pointer_results =
       pointer_track |> Enum.reverse() |> Enum.map(&resolve_pointer_entry(&1, by_name, actor_uuid))
 
@@ -464,7 +468,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       resolve_name_entries(Enum.reverse(name_track), by_name, pointer_claims, actor_uuid)
 
     all_error_labels = hook_error_labels ++ pointer_error_labels ++ name_error_labels
-    {pointer_entries ++ name_entries, all_error_labels}
+    {pointer_entries ++ name_entries, all_error_labels, resolved_parents}
   end
 
   # U8: keeps the record label of each hook failure (rather than only a
@@ -562,12 +566,14 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   end
 
   # D6/E2: a folder found through the record's live pointer keeps its own
-  # name — UNLESS that name is still the legacy deterministic one, in
-  # which case it gets the host name like any other candidate (R8: the
-  # name hook is skipped entirely otherwise).
+  # name — UNLESS that name is still one this module generated itself (the
+  # legacy deterministic name, or a `location-attachment-pending-*` name
+  # whose post-insert rename never happened), in which case it gets the
+  # host name like any other candidate (R8: the name hook is skipped
+  # entirely otherwise).
   defp resolve_pointer_entry(%{pointer_folder: folder} = d, by_name, actor_uuid) do
     name_result =
-      if folder.name == d.legacy_name do
+      if module_generated_name?(folder.name, d.legacy_name) do
         resolve_folder_name(d.record, actor_uuid, d.kind)
       else
         {:ok, nil}
@@ -593,6 +599,9 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         }
     end
   end
+
+  defp module_generated_name?(name, legacy_name),
+    do: name == legacy_name or String.starts_with?(name, @pending_prefix)
 
   # F5/T5: every live match for the legacy name other than the record's
   # own current folder — a list, not just the first one. A live record's
@@ -938,8 +947,11 @@ defmodule PhoenixKitLocations.MediaReorganizer do
 
   defp noop_move?(_folder, _parent_uuid, _name), do: false
 
+  # Same rule as core's `Reorganizer.Action.matches_name?/2`: `N` is an
+  # integer >= 2 with no leading zero (all the engine's suffixing ever
+  # generates), so a folder named "Item (1)" is not taken for "Item".
   defp suffixed_variant?(folder_name, name) do
-    Regex.match?(~r/^#{Regex.escape(name)} \(\d+\)$/, folder_name)
+    Regex.match?(~r/\A#{Regex.escape(name)} \((?:[2-9]|[1-9]\d+)\)\z/, folder_name)
   end
 
   defp build_ambiguous_duplicate_action(%{record: record, ambiguous: {f1, f2}}) do

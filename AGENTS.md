@@ -108,6 +108,7 @@ lib/phoenix_kit_locations/
 ├── policy.ex                                # Access: base `locations` = own locations, `locations.manage_all` = all
 ├── attachments.ex                           # Multi-scope files + featured image (Location and each Space)
 ├── errors.ex                                # Error atom -> translated message
+├── media_reorganizer.ex                     # Storage.Reorganizer source: plans legacy folder moves via the attachment hooks
 ├── gettext.ex                               # PhoenixKitLocations.Gettext backend
 ├── paths.ex                                 # URL helpers
 ├── schemas/
@@ -220,6 +221,7 @@ enforces the latter).
 |---|---|---|
 | Spaces tree + Structure tab | A parent must be in the same Location (context guard, not DB); deletes cascade the subtree and fire only from the confirm modal | `dev_docs/guides/spaces.md` |
 | Multi-scope attachments | All per-resource state lives in `attachments_by_scope`; every event carries its scope; pending folders are renamed after a `:new` insert | `PhoenixKitLocations.Attachments` moduledoc |
+| Media reorganizer source | `media_reorganizer/0` → `MediaReorganizer.plan/2` (core 2.24+ `mix phoenix_kit.media.reorganize`). Plain maps, no `@behaviour` while the core floor is `~> 2.0`; every action must pass core's `Reorganizer.Action.new!/1` (a test enforces it). Without a configured `:attachments_parent_folder` hook it only reports; a failing hook is `:hook_error`, never root; it never creates folders | `PhoenixKitLocations.MediaReorganizer` moduledoc, core `Reorganizer.Source` moduledoc |
 | Sites project extension | One-way duck-typed contract; `ProjectSitesLive` has no `handle_params/3` and never crashes the host project page | `PhoenixKitLocations.Web.ProjectSitesLive` moduledoc |
 | PlacePicker | Sends `{:place_picker_select, id, %{location_uuid, space_uuid}}`; `selected_space_uuid` is seed-once; a given `:owner_uuid` also gates `select_location` | `PhoenixKitLocations.Web.Components.PlacePicker` moduledoc |
 | Ownership + scoped access | No client-supplied value reaches another account's location: owner never cast from attrs; without `locations.manage_all` every page resolves through `Policy` (mount and save) and spaces must belong to the loaded location; owner filter omitted = all rows | `PhoenixKitLocations.Policy`, `Locations` docs, `LocationFormLive` moduledoc |

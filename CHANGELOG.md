@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.2 - 2026-09-16
+
+### Added
+
+- Media reorganizer source (`media_reorganizer/0` →
+  `PhoenixKitLocations.MediaReorganizer`) for core 2.24's
+  `mix phoenix_kit.media.reorganize`. It plans moves of existing location and
+  space folders under the host's `:attachments_parent_folder` /
+  `:attachments_folder_name` hooks, back-fills missing folder pointers, trashes
+  stale empty pending upload folders, and reports duplicates, relocated copies,
+  orphans and failing hooks. Without a configured parent hook it only reports.
+
+### Fixed
+
+- A folder pointer still carrying a `location-attachment-pending-*` name (a
+  failed post-insert rename) is now renamed to the host name instead of keeping
+  the pending name forever.
+- A record whose name hook fails no longer drops its resolved parent from the
+  orphan-folder scan.
+- A `"name (1)"` folder is no longer read as a collision suffix of `"name"`;
+  the rule now matches core's (`N >= 2`).
+
 ## 0.5.1 - 2026-09-15
 
 ### Added

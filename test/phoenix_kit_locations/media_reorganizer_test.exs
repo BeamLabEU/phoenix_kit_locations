@@ -1666,4 +1666,107 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       assert length(locations) == 12
     end
   end
+
+  describe "post-merge review fixes (PR #17)" do
+    test "pointer folder still carrying a pending upload name → renamed to the host name" do
+      location = new_location(%{name: "Tallinn HQ"})
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+      {:ok, folder} =
+        Storage.create_folder(%{
+          name: "location-attachment-pending-#{Ecto.UUID.generate()}",
+          parent_uuid: target.uuid
+        })
+
+      {:ok, _location} =
+        Locations.update_location(location, %{data: %{"files_folder_uuid" => folder.uuid}})
+
+      Process.put(:target_folder, target.uuid)
+      Process.put(:target_name, "Nice")
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+      Application.put_env(:phoenix_kit_locations, :attachments_folder_name, {Hook, :name})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      action = Enum.find(actions, &(&1.kind == :location and &1.op == :move))
+      assert action.folder.uuid == folder.uuid
+      assert action.parent_uuid == target.uuid
+      assert action.name == "Nice"
+      assert is_nil(action.after_move)
+      # Claimed by the pointer: never also reported or trashed as pending.
+      refute Enum.any?(actions, &(&1.kind == :pending))
+    end
+
+    test "a failing name hook skips the record but keeps its resolved parent in the orphan scope" do
+      location = new_location(%{name: "Tallinn HQ"})
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, _legacy} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      {:ok, orphan_folder} =
+        Storage.create_folder(%{
+          name: "location-#{Ecto.UUID.generate()}",
+          parent_uuid: target.uuid
+        })
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      Application.put_env(
+        :phoenix_kit_locations,
+        :attachments_folder_name,
+        {RaisingNameHook, :name}
+      )
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      assert Enum.any?(actions, &(&1.kind == :hook_error))
+      refute Enum.any?(actions, &(&1.op == :move))
+      assert Enum.any?(actions, &(&1.kind == :orphan and &1.folder.uuid == orphan_folder.uuid))
+    end
+
+    test "every planned action is accepted by core's Reorganizer.Action with no unknown keys" do
+      action_mod = PhoenixKit.Modules.Storage.Reorganizer.Action
+
+      location = new_location(%{name: "Tallinn HQ"})
+      space = new_space(location, %{name: "Ground"})
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, elsewhere} = Storage.create_folder(%{name: "Elsewhere"})
+
+      # move + back-fill (location), relocated (space), orphan, stale pending.
+      {:ok, _} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+
+      {:ok, _} =
+        Storage.create_folder(%{
+          name: "location-space-#{space.uuid}",
+          parent_uuid: elsewhere.uuid
+        })
+
+      {:ok, _} = Storage.create_folder(%{name: "location-#{Ecto.UUID.generate()}"})
+
+      {:ok, pending} =
+        Storage.create_folder(%{name: "location-attachment-pending-#{Ecto.UUID.generate()}"})
+
+      old =
+        DateTime.utc_now() |> DateTime.add(-30 * 86_400, :second) |> DateTime.truncate(:second)
+
+      pending
+      |> Ecto.Changeset.change(inserted_at: old)
+      |> PhoenixKit.RepoHelper.repo().update!()
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      assert Enum.any?(actions, &(&1.op == :move))
+      assert Enum.any?(actions, &(&1.kind == :relocated))
+      assert Enum.any?(actions, &(&1.kind == :orphan))
+      assert Enum.any?(actions, &(&1.op == :trash))
+
+      for action <- actions do
+        assert action_mod.unknown_keys(action) == [], "unknown keys in #{inspect(action)}"
+        assert %{op: _} = action_mod.new!(action)
+      end
+    end
+  end
 end
