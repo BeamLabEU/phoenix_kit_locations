@@ -1543,6 +1543,19 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       location_b = new_location(%{name: "Beta"})
       {:ok, folder_b} = Storage.create_folder(%{name: "Somewhere for Beta"})
 
+      # `inserted_at` has second precision and both records land in the same
+      # second, so the order would fall back to the uuid tiebreak, which
+      # UUIDv7 does not guarantee within a millisecond. Pin Alpha as the
+      # older record explicitly — the test is about ordering, not about
+      # how fast two inserts run.
+      old_time =
+        DateTime.utc_now() |> DateTime.add(-10 * 86_400, :second) |> DateTime.truncate(:second)
+
+      Repo.update_all(
+        from(l in Location, where: l.uuid == ^location_a.uuid),
+        set: [inserted_at: old_time]
+      )
+
       {:ok, _location_b} =
         Locations.update_location(location_b, %{data: %{"files_folder_uuid" => folder_b.uuid}})
 
