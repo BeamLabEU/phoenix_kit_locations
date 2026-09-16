@@ -90,6 +90,13 @@ defmodule PhoenixKitLocations do
   @impl PhoenixKit.Module
   def css_sources, do: [:phoenix_kit_locations]
 
+  # PhoenixKit.Module.media_reorganizer/0 (core ≥ the release that ships
+  # Storage.Reorganizer). No `@impl` yet — today's hex core pin (~> 2.0)
+  # predates the callback; `ModuleRegistry.all_media_reorganizers/0` looks
+  # this function up by name, not by behaviour, so it is collected either
+  # way once core ships it.
+  def media_reorganizer, do: PhoenixKitLocations.MediaReorganizer
+
   # Project-extension contribution to the `phoenix_kit_projects` hub — the
   # duck-typed one-way contract (same shape as the dashboards widget
   # contract): its Extensions.Registry discovers this function; no
