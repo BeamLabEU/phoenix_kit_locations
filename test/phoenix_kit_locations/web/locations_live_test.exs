@@ -19,9 +19,16 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       assert html =~ "No locations yet."
     end
 
-    test "renders a New Location link", %{conn: conn} do
+    test "puts the title and New Location button in the admin header", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/en/admin/locations/")
-      assert has_element?(view, "a", "New Location")
+      assert has_element?(view, "#header-title", "Locations")
+      refute has_element?(view, "#header-section")
+
+      assert has_element?(
+               view,
+               ~s(#header-action[href="#{Paths.location_new()}"]),
+               "New Location"
+             )
     end
 
     test "row menu links to the Structure page for the location", %{conn: conn} do
@@ -38,6 +45,13 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
   end
 
   describe "types tab" do
+    test "puts Locations / Types and the New Type button in the admin header", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/en/admin/locations/types")
+      assert has_element?(view, ~s(#header-section[href="#{Paths.index()}"]), "Locations")
+      assert has_element?(view, "#header-title", "Types")
+      assert has_element?(view, ~s(#header-action[href="#{Paths.type_new()}"]), "New Type")
+    end
+
     test "renders the types list", %{conn: conn} do
       fixture_location_type(%{name: "Showroom"})
 

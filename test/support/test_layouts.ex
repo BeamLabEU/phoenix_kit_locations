@@ -23,8 +23,36 @@ defmodule PhoenixKitLocations.Test.Layouts do
     """
   end
 
+  # Mirrors the header fields core's admin layout reads from a plugin
+  # LiveView's assigns (`page_section`, `page_crumbs`, `page_title`,
+  # `page_action`), so tests can assert what lands in the breadcrumb bar.
   def app(assigns) do
     ~H"""
+    <header id="test-admin-header">
+      <.link
+        :if={assigns[:page_section]}
+        id="header-section"
+        navigate={assigns[:page_section_path]}
+      >
+        {assigns[:page_section]}
+      </.link>
+      <.link
+        :for={crumb <- assigns[:page_crumbs] || []}
+        class="header-crumb"
+        navigate={crumb[:path]}
+      >
+        {crumb.label}
+      </.link>
+      <span :if={assigns[:page_title]} id="header-title">{assigns[:page_title]}</span>
+      <.link
+        :if={assigns[:page_action]}
+        id="header-action"
+        navigate={assigns[:page_action].navigate}
+        title={assigns[:page_action].label}
+      >
+        {assigns[:page_action].label}
+      </.link>
+    </header>
     <div id="test-flashes">
       <div :if={msg = Phoenix.Flash.get(@flash, :info)} id="flash-info" data-flash-kind="info">
         {msg}

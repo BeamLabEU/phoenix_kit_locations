@@ -7,7 +7,6 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
   require Logger
 
   import PhoenixKitWeb.Components.MultilangForm
-  import PhoenixKitWeb.Components.Core.AdminPageHeader, only: [admin_page_header: 1]
   import PhoenixKitWeb.Components.Core.Select
 
   alias PhoenixKitLocations.Errors
@@ -51,6 +50,14 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
          socket
          |> assign(
            page_title: page_title(action, location_type),
+           page_section: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+           page_section_path: Paths.index(),
+           page_crumbs: [
+             %{
+               label: gettext_with_backend(PhoenixKitLocations.Gettext, "Types"),
+               path: Paths.types()
+             }
+           ],
            action: action,
            location_type: location_type
          )
@@ -71,8 +78,12 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
     end
   end
 
-  defp page_title(:new, _location_type), do: gettext("New Location Type")
-  defp page_title(:edit, location_type), do: gettext("Edit %{name}", name: location_type.name)
+  # Rendered by the PhoenixKit admin header as "Locations / Types / New" or
+  # "Locations / Types / <name>"; the page body has no header of its own.
+  defp page_title(:new, _location_type),
+    do: gettext_with_backend(PhoenixKitLocations.Gettext, "New")
+
+  defp page_title(:edit, location_type), do: location_type.name
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     assign(socket, changeset: changeset, form: to_form(changeset, as: :location_type))
@@ -161,11 +172,6 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
 
     ~H"""
     <div class="flex flex-col w-full px-4 py-8 gap-6">
-      <.admin_page_header
-        title={@page_title}
-        subtitle={if @action == :new, do: gettext("Create a new location type for categorizing locations."), else: gettext("Update location type details.")}
-      />
-
       <div class="max-w-3xl mx-auto w-full">
       <.form for={@form} id="location-type-form" action="#" phx-change="validate" phx-submit="save">
         <div class="card bg-base-100 shadow-lg">

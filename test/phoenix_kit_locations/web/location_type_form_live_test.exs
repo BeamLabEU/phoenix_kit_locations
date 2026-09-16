@@ -4,9 +4,13 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
   alias PhoenixKitLocations.Locations
 
   describe "new form" do
-    test "renders the New Location Type heading", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/en/admin/locations/types/new")
-      assert html =~ "New Location Type"
+    test "puts Locations / Types / New in the admin header, not the body", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+
+      assert has_element?(view, ~s(#header-section[href="/en/admin/locations"]), "Locations")
+      assert has_element?(view, ~s(.header-crumb[href="/en/admin/locations/types"]), "Types")
+      assert has_element?(view, "#header-title", "New")
+      refute render(view) =~ "New Location Type"
     end
 
     test "submitting the form creates a type, redirects, and logs with actor_uuid",
@@ -47,9 +51,10 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
     test "renders existing type values", %{conn: conn} do
       type = fixture_location_type(%{name: "Original"})
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+      {:ok, view, html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
 
-      assert html =~ "Edit Original"
+      assert has_element?(view, "#header-title", "Original")
+      assert html =~ ~s(value="Original")
     end
 
     test "updating name persists the change", %{conn: conn} do
@@ -123,7 +128,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
       rendered = render_click(view, "switch_language", %{"lang" => "fr"})
 
       assert is_binary(rendered)
-      assert rendered =~ "New Location Type"
+      assert has_element?(view, "#location-type-form")
     end
   end
 

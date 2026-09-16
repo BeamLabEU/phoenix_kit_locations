@@ -24,7 +24,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   require Logger
 
   import PhoenixKitWeb.Components.MultilangForm
-  import PhoenixKitWeb.Components.Core.AdminPageHeader, only: [admin_page_header: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
   import PhoenixKitWeb.Components.Core.Input
   import PhoenixKitWeb.Components.Core.Select
@@ -85,6 +84,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
          socket
          |> assign(
            page_title: page_title(action, location),
+           page_section: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+           page_section_path: Paths.index(),
            mode: mode,
            action: action,
            location: location,
@@ -161,10 +162,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       []
   end
 
-  defp page_title(:new, _location), do: gettext("New Location")
-
-  defp page_title(:edit, location),
-    do: gettext("Edit %{name}", name: location.name)
+  # Rendered by the PhoenixKit admin header as "Locations / New" or
+  # "Locations / <name>"; the page body has no header of its own.
+  defp page_title(:new, _location), do: gettext_with_backend(PhoenixKitLocations.Gettext, "New")
+  defp page_title(:edit, location), do: location.name
 
   # Keeps the `:changeset` assign (for `<.translatable_field>`) and `:form`
   # (for core `<.input>` / `<.select>` / `<.textarea>` which want a
@@ -478,11 +479,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         selected_uuids={@media_selected_uuids}
         scope_folder_id={Attachments.state(%{assigns: assigns}, @media_selector_scope).folder_uuid}
         phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
-      />
-
-      <.admin_page_header
-        title={@page_title}
-        subtitle={if @action == :new, do: gettext("Add a new location."), else: gettext("Update location details.")}
       />
 
       <%!-- Form content capped at 5xl (matches AI module pattern). --%>

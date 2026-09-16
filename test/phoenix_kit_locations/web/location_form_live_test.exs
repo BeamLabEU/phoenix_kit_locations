@@ -7,7 +7,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
   describe "new form" do
     test "renders the New Location heading", %{conn: conn} do
       {:ok, view, html} = live(conn, "/en/admin/locations/new")
-      assert html =~ "New Location"
+      # Title lives in the admin header as "Locations / New".
+      assert has_element?(view, ~s(#header-section[href="/en/admin/locations"]), "Locations")
+      assert has_element?(view, "#header-title", "New")
+      refute html =~ "New Location"
       assert html =~ "Address"
       assert html =~ "Contact"
       assert html =~ "Features &amp; Amenities"
@@ -66,9 +69,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     test "renders existing location values", %{conn: conn} do
       location = fixture_location(%{name: "Original", city: "Oldtown"})
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
 
-      assert html =~ "Edit Original"
+      assert has_element?(view, "#header-section", "Locations")
+      assert has_element?(view, "#header-title", "Original")
       assert html =~ "value=\"Oldtown\""
     end
 
@@ -403,7 +407,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       assert is_binary(rendered)
       # The form still renders after a language switch.
-      assert rendered =~ "New Location"
+      assert has_element?(view, "#location-form")
     end
   end
 

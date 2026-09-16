@@ -100,9 +100,13 @@ defmodule PhoenixKitLocationsTest do
       end
     end
 
-    test "the Types subtab is hidden behind a scope check" do
-      types = Enum.find(PhoenixKitLocations.admin_tabs(), &(&1.id == :admin_locations_types))
-      assert is_function(types.visible, 1)
+    test "the list and Types subtabs are hidden behind a scope check" do
+      tabs = PhoenixKitLocations.admin_tabs()
+
+      for id <- [:admin_locations_list, :admin_locations_types] do
+        tab = Enum.find(tabs, &(&1.id == id))
+        assert is_function(tab.visible, 1)
+      end
     end
 
     test "visible subtabs include locations and types" do

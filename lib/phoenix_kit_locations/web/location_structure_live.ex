@@ -34,7 +34,6 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
   import PhoenixKitWeb.Components.LanguageSwitcher, only: [language_switcher: 1]
   import PhoenixKitWeb.Components.MultilangForm
-  import PhoenixKitWeb.Components.Core.AdminPageHeader, only: [admin_page_header: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
   import PhoenixKitWeb.Components.Core.Input
   import PhoenixKitWeb.Components.Core.Modal, only: [confirm_modal: 1]
@@ -87,15 +86,15 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
            adding_parent_uuid: nil,
            new_space_form: nil,
            confirm_delete: nil,
-           page_title: page_title(location)
+           page_title: location.name,
+           page_section: gettext("Locations"),
+           page_section_path: Paths.index()
          )
          |> mount_multilang()
          |> Attachments.init()
          |> maybe_allow_uploads(Policy.manage_all?(scope))}
     end
   end
-
-  defp page_title(location), do: gettext("%{name} — Structure", name: location.name)
 
   # ── Expand / select (mount skeleton) ─────────────────────────────
 
@@ -395,8 +394,6 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
         scope_folder_id={Attachments.state(%{assigns: assigns}, @media_selector_scope).folder_uuid}
         phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
       />
-
-      <.admin_page_header title={@location.name} />
 
       <div class="max-w-5xl mx-auto w-full flex flex-col gap-4">
         <.location_tabs location={@location} active={:structure} />

@@ -184,6 +184,10 @@ defmodule PhoenixKitLocations do
         # swallow types; `:exact` misses /new and /:uuid/edit, leaving the
         # parent tab as the only visible "active" item on those pages.
         match: {:regex, ~r{(?:^|/)locations(?:/new|/[^/]+/edit)?$}},
+        # Only listed next to Types. Without `locations.manage_all` Types is
+        # hidden, and a lone "Locations" child under the "Locations" parent
+        # reads as a duplicate; the parent tab already opens the list.
+        visible: fn scope -> PhoenixKitLocations.Policy.manage_all?(scope) end,
         parent: :admin_locations,
         gettext_backend: PhoenixKitLocations.Gettext,
         gettext_domain: "default",

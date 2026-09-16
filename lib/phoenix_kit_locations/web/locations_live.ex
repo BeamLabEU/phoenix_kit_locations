@@ -12,8 +12,6 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
 
   require Logger
 
-  import PhoenixKitWeb.Components.Core.AdminPageHeader
-  import PhoenixKitWeb.Components.Core.Icon
   import PhoenixKitWeb.Components.Core.Modal, only: [confirm_modal: 1]
   import PhoenixKitWeb.Components.Core.TableDefault
   import PhoenixKitWeb.Components.Core.TableRowMenu
@@ -29,7 +27,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: gettext("Locations"),
+       page_title: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
        locations: [],
        location_types: [],
        manage_all: false,
@@ -55,7 +53,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
       socket =
         socket
         |> assign(:active_tab, action)
-        |> assign(:page_title, tab_title(action))
+        |> assign_header(action)
         |> assign(:confirm_delete, nil)
         |> assign(:manage_all, manage_all?)
         |> assign(
@@ -68,8 +66,34 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
     end
   end
 
-  defp tab_title(:index), do: gettext("Locations")
-  defp tab_title(:types), do: gettext("Location Types")
+  # The page title, trail and create button live in the PhoenixKit admin
+  # header (`page_title` / `page_section` / `page_action`), not in the body.
+  # Both actions share this LiveView, so a patch between them resets them all.
+  defp assign_header(socket, :index) do
+    assign(socket,
+      page_title: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+      page_section: nil,
+      page_section_path: nil,
+      page_action: %{
+        icon: "hero-plus",
+        label: gettext_with_backend(PhoenixKitLocations.Gettext, "New Location"),
+        navigate: Paths.location_new()
+      }
+    )
+  end
+
+  defp assign_header(socket, :types) do
+    assign(socket,
+      page_title: gettext_with_backend(PhoenixKitLocations.Gettext, "Types"),
+      page_section: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+      page_section_path: Paths.index(),
+      page_action: %{
+        icon: "hero-plus",
+        label: gettext_with_backend(PhoenixKitLocations.Gettext, "New Type"),
+        navigate: Paths.type_new()
+      }
+    )
+  end
 
   defp load_data(socket, :index) do
     # `Policy` pins a user without `manage_all` to their own locations; the
@@ -240,36 +264,9 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col w-full px-4 py-6 gap-6">
-      <%!-- Locations / Types switching lives in the PhoenixKit admin
-           dashboard's subtab nav (`:admin_locations_list` and
-           `:admin_locations_types`); rendering the same switcher in
-           the page would duplicate it. --%>
-      <.admin_page_header
-        title={if @active_tab == :types, do: gettext("Location Types"), else: gettext("Locations")}
-        subtitle={
-          if @active_tab == :types,
-            do: gettext("Categories used to tag locations."),
-            else: gettext("Physical and virtual locations.")
-        }
-      >
-        <:actions>
-          <.link
-            :if={@active_tab == :index}
-            navigate={Paths.location_new()}
-            class="btn btn-primary btn-sm"
-          >
-            <.icon name="hero-plus" class="w-4 h-4" /> {gettext("New Location")}
-          </.link>
-          <.link
-            :if={@active_tab == :types}
-            navigate={Paths.type_new()}
-            class="btn btn-primary btn-sm"
-          >
-            <.icon name="hero-plus" class="w-4 h-4" /> {gettext("New Type")}
-          </.link>
-        </:actions>
-      </.admin_page_header>
-
+      <%!-- Title, trail and the New Location / New Type button render in
+           the PhoenixKit admin header (`assign_header/2`); Locations / Types
+           switching lives in its subtab nav. --%>
       <%!-- Locations tab content --%>
       <div :if={@active_tab == :index} class="flex flex-col gap-4">
         <.owner_filter :if={@manage_all} active={@owner_filter} />
