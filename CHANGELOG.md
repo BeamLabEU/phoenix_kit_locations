@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.3 - 2026-09-16
+
+### Changed
+
+- Page titles render in the PhoenixKit admin header instead of an in-page
+  header: "Locations" and "Locations / Types" (with the New Location / New
+  Type button in the header), "Locations / New" and "Locations / <name>" on
+  the location form and Structure page, "Locations / Types / New" or
+  "… / <name>" on the type form.
+- The "Locations" list subtab is shown only alongside Types (with
+  `locations.manage_all`); an owner-scoped user gets a single "Locations"
+  sidebar entry instead of "Locations / Locations".
+
 ## 0.5.2 - 2026-09-16
 
 ### Added
