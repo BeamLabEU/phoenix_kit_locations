@@ -1411,6 +1411,36 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       reloaded = Locations.get_location(location.uuid)
       assert reloaded.data["files_folder_uuid"] == folder.uuid
     end
+
+    test "no pointer, TWO live legacy copies under two different real parents; hook answers nil → :duplicate naming both, no adoption, no hook_nil (R5-1)" do
+      location = new_location(%{name: "Tallinn HQ"})
+
+      {:ok, parent1} = Storage.create_folder(%{name: "Container one"})
+      {:ok, parent2} = Storage.create_folder(%{name: "Container two"})
+
+      {:ok, copy1} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: parent1.uuid})
+
+      {:ok, copy2} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: parent2.uuid})
+
+      # No pointer set on the record — resolved through the name track only.
+      Process.put(:target_folder, nil)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      # Neither copy is adopted, nothing is moved, no pointer back-fill, and
+      # the record is not counted into the `:hook_nil` report.
+      refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
+      refute Enum.any?(actions, &(&1.kind == :hook_nil))
+      refute Enum.any?(actions, &(&1.kind == :relocated and &1.label == location.name))
+
+      dup = Enum.find(actions, &(&1.kind == :duplicate and &1.label == location.name))
+      refute is_nil(dup)
+      assert dup.reason =~ copy1.uuid
+      assert dup.reason =~ copy2.uuid
+    end
   end
 
   describe "every stray legacy copy is reported, not only the first (F5)" do

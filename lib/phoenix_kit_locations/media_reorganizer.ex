@@ -743,17 +743,34 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # name left exactly as they are — and let the caller-wide
   # `apply_nil_root_guard/1` pass turn this into a pointer back-fill
   # only, counted as `:hook_nil`, never a `:move` to root.
+  # R5-1: TWO (or more) live legacy copies under different real parents can
+  # never be picked between deterministically from an unordered query result
+  # — adopting whichever the database happens to return first is a bug, not
+  # a resolution. Sorted by uuid so the pair named in the report is at least
+  # stable across runs. This is reported the same way as the module's other
+  # unresolvable pairs (host+legacy, under_parent+at_root) — `:duplicate`,
+  # no adoption, no move, no back-fill — and, because `entry.folder` stays
+  # `nil`, `apply_nil_root_guard/1` never counts the record into
+  # `:hook_nil` either. Any further live copy beyond the reported pair still
+  # gets its own `:relocated` report via `stray_legacy` (U9 parity).
   defp apply_name_track_f1(%{folder: nil, ambiguous: nil} = result, nil, matches) do
-    case Enum.find(matches, &(!is_nil(&1.parent_uuid))) do
-      nil ->
+    case matches |> Enum.filter(&(!is_nil(&1.parent_uuid))) |> Enum.sort_by(& &1.uuid) do
+      [] ->
         result
 
-      folder ->
+      [folder] ->
         %{
           result
           | folder: folder,
             via: :name,
             stray_legacy: Enum.reject(matches, &(&1 == folder))
+        }
+
+      [folder1, folder2 | _rest] = elsewhere ->
+        %{
+          result
+          | ambiguous: {folder1, folder2},
+            stray_legacy: Enum.reject(matches, &(&1 in elsewhere))
         }
     end
   end
