@@ -227,35 +227,58 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       |> Enum.with_index()
       |> Enum.map(fn {c, idx} -> Map.put(c, :order_index, idx) end)
 
-    {resolved_all, hook_error_count} =
+    {resolved_all, hook_error_labels} =
       resolve_candidates(candidates, by_pointer, by_name, mod, fun, pointer_claims, actor_uuid)
+
+    # U4: orphan scope = every parent a hook call for ANY candidate
+    # actually returned, regardless of that candidate's outcome (moved,
+    # relocated, duplicate, hook_nil) — captured from the raw hook
+    # answers, before `apply_nil_root_guard` below can rewrite a
+    # hook-nil entry's `parent_uuid` to its folder's own (a value the
+    # hook never returned). Never derived from where a folder happens to
+    # end up living.
+    resolved_parents =
+      resolved_all
+      |> Enum.map(& &1.parent_uuid)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
 
     resolved_all =
       resolved_all
       |> Enum.sort_by(& &1.order_index)
       |> Enum.map(&apply_nil_root_guard/1)
 
-    hook_nil_count = Enum.count(resolved_all, & &1.hook_nil)
-
-    resolved_parents =
-      resolved_all
-      |> Enum.filter(& &1.folder)
-      |> Enum.map(& &1.parent_uuid)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
+    hook_nil_labels =
+      resolved_all |> Enum.filter(& &1.hook_nil) |> Enum.map(& &1.record.name)
 
     {ambiguous, normal} = Enum.split_with(resolved_all, & &1.ambiguous)
     {with_folder, without_folder} = Enum.split_with(normal, & &1.folder)
 
     {shared, unique} = split_shared(with_folder)
-    {converging, solo} = split_converging(unique)
 
-    move_actions = solo |> Enum.map(&build_move_action/1) |> Enum.reject(&is_nil/1)
+    # E3/F6/U2: convergence collisions are only meaningful among entries
+    # that actually need to move — a folder already sitting exactly
+    # where it belongs (`noop_move?`) can never collide with anything at
+    # apply time, so it must never be swept into a `:duplicate` report
+    # merely for sharing its resolved name with a real mover.
+    {movers, _noops} =
+      Enum.split_with(unique, &(!noop_move?(&1.folder, &1.parent_uuid, &1.name)))
+
+    {converging, _solo_movers} = split_converging(movers)
+
+    converging_record_uuids = converging |> List.flatten() |> MapSet.new(& &1.record.uuid)
+
+    move_actions =
+      unique
+      |> Enum.reject(&MapSet.member?(converging_record_uuids, &1.record.uuid))
+      |> Enum.map(&build_move_action/1)
+      |> Enum.reject(&is_nil/1)
+
     dup_actions = Enum.map(ambiguous, &build_ambiguous_duplicate_action/1)
     shared_actions = Enum.map(shared, &build_shared_duplicate_action/1)
     converging_actions = Enum.map(converging, &build_converging_duplicate_action/1)
-    hook_error_actions = hook_error_action(hook_error_count)
-    hook_nil_actions = hook_nil_action(hook_nil_count)
+    hook_error_actions = hook_error_action(hook_error_labels)
+    hook_nil_actions = hook_nil_action(hook_nil_labels)
 
     claimed = claimed_folder_uuids(unique, ambiguous, shared, converging)
     all_claimed = MapSet.union(claimed, pointer_claims)
@@ -403,26 +426,29 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # never need the batched host-name-under-parent lookup (R3/R8) that the
   # remaining candidates (`name_track`) do.
   defp resolve_candidates(candidates, by_pointer, by_name, mod, fun, pointer_claims, actor_uuid) do
-    {pointer_track, name_track, hook_error_count} =
-      Enum.reduce(candidates, {[], [], 0}, fn p, acc ->
+    {pointer_track, name_track, hook_error_labels} =
+      Enum.reduce(candidates, {[], [], []}, fn p, acc ->
         sort_candidate(p, by_pointer, mod, fun, actor_uuid, acc)
       end)
 
     pointer_results =
       pointer_track |> Enum.reverse() |> Enum.map(&resolve_pointer_entry(&1, by_name, actor_uuid))
 
-    {pointer_entries, pointer_error_count} = split_hook_errors(pointer_results)
+    {pointer_entries, pointer_error_labels} = split_hook_errors(pointer_results)
 
-    {name_entries, name_error_count} =
+    {name_entries, name_error_labels} =
       resolve_name_entries(Enum.reverse(name_track), by_name, pointer_claims, actor_uuid)
 
-    total_errors = hook_error_count + pointer_error_count + name_error_count
-    {pointer_entries ++ name_entries, total_errors}
+    all_error_labels = hook_error_labels ++ pointer_error_labels ++ name_error_labels
+    {pointer_entries ++ name_entries, all_error_labels}
   end
 
+  # U8: keeps the record label of each hook failure (rather than only a
+  # count) so the aggregated `:hook_error` report can name the affected
+  # records.
   defp split_hook_errors(results) do
-    {ok, errors} = Enum.split_with(results, &(&1 != :hook_error))
-    {ok, length(errors)}
+    {errors, ok} = Enum.split_with(results, &match?({:hook_error, _label}, &1))
+    {ok, Enum.map(errors, fn {:hook_error, label} -> label end)}
   end
 
   defp sort_candidate(p, by_pointer, mod, fun, actor_uuid, {ptrs, names, errs}) do
@@ -433,7 +459,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         push_candidate(base, pointer_folder, ptrs, names, errs)
 
       :error ->
-        {ptrs, names, errs + 1}
+        {ptrs, names, [p.record.name | errs]}
     end
   end
 
@@ -445,10 +471,10 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   defp resolve_parent(mod, fun, kind, actor_uuid, resource) do
     cond do
       Code.ensure_loaded?(mod) and function_exported?(mod, fun, 3) ->
-        guarded_hook_call(fn -> apply(mod, fun, [kind, actor_uuid, resource]) end)
+        guarded_hook_call(fn -> apply(mod, fun, [kind, actor_uuid, resource]) end, mod, fun, kind)
 
       Code.ensure_loaded?(mod) and function_exported?(mod, fun, 2) ->
-        guarded_hook_call(fn -> apply(mod, fun, [kind, actor_uuid]) end)
+        guarded_hook_call(fn -> apply(mod, fun, [kind, actor_uuid]) end, mod, fun, kind)
 
       true ->
         :error
@@ -461,12 +487,19 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # take down the whole plan). This also normalises case, so an upper-case
   # parent answer never looks "different" from the same lower-case answer
   # on the next run. F2: an explicit `{:ok, nil}` or bare `nil` means root.
-  defp guarded_hook_call(fun) do
+  # U6: every log line names the failing hook (`{mod, fun}`) and the
+  # record kind it was called for — including a BAD RETURN value, not
+  # only a raise/exit.
+  defp guarded_hook_call(fun, mod, fun_name, kind) do
     case fun.() do
       {:ok, uuid} when is_binary(uuid) ->
         case valid_uuid(uuid) do
-          nil -> :error
-          cast -> {:ok, cast}
+          nil ->
+            log_bad_hook_return(:parent, mod, fun_name, kind, {:ok, uuid})
+            :error
+
+          cast ->
+            {:ok, cast}
         end
 
       {:ok, nil} ->
@@ -475,20 +508,33 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       nil ->
         {:ok, nil}
 
-      _other ->
+      other ->
+        log_bad_hook_return(:parent, mod, fun_name, kind, other)
         :error
     end
   rescue
     error ->
       Logger.warning(
-        "Attachments parent hook raised: " <> Exception.format(:error, error, __STACKTRACE__)
+        "Attachments parent hook {#{inspect(mod)}, #{inspect(fun_name)}} (#{kind}) raised: " <>
+          Exception.format(:error, error, __STACKTRACE__)
       )
 
       :error
   catch
-    kind, reason ->
-      Logger.warning("Attachments parent hook #{kind}: #{inspect(reason)}")
+    error_kind, reason ->
+      Logger.warning(
+        "Attachments parent hook {#{inspect(mod)}, #{inspect(fun_name)}} (#{kind}) " <>
+          "#{error_kind}: #{inspect(reason)}"
+      )
+
       :error
+  end
+
+  defp log_bad_hook_return(hook, mod, fun_name, kind, value) do
+    Logger.warning(
+      "Attachments #{hook} hook {#{inspect(mod)}, #{inspect(fun_name)}} (#{kind}) returned " <>
+        "an unexpected value: #{inspect(value)}"
+    )
   end
 
   # D6/E2: a folder found through the record's live pointer keeps its own
@@ -498,14 +544,14 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   defp resolve_pointer_entry(%{pointer_folder: folder} = d, by_name, actor_uuid) do
     name_result =
       if folder.name == d.legacy_name do
-        resolve_folder_name(d.record, actor_uuid)
+        resolve_folder_name(d.record, actor_uuid, d.kind)
       else
         {:ok, nil}
       end
 
     case name_result do
       :error ->
-        :hook_error
+        {:hook_error, d.record.name}
 
       {:ok, name} ->
         %{
@@ -547,11 +593,11 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # a candidate whose name hook fails is skipped entirely (counted as a
   # hook error) before the batched host-name lookup even runs for it.
   defp resolve_name_entries(candidates, by_name, pointer_claims, actor_uuid) do
-    {ok_candidates, error_count} =
-      Enum.reduce(candidates, {[], 0}, fn c, {acc, errs} ->
-        case resolve_folder_name(c.record, actor_uuid) do
+    {ok_candidates, error_labels} =
+      Enum.reduce(candidates, {[], []}, fn c, {acc, errs} ->
+        case resolve_folder_name(c.record, actor_uuid, c.kind) do
           {:ok, name} -> {[Map.put(c, :host_name, name) | acc], errs}
-          :error -> {acc, errs + 1}
+          :error -> {acc, [c.record.name | errs]}
         end
       end)
 
@@ -561,7 +607,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     entries =
       Enum.map(with_host_name, &resolve_name_entry(&1, by_name, host_map, pointer_claims))
 
-    {entries, error_count}
+    {entries, error_labels}
   end
 
   # Only host names that actually differ from the deterministic legacy
@@ -649,8 +695,8 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     # report.
     stray_legacy = Enum.reject(matches, &(&1 == legacy_folder))
 
-    resolve_name_entry_result(
-      base,
+    base
+    |> resolve_name_entry_result(
       desired_name,
       host_folder,
       legacy_folder,
@@ -659,7 +705,36 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       matches,
       stray_legacy
     )
+    |> apply_name_track_f1(d.parent_uuid, matches)
   end
+
+  # U1/F1 on the name track: the hook answered root (`d.parent_uuid ==
+  # nil`) and nothing else resolved a current folder (no host name, no
+  # legacy match at root or under the resolved — root — parent), but a
+  # legacy-named folder already lives under some OTHER real parent.
+  # `find_resource_folder(parent: nil)` only ever looks at root, so
+  # without this the link stays broken forever. Instead of leaving the
+  # record with no current folder (which would report every live match
+  # as `:relocated`), adopt that folder as the current one — parent and
+  # name left exactly as they are — and let the caller-wide
+  # `apply_nil_root_guard/1` pass turn this into a pointer back-fill
+  # only, counted as `:hook_nil`, never a `:move` to root.
+  defp apply_name_track_f1(%{folder: nil, ambiguous: nil} = result, nil, matches) do
+    case Enum.find(matches, &(!is_nil(&1.parent_uuid))) do
+      nil ->
+        result
+
+      folder ->
+        %{
+          result
+          | folder: folder,
+            via: :name,
+            stray_legacy: Enum.reject(matches, &(&1 == folder))
+        }
+    end
+  end
+
+  defp apply_name_track_f1(result, _hook_parent_uuid, _matches), do: result
 
   defp resolve_name_entry_result(
          base,
@@ -911,19 +986,19 @@ defmodule PhoenixKitLocations.MediaReorganizer do
   # reportable failure here instead of a silent legacy-name fallback. Not
   # configured, or configured but not callable, is NOT a failure — it is
   # simply "no host name", same as `Attachments.folder_name/2` treats it.
-  defp resolve_folder_name(record, actor_uuid) do
+  defp resolve_folder_name(record, actor_uuid, kind) do
     case Application.get_env(:phoenix_kit_locations, :attachments_folder_name) do
       {mod, fun} when is_atom(mod) and is_atom(fun) ->
-        resolve_configured_folder_name(mod, fun, record, actor_uuid)
+        resolve_configured_folder_name(mod, fun, record, actor_uuid, kind)
 
       _ ->
         {:ok, legacy_name(record)}
     end
   end
 
-  defp resolve_configured_folder_name(mod, fun, record, actor_uuid) do
+  defp resolve_configured_folder_name(mod, fun, record, actor_uuid, kind) do
     if Code.ensure_loaded?(mod) and function_exported?(mod, fun, 2) do
-      case guarded_name_hook_call(mod, fun, record, actor_uuid) do
+      case guarded_name_hook_call(mod, fun, record, actor_uuid, kind) do
         {:ok, nil} -> {:ok, legacy_name(record)}
         {:ok, name} -> {:ok, name}
         :error -> :error
@@ -933,24 +1008,36 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     end
   end
 
-  defp guarded_name_hook_call(mod, fun, record, actor_uuid) do
+  # U6: mirrors `guarded_hook_call/4` — every log line names the hook
+  # `{mod, fun}` and the record kind, and a bad RETURN value is logged
+  # too (not only a raise/exit).
+  defp guarded_name_hook_call(mod, fun, record, actor_uuid, kind) do
     case apply(mod, fun, [record, actor_uuid]) do
       {:ok, name} when is_binary(name) and name != "" -> {:ok, name}
       nil -> {:ok, nil}
-      _other -> :error
+      other -> bad_name_hook_return(mod, fun, kind, other)
     end
   rescue
     error ->
       Logger.warning(
-        "Attachments name hook #{inspect(mod)}.#{fun} raised: " <>
+        "Attachments name hook {#{inspect(mod)}, #{inspect(fun)}} (#{kind}) raised: " <>
           Exception.format(:error, error, __STACKTRACE__)
       )
 
       :error
   catch
-    kind, reason ->
-      Logger.warning("Attachments name hook #{inspect(mod)}.#{fun} #{kind}: #{inspect(reason)}")
+    error_kind, reason ->
+      Logger.warning(
+        "Attachments name hook {#{inspect(mod)}, #{inspect(fun)}} (#{kind}) " <>
+          "#{error_kind}: #{inspect(reason)}"
+      )
+
       :error
+  end
+
+  defp bad_name_hook_return(mod, fun, kind, value) do
+    log_bad_hook_return(:name, mod, fun, kind, value)
+    :error
   end
 
   # R5/X3: a pointer that is not a well-formed UUID is treated as absent,
@@ -1074,9 +1161,9 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     |> repo().one()
   end
 
-  defp hook_error_action(0), do: []
+  defp hook_error_action([]), do: []
 
-  defp hook_error_action(count) do
+  defp hook_error_action(labels) do
     [
       %{
         source: "locations",
@@ -1085,16 +1172,16 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         label: "attachments parent hook",
         counts: nil,
         reason:
-          "#{count} record(s) skipped: the configured parent or name hook raised, exited, " <>
-            "or returned neither {:ok, uuid} nor nil"
+          "#{length(labels)} record(s) skipped: the configured parent or name hook raised, " <>
+            "exited, or returned neither {:ok, uuid} nor nil (#{label_list(labels)})"
       }
     ]
   end
 
-  # F1: a plain count, not one report per record — mirrors hook_error_action.
-  defp hook_nil_action(0), do: []
+  # F1: one aggregated report, not one per record — mirrors hook_error_action.
+  defp hook_nil_action([]), do: []
 
-  defp hook_nil_action(count) do
+  defp hook_nil_action(labels) do
     [
       %{
         source: "locations",
@@ -1103,10 +1190,21 @@ defmodule PhoenixKitLocations.MediaReorganizer do
         label: "attachments parent hook",
         counts: nil,
         reason:
-          "#{count} record(s): the parent hook answered root for a folder living under a " <>
-            "parent — left in place"
+          "#{length(labels)} record(s): the parent hook answered root for a folder living " <>
+            "under a parent — left in place (#{label_list(labels)})"
       }
     ]
+  end
+
+  # U8: lists up to 10 record labels so the owner can tell where to look,
+  # instead of a bare count — "… and N more" once there are more than 10.
+  defp label_list(labels) do
+    {shown, rest} = Enum.split(labels, 10)
+
+    case rest do
+      [] -> Enum.join(shown, ", ")
+      more -> Enum.join(shown, ", ") <> ", … and #{length(more)} more"
+    end
   end
 
   # ── Pending upload folders ──────────────────────────────────────
@@ -1122,6 +1220,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       Folder
       |> where([f], is_nil(f.trashed_at))
       |> where([f], like(f.name, ^"#{@pending_prefix}%"))
+      |> order_by([f], asc: f.inserted_at, asc: f.uuid)
       |> repo().all()
       |> Enum.reject(&MapSet.member?(claimed_uuids, &1.uuid))
 
@@ -1257,6 +1356,7 @@ defmodule PhoenixKitLocations.MediaReorganizer do
     |> where([f], is_nil(f.trashed_at))
     |> where([f], is_nil(f.parent_uuid) or f.parent_uuid in ^parent_uuids)
     |> where([f], like(f.name, ^"#{@legacy_prefix}%"))
+    |> order_by([f], asc: f.inserted_at, asc: f.uuid)
     |> repo().all()
     |> Enum.reject(&MapSet.member?(claimed_uuids, &1.uuid))
     |> Enum.map(&{&1, legacy_kind(&1.name)})
@@ -1417,6 +1517,44 @@ defmodule PhoenixKitLocations.MediaReorganizer do
       fragment("?->>'files_folder_uuid'", s.data)
     })
     |> repo().all()
+    |> spaces_parent_first()
+  end
+
+  # U5/T6: a space can nest under another space (`parent_uuid`), so a
+  # plain `inserted_at` order can list a child space before its own
+  # parent — the SQL order above only remains the tiebreak at each level.
+  defp spaces_parent_first(spaces) do
+    by_uuid = Map.new(spaces, fn {space, _pointer} = row -> {space.uuid, row} end)
+
+    {ordered, _emitted} =
+      Enum.reduce(spaces, {[], MapSet.new()}, fn row, {acc, emitted} ->
+        emit_parent_first(row, by_uuid, acc, emitted)
+      end)
+
+    Enum.reverse(ordered)
+  end
+
+  defp emit_parent_first({%Space{uuid: uuid}, _pointer} = row, by_uuid, acc, emitted) do
+    if MapSet.member?(emitted, uuid) do
+      {acc, emitted}
+    else
+      # Mark `uuid` emitted before recursing into its parent — guards
+      # against a (should-never-happen) cycle looping forever instead of
+      # trusting the data to always be a tree.
+      emitted = MapSet.put(emitted, uuid)
+      {acc, emitted} = emit_parent_row(row, by_uuid, acc, emitted)
+      {[row | acc], emitted}
+    end
+  end
+
+  defp emit_parent_row({%Space{parent_uuid: nil}, _pointer}, _by_uuid, acc, emitted),
+    do: {acc, emitted}
+
+  defp emit_parent_row({%Space{parent_uuid: parent_uuid}, _pointer}, by_uuid, acc, emitted) do
+    case Map.get(by_uuid, parent_uuid) do
+      nil -> {acc, emitted}
+      parent_row -> emit_parent_first(parent_row, by_uuid, acc, emitted)
+    end
   end
 
   defp repo, do: PhoenixKit.RepoHelper.repo()

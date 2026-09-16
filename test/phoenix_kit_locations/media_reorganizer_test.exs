@@ -905,6 +905,39 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
     end
   end
 
+  describe "orphan scope includes parents resolved only by a relocated candidate (U4)" do
+    test "a parent no candidate ADOPTED, but the hook still resolved for a relocated one, is still scanned for orphans" do
+      location = new_location(%{name: "Tallinn HQ"})
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, elsewhere} = Storage.create_folder(%{name: "Somewhere else entirely"})
+
+      # This candidate never adopts `target` as its current folder — its
+      # legacy folder lives under a third, unrelated parent, so it is
+      # reported `:relocated`, not moved. The hook still ANSWERED
+      # `target.uuid` for it though.
+      {:ok, _legacy} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: elsewhere.uuid})
+
+      # An orphaned legacy folder living under that same resolved parent —
+      # only found if `target.uuid` stays in the orphan scan scope.
+      missing_uuid = Ecto.UUID.generate()
+
+      {:ok, orphan_folder} =
+        Storage.create_folder(%{name: "location-#{missing_uuid}", parent_uuid: target.uuid})
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      relocated = Enum.find(actions, &(&1.kind == :relocated and &1.label == location.name))
+      refute is_nil(relocated)
+
+      orphan = Enum.find(actions, &(&1.kind == :orphan and &1.folder.uuid == orphan_folder.uuid))
+      refute is_nil(orphan)
+    end
+  end
+
   describe "pointer normalisation (R5)" do
     test "an upper-case pointer still resolves to its (lower-case) live folder" do
       location = new_location(%{name: "Tallinn HQ"})
@@ -979,17 +1012,55 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
 
       refute is_nil(dup)
     end
+
+    test "an already-correct entry no longer blocks a real mover from converging on the same destination (U2)" do
+      location1 = new_location(%{name: "First"})
+      location2 = new_location(%{name: "Second"})
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+      # location1's folder already sits exactly at the destination the
+      # hook resolves to — a plain no-op that must never block a real
+      # mover from landing on the very same {parent, name} pair.
+      {:ok, folder1} = Storage.create_folder(%{name: "Same name", parent_uuid: target.uuid})
+
+      {:ok, _location1} =
+        Locations.update_location(location1, %{data: %{"files_folder_uuid" => folder1.uuid}})
+
+      {:ok, folder2} = Storage.create_folder(%{name: "location-#{location2.uuid}"})
+
+      {:ok, _location2} =
+        Locations.update_location(location2, %{data: %{"files_folder_uuid" => folder2.uuid}})
+
+      Process.put(:target_folder, target.uuid)
+      Process.put(:target_name, "Same name")
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+      Application.put_env(:phoenix_kit_locations, :attachments_folder_name, {Hook, :name})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :duplicate))
+      refute Enum.any?(actions, &(&1.kind == :location and &1.label == "First"))
+
+      move = Enum.find(actions, &(&1.kind == :location and &1.label == "Second"))
+      refute is_nil(move)
+      assert move.op == :move
+      assert move.parent_uuid == target.uuid
+      assert move.name == "Same name"
+    end
   end
 
   describe "legacy folder relocated elsewhere (locations-specific)" do
     test "legacy folder live under a parent that isn't root or the resolved parent → reported :relocated, not adopted" do
       location = new_location(%{name: "Tallinn HQ"})
 
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
       {:ok, elsewhere} = Storage.create_folder(%{name: "Some other container"})
 
       {:ok, _legacy} =
         Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: elsewhere.uuid})
 
+      Process.put(:target_folder, target.uuid)
       Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
 
       actions = MediaReorganizer.plan(nil, [])
@@ -1213,6 +1284,36 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
       refute Enum.any?(actions, &(&1.kind == :hook_nil))
       refute Enum.any?(actions, &(&1.kind == :location and &1.op == :move))
     end
+
+    test "no pointer, legacy folder already lives under a real parent; hook answers nil → adopted, hook_nil, no :relocated (U1 name track)" do
+      location = new_location(%{name: "Tallinn HQ"})
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+      {:ok, folder} =
+        Storage.create_folder(%{name: "location-#{location.uuid}", parent_uuid: target.uuid})
+
+      # No pointer set on the record at all — this candidate is resolved
+      # entirely through the NAME track, not the pointer track.
+      Process.put(:target_folder, nil)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      refute Enum.any?(actions, &(&1.kind == :relocated))
+      hook_nil = Enum.find(actions, &(&1.kind == :hook_nil))
+      refute is_nil(hook_nil)
+      assert hook_nil.reason =~ "1 record"
+
+      move = Enum.find(actions, &(&1.kind == :location))
+      refute is_nil(move)
+      assert move.folder.uuid == folder.uuid
+      assert move.parent_uuid == target.uuid
+      assert is_function(move.after_move, 0)
+
+      assert :ok = move.after_move.()
+      reloaded = Locations.get_location(location.uuid)
+      assert reloaded.data["files_folder_uuid"] == folder.uuid
+    end
   end
 
   describe "every stray legacy copy is reported, not only the first (F5)" do
@@ -1294,6 +1395,101 @@ defmodule PhoenixKitLocations.MediaReorganizerTest do
 
       assert Enum.find_index(location_labels, &(&1 == "Alpha")) <
                Enum.find_index(location_labels, &(&1 == "Beta"))
+    end
+
+    test "a nested space is listed after its own parent space even when created earlier (U5)" do
+      location = new_location(%{name: "Tallinn HQ"})
+
+      parent_space = new_space(location, %{name: "Floor 1", kind: "floor"})
+
+      child_space =
+        new_space(location, %{
+          name: "Room 101",
+          kind: "room",
+          parent_uuid: parent_space.uuid
+        })
+
+      # Force the child to look OLDER than its parent — proves the order
+      # comes from the space tree, not raw `inserted_at`.
+      old_time =
+        DateTime.utc_now() |> DateTime.add(-10 * 86_400, :second) |> DateTime.truncate(:second)
+
+      Repo.update_all(
+        from(s in Space, where: s.uuid == ^child_space.uuid),
+        set: [inserted_at: old_time]
+      )
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+      {:ok, _f1} = Storage.create_folder(%{name: "location-space-#{parent_space.uuid}"})
+      {:ok, _f2} = Storage.create_folder(%{name: "location-space-#{child_space.uuid}"})
+
+      Process.put(:target_folder, target.uuid)
+      Application.put_env(:phoenix_kit_locations, :attachments_parent_folder, {Hook, :parent})
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      space_labels = actions |> Enum.filter(&(&1.kind == :space)) |> Enum.map(& &1.label)
+
+      assert Enum.find_index(space_labels, &(&1 == "Floor 1")) <
+               Enum.find_index(space_labels, &(&1 == "Room 101"))
+    end
+  end
+
+  describe "hook_error / hook_nil reports list record labels, not only a count (U8)" do
+    test "hook_error report lists the affected records' labels" do
+      location1 = new_location(%{name: "First"})
+      location2 = new_location(%{name: "Second"})
+
+      {:ok, target} = Storage.create_folder(%{name: "Locations"})
+
+      {:ok, folder1} =
+        Storage.create_folder(%{name: "location-#{location1.uuid}", parent_uuid: target.uuid})
+
+      {:ok, folder2} =
+        Storage.create_folder(%{name: "location-#{location2.uuid}", parent_uuid: target.uuid})
+
+      {:ok, _location1} =
+        Locations.update_location(location1, %{data: %{"files_folder_uuid" => folder1.uuid}})
+
+      {:ok, _location2} =
+        Locations.update_location(location2, %{data: %{"files_folder_uuid" => folder2.uuid}})
+
+      Application.put_env(
+        :phoenix_kit_locations,
+        :attachments_parent_folder,
+        {RaisingHook, :parent}
+      )
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      error = Enum.find(actions, &(&1.kind == :hook_error))
+      refute is_nil(error)
+      assert error.reason =~ "2 record(s)"
+      assert error.reason =~ "First"
+      assert error.reason =~ "Second"
+    end
+
+    test "more than 10 affected records → lists the first 10, then a count of the rest" do
+      locations =
+        for n <- 1..12 do
+          location = new_location(%{name: "Location #{n}"})
+          {:ok, _folder} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+          location
+        end
+
+      Application.put_env(
+        :phoenix_kit_locations,
+        :attachments_parent_folder,
+        {RaisingHook, :parent}
+      )
+
+      actions = MediaReorganizer.plan(nil, [])
+
+      error = Enum.find(actions, &(&1.kind == :hook_error))
+      refute is_nil(error)
+      assert error.reason =~ "12 record(s)"
+      assert error.reason =~ "… and 2 more"
+      assert length(locations) == 12
     end
   end
 end
