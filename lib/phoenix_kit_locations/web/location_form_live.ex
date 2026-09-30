@@ -524,19 +524,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         <%!-- ═══════════════════════════════════════════════════════ --%>
         <%!-- PUBLIC INFORMATION                                     --%>
         <%!-- ═══════════════════════════════════════════════════════ --%>
-        <div class="card bg-base-100 shadow-lg">
+        <.form_section title={gettext("Public information")} icon="hero-globe-alt" body_class="gap-5">
           <%!-- Translatable fields (name, description, public notes) --%>
           <.multilang_tabs
             multilang_enabled={@multilang_enabled}
             language_tabs={@language_tabs}
             current_lang={@current_lang}
-            class="card-body pb-0 pt-4"
+            class=""
           />
 
           <.multilang_fields_wrapper
             multilang_enabled={@multilang_enabled}
             current_lang={@current_lang}
-            skeleton_class="card-body pt-0 flex flex-col gap-5"
+            skeleton_class="flex flex-col gap-5"
+            fields_class="flex flex-col gap-5"
           >
             <:skeleton>
               <div class="fieldset">
@@ -552,7 +553,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 <div class="bg-base-content/15 rounded-lg h-20 w-full animate-pulse"></div>
               </div>
             </:skeleton>
-            <div class="card-body pt-0 flex flex-col gap-5">
               <.translatable_field
                 field_name="name"
                 form_prefix="location"
@@ -597,10 +597,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 placeholder={gettext("e.g., Bell is broken — knock loudly, entrance from side street...")}
                 class="w-full"
               />
-            </div>
           </.multilang_fields_wrapper>
 
-          <div class="card-body flex flex-col gap-5 pt-0">
             <.section_header icon="hero-map-pin" title={gettext("Address")} />
 
             <div :if={@address_warning} class="alert alert-warning text-sm py-2">
@@ -674,14 +672,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 :for={key <- @feature_keys}
                 id={"location-feature-#{key}"}
                 name={"location[features][#{key}]"}
-                checked={Map.get(@features, key, false) == true}
+                checked={feature_on?(Map.get(@features, key))}
                 label={feature_label(key)}
                 class="checkbox-sm"
                 wrapper_class="gap-2"
               />
             </div>
-          </div>
-        </div>
+        </.form_section>
 
         <%!-- ═══════════════════════════════════════════════════════ --%>
         <%!-- FILES & FEATURED IMAGE — Location scope                --%>
@@ -797,6 +794,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   defp put_features(features, _params), do: features
+
+  # A features map can hold `"true"` strings (an import, an older client),
+  # not only booleans; both count as on.
+  defp feature_on?(value), do: value in [true, "true"]
 
   # Every security decision reads the LIVE scope, never the mount-time `@mode`.
   defp manage_all?(socket), do: Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope])

@@ -33,6 +33,27 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
              )
     end
 
+    test "New Location is the toolbar's last control, after the view toggle", %{conn: conn} do
+      fixture_location(%{name: "Somewhere"})
+      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+
+      {toggle, _} = :binary.match(html, ~s(data-view-action="table"))
+      {button, _} = :binary.match(html, ~s(aria-label="New Location"))
+      assert toggle < button
+    end
+
+    test "an empty list offers the first location", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+
+      assert has_element?(
+               view,
+               ~s(#locations-list a[href="#{Paths.location_new()}"]),
+               "Create your first location"
+             )
+
+      refute has_element?(view, "#locations-list a", "Clear filter")
+    end
+
     test "keeps the toolbar and says a filter matched nothing on an empty filtered list",
          %{conn: conn} do
       fixture_location(%{name: "GlobalOnly"})
@@ -44,6 +65,10 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       assert html =~ "No locations match this filter."
       assert has_element?(view, "#locations-list #owner-filter")
       assert has_element?(view, ~s(#locations-list a[href="#{Paths.location_new()}"]))
+
+      # The remedy for a filter miss is clearing it, not creating.
+      assert has_element?(view, ~s(#locations-list a[href="#{Paths.index()}"]), "Clear filter")
+      refute html =~ "Create your first location"
     end
 
     test "row menu links to the Structure page for the location", %{conn: conn} do
@@ -77,8 +102,14 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     end
 
     test "renders empty state when no types exist", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/en/admin/locations/types")
+      {:ok, view, html} = live(conn, "/en/admin/locations/types")
       assert html =~ "No location types yet."
+
+      assert has_element?(
+               view,
+               ~s(#types-list a[href="#{Paths.type_new()}"]),
+               "Create your first type"
+             )
     end
   end
 

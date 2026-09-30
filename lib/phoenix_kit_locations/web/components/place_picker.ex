@@ -160,7 +160,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   end
 
   def handle_event("select_location", %{"uuid" => uuid}, socket) do
-    case selectable_location(uuid, socket.assigns.owner_filter) do
+    case selectable_location(uuid, socket.assigns) do
       nil ->
         {:noreply, socket}
 
@@ -244,18 +244,27 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
     assign(socket, :matches, matches)
   end
 
-  # The event payload's uuid is client-supplied: resolve it and re-apply the
-  # owner filter, so a forged `select_location` can't reach a location the
-  # search would never have offered.
-  defp selectable_location(uuid, owner_filter) do
+  # The event payload's uuid is client-supplied: resolve it and re-apply
+  # every filter the search applies (active, the type, the owner), so a
+  # forged `select_location` can't reach a location the search would never
+  # have offered.
+  defp selectable_location(uuid, assigns) do
     with {:ok, _} <- Ecto.UUID.cast(uuid),
-         %Location{} = location <- Locations.get_location(uuid),
-         true <- owner_allowed?(location, owner_filter) do
+         %Location{status: "active"} = location <- Locations.get_location(uuid),
+         true <- type_allowed?(location, assigns.location_type_uuid),
+         true <- owner_allowed?(location, assigns.owner_filter) do
       location
     else
       _ -> nil
     end
   end
+
+  defp type_allowed?(_location, nil), do: true
+
+  defp type_allowed?(%Location{location_types: types}, type_uuid) when is_list(types),
+    do: Enum.any?(types, &(&1.uuid == type_uuid))
+
+  defp type_allowed?(_location, _type_uuid), do: false
 
   defp put_owner_opt(opts, :none), do: opts
   defp put_owner_opt(opts, {:only, owner_uuid}), do: Keyword.put(opts, :owner_uuid, owner_uuid)

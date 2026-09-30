@@ -309,12 +309,17 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         <:toolbar_title>
           <.owner_filter :if={@manage_all} active={@owner_filter} />
         </:toolbar_title>
-        <:toolbar_actions>
-          <.button size="sm" navigate={Paths.location_new()} title={gettext("New Location")}>
+        <:toolbar_primary>
+          <.button
+            size="sm"
+            navigate={Paths.location_new()}
+            title={gettext("New Location")}
+            aria-label={gettext("New Location")}
+          >
             <.icon name="hero-plus" class="h-4 w-4" />
             <span class="hidden sm:inline">{gettext("New Location")}</span>
           </.button>
-        </:toolbar_actions>
+        </:toolbar_primary>
         <:above_cards :if={@locations == []}>
           <.locations_empty owner_filter={@owner_filter} />
         </:above_cards>
@@ -390,14 +395,19 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           %{label: gettext("Status"), value: status_label(t.status)}
         ] end}
       >
-        <:toolbar_actions>
-          <.button size="sm" navigate={Paths.type_new()} title={gettext("New Type")}>
+        <:toolbar_primary>
+          <.button
+            size="sm"
+            navigate={Paths.type_new()}
+            title={gettext("New Type")}
+            aria-label={gettext("New Type")}
+          >
             <.icon name="hero-plus" class="h-4 w-4" />
             <span class="hidden sm:inline">{gettext("New Type")}</span>
           </.button>
-        </:toolbar_actions>
+        </:toolbar_primary>
         <:above_cards :if={@location_types == []}>
-          <.empty_state icon="hero-tag" title={gettext("No location types yet.")} />
+          <.types_empty />
         </:above_cards>
         <.table_default_header>
           <.table_default_row>
@@ -410,7 +420,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         <.table_default_body>
           <.table_default_row :if={@location_types == []}>
             <.table_default_cell colspan={4}>
-              <.empty_state icon="hero-tag" title={gettext("No location types yet.")} />
+              <.types_empty />
             </.table_default_cell>
           </.table_default_row>
           <.table_default_row :for={t <- @location_types}>
@@ -446,18 +456,42 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
 
   attr(:owner_filter, :atom, required: true)
 
-  # A filtered list that comes back empty says so, rather than claiming
-  # there are no locations at all.
+  # An empty list offers the next step: the first location, or — when a
+  # filter is what emptied it — clearing the filter. Creating is never the
+  # remedy for a filter miss.
+  defp locations_empty(%{owner_filter: :all} = assigns) do
+    ~H"""
+    <.empty_state icon="hero-map-pin" title={gettext("No locations yet.")}>
+      <:cta>
+        <.button size="sm" navigate={Paths.location_new()}>
+          <.icon name="hero-plus" class="h-4 w-4" /> {gettext("Create your first location")}
+        </.button>
+      </:cta>
+    </.empty_state>
+    """
+  end
+
   defp locations_empty(assigns) do
     ~H"""
-    <.empty_state
-      icon="hero-map-pin"
-      title={
-        if @owner_filter == :all,
-          do: gettext("No locations yet."),
-          else: gettext("No locations match this filter.")
-      }
-    />
+    <.empty_state icon="hero-map-pin" title={gettext("No locations match this filter.")}>
+      <:cta>
+        <.button size="sm" variant="ghost" patch={Paths.index()}>
+          {gettext("Clear filter")}
+        </.button>
+      </:cta>
+    </.empty_state>
+    """
+  end
+
+  defp types_empty(assigns) do
+    ~H"""
+    <.empty_state icon="hero-tag" title={gettext("No location types yet.")}>
+      <:cta>
+        <.button size="sm" navigate={Paths.type_new()}>
+          <.icon name="hero-plus" class="h-4 w-4" /> {gettext("Create your first type")}
+        </.button>
+      </:cta>
+    </.empty_state>
     """
   end
 

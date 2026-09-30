@@ -228,6 +228,8 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
       html = render_click(view, "open_add_root", %{})
 
       assert has_element?(view, ~s(#new-space-form select#new_space_kind[name="space[kind]"]))
+      # Opening the form puts the cursor in Name.
+      assert has_element?(view, "#new-space-form input#new_space_name[phx-mounted]")
       assert has_element?(view, ~s(#space-detail-form select#space_kind[name="space[kind]"]))
 
       ids = Regex.scan(~r/\sid="([^"]+)"/, html, capture: :all_but_first) |> List.flatten()

@@ -134,6 +134,37 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerTest do
     end
   end
 
+  describe "a forged select_location" do
+    # The search only offers active locations of the given type; a
+    # client-sent uuid must be held to the same filter, not just the owner.
+    test "outside the type filter, or inactive, is ignored", %{conn: conn} do
+      type = fixture_location_type()
+      offered = fixture_location(%{name: "Typed Active"})
+      {:ok, _} = Locations.add_location_type(offered.uuid, type.uuid)
+      untyped = fixture_location(%{name: "Untyped Active"})
+      inactive = fixture_location(%{name: "Typed Inactive", status: "inactive"})
+      {:ok, _} = Locations.add_location_type(inactive.uuid, type.uuid)
+
+      {:ok, view, _html} = live(conn, harness_path(location_type_uuid: type.uuid))
+
+      for location <- [untyped, inactive] do
+        html = picker(view) |> render_click("select_location", %{"uuid" => location.uuid})
+        refute html =~ "Use this location"
+      end
+
+      html = select_location_option(view, offered)
+      assert html =~ "Use this location"
+    end
+
+    test "of an inactive location is ignored without a type filter", %{conn: conn} do
+      inactive = fixture_location(%{name: "Closed Site", status: "inactive"})
+      {:ok, view, _html} = live(conn, harness_path())
+
+      html = picker(view) |> render_click("select_location", %{"uuid" => inactive.uuid})
+      refute html =~ "Use this location"
+    end
+  end
+
   describe "selecting a Space in the tree sends {:place_picker_select, ...} to the host" do
     test "a root-level node sends its location_uuid + space_uuid", %{conn: conn} do
       location = fixture_location(%{name: "Central Warehouse"})

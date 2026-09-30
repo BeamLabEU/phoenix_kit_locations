@@ -450,6 +450,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
                   label={gettext("Name")}
                   required
                   wrapper_class="flex-1"
+                  phx-mounted={Phoenix.LiveView.JS.focus()}
                 />
               </div>
 
