@@ -18,11 +18,17 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
   """
 
   use Phoenix.LiveView
+  use Gettext, backend: PhoenixKitLocations.Gettext
+
+  import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
+  import PhoenixKitWeb.Components.Core.EmptyState, only: [empty_state: 1]
 
   alias PhoenixKitLocations.{Locations, Paths}
 
   @impl true
   def mount(_params, session, socket) do
+    put_embed_locale(session)
+
     uuids =
       session
       |> get_in(["config", "location_uuids"])
@@ -35,6 +41,17 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
 
     {:ok, assign(socket, locations: locations, configured?: uuids != [])}
   end
+
+  # A `live_render`ed LiveView runs in its own process, which does not inherit
+  # the host's Gettext locale; the hub passes it as `session["locale"]`
+  # (a content language such as "et" or "en-US" — the catalogue is keyed by
+  # the base code).
+  defp put_embed_locale(%{"locale" => locale}) when is_binary(locale) and locale != "" do
+    base = locale |> String.split(["-", "_"]) |> hd() |> String.downcase()
+    Gettext.put_locale(PhoenixKitLocations.Gettext, base)
+  end
+
+  defp put_embed_locale(_session), do: :ok
 
   defp parse_uuids(value) when is_binary(value) do
     value
@@ -60,22 +77,24 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
     ~H"""
     <div class="flex flex-col gap-3">
       <%= if @locations == [] do %>
-        <div class="card border border-dashed border-base-300 bg-base-100">
-          <div class="card-body items-center text-center py-8 gap-2">
-            <p class="text-sm opacity-70">
-              <%= if @configured? do %>
-                The configured locations no longer exist.
-              <% else %>
-                No sites linked to this project yet.
-              <% end %>
-            </p>
-            <p class="text-xs opacity-50">
-              Add location UUIDs (comma-separated) in the project's Modules &
-              features panel — find them in
-              <.link navigate={Paths.index()} class="link">Locations</.link>.
-            </p>
-          </div>
-        </div>
+        <.empty_state
+          variant="card"
+          icon="hero-map-pin"
+          title={
+            if @configured?,
+              do: gettext("The configured locations no longer exist."),
+              else: gettext("No sites linked to this project yet.")
+          }
+          description={
+            gettext(
+              "Add location UUIDs (comma-separated) in the project's Modules & features panel."
+            )
+          }
+        >
+          <.button variant="link" size="sm" navigate={Paths.index()}>
+            {gettext("Find them in Locations")}
+          </.button>
+        </.empty_state>
       <% else %>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div :for={location <- @locations} class="card border border-base-200 bg-base-100">
@@ -87,9 +106,9 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
                 |> Enum.join(", ")}
               </p>
               <div class="card-actions justify-end mt-1">
-                <.link navigate={Paths.location_edit(location.uuid)} class="btn btn-ghost btn-xs">
-                  Open location
-                </.link>
+                <.button variant="ghost" size="xs" navigate={Paths.location_edit(location.uuid)}>
+                  {gettext("Open location")}
+                </.button>
               </div>
             </div>
           </div>

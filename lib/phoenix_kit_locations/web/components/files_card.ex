@@ -9,8 +9,12 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
   """
 
   use Phoenix.Component
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitLocations.Gettext
 
+  import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
+  import PhoenixKitWeb.Components.Core.EmptyState, only: [empty_state: 1]
+  import PhoenixKitWeb.Components.Core.FileUpload, only: [upload_entry_stats: 1]
+  import PhoenixKitWeb.Components.Core.FormSection, only: [section_header: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
 
   alias PhoenixKit.Modules.Storage.URLSigner
@@ -39,11 +43,9 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
       end)
 
     ~H"""
-    <div class="flex items-center justify-between">
-      <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-        <.icon name="hero-photo" class="w-4 h-4" /> {gettext("Featured Image")}
-      </h2>
-      <span class="text-xs text-base-content/50">{@featured_subtitle}</span>
+    <div class="flex flex-col gap-0.5">
+      <.section_header icon="hero-photo" title={gettext("Featured Image")} />
+      <p class="text-xs text-base-content/50">{@featured_subtitle}</p>
     </div>
 
     <%= if @state.featured_image_file do %>
@@ -66,23 +68,25 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
           <p class="text-xs text-base-content/50">{Attachments.format_file_size(@state.featured_image_file.size)}</p>
         </div>
         <div class="flex flex-col gap-2">
-          <button
+          <.button
             type="button"
+            variant="outline"
+            size="sm"
             phx-click="open_featured_image_picker"
             phx-value-scope={@scope}
-            class="btn btn-sm btn-outline"
           >
             {gettext("Change")}
-          </button>
-          <button
+          </.button>
+          <.button
             type="button"
+            variant="ghost"
+            size="sm"
             phx-click="clear_featured_image"
             phx-value-scope={@scope}
             phx-disable-with={gettext("Removing...")}
-            class="btn btn-sm btn-ghost"
           >
             {gettext("Remove")}
-          </button>
+          </.button>
         </div>
       </div>
     <% else %>
@@ -91,26 +95,23 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
           <.icon name="hero-photo" class="w-6 h-6" />
           <span class="text-sm">{gettext("No featured image set.")}</span>
         </div>
-        <button
+        <.button
           type="button"
+          size="sm"
           phx-click="open_featured_image_picker"
           phx-value-scope={@scope}
-          class="btn btn-sm btn-primary"
         >
           <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Set featured image")}
-        </button>
+        </.button>
       </div>
     <% end %>
 
-    <div class="divider my-0"></div>
-
     <div class="flex flex-col gap-0.5">
-      <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-        <.icon name="hero-paper-clip" class="w-4 h-4" /> {gettext("Attached Files")}
-        <span :if={@state.files != []} class="badge badge-sm badge-ghost ml-1">
-          {length(@state.files)}
-        </span>
-      </h2>
+      <.section_header icon="hero-paper-clip" title={gettext("Attached Files")}>
+        <:actions :if={@state.files != []}>
+          <span class="badge badge-sm badge-ghost">{length(@state.files)}</span>
+        </:actions>
+      </.section_header>
       <p class="text-xs text-base-content/50">{@files_subtitle}</p>
     </div>
 
@@ -146,17 +147,20 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
         <div class="flex-1 min-w-0">
           <p class="text-sm truncate">{entry.client_name}</p>
           <progress class="progress progress-primary w-full h-1 mt-1" value={entry.progress} max="100"></progress>
+          <.upload_entry_stats entry={entry} />
         </div>
         <span class="text-xs text-base-content/50 tabular-nums">{entry.progress}%</span>
-        <button
+        <.button
           type="button"
+          variant="ghost"
+          size="xs"
+          class="btn-square"
           phx-click="cancel_upload"
           phx-value-ref={entry.ref}
-          class="btn btn-ghost btn-xs btn-square"
           title={gettext("Cancel")}
         >
           <.icon name="hero-x-mark" class="w-4 h-4" />
-        </button>
+        </.button>
       </div>
     </div>
 
@@ -165,10 +169,11 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
     </p>
 
     <%= if @state.files == [] do %>
-      <div class="flex flex-col items-center gap-2 py-10 text-center border border-dashed border-base-300 rounded-md">
-        <.icon name="hero-paper-clip" class="w-8 h-8 text-base-content/30" />
-        <p class="text-sm text-base-content/50">{gettext("No files attached yet.")}</p>
-      </div>
+      <.empty_state
+        icon="hero-paper-clip"
+        title={gettext("No files attached yet.")}
+        class="py-10 border border-dashed border-base-300 rounded-md"
+      />
     <% else %>
       <ul class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <li
@@ -207,18 +212,20 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
               {Attachments.format_file_size(file.size)} · {file.file_type}
             </p>
           </div>
-          <button
+          <.button
             type="button"
+            variant="ghost"
+            size="xs"
+            class="btn-square"
             phx-click="remove_file"
             phx-value-scope={@scope}
             phx-value-uuid={file.uuid}
             phx-disable-with={gettext("Removing...")}
             data-confirm={@remove_file_confirm}
-            class="btn btn-ghost btn-xs btn-square"
             title={gettext("Remove")}
           >
             <.icon name="hero-x-mark" class="w-4 h-4" />
-          </button>
+          </.button>
         </li>
       </ul>
     <% end %>

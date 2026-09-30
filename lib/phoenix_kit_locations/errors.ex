@@ -23,7 +23,7 @@ defmodule PhoenixKitLocations.Errors do
       "Location not found."
   """
 
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitLocations.Gettext
 
   @doc """
   Translates an error reason into a user-facing string via gettext.

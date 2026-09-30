@@ -6,11 +6,13 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerTest do
   `ItemPickerEventsTest` drives `ItemPicker` through a real host LV in
   the catalogue module.
 
-  Every interactive element in `PlacePicker`'s template carries
-  `phx-target={@myself}` (it's a LiveComponent), so every event below
-  goes through `element(view, selector) |> render_*()` rather than
-  `render_*(view, event, value)` directly — the latter would dispatch
-  to the harness LiveView itself and miss the component entirely.
+  `PlacePicker` is a LiveComponent, so every event below is sent to it
+  through `with_target(view, "#harness-picker")` (or an element carrying
+  `phx-target={@myself}`); `render_*(view, event, value)` alone would
+  dispatch to the harness LiveView and miss the component. The location
+  search is core's SearchPicker, whose dropdown the hook renders
+  client-side: `search/2` sends the hook's event and returns the labels of
+  the rows the component pushed back.
   """
 
   use PhoenixKitLocations.LiveCase
@@ -35,13 +37,20 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerTest do
 
   defp search_input, do: "#harness-picker-input"
 
-  defp search(view, query),
-    do: view |> element(search_input()) |> render_change(%{"value" => query})
+  defp picker(view), do: with_target(view, "#harness-picker")
 
+  defp search(view, query) do
+    picker(view) |> render_hook("location_search", %{"q" => query, "limit" => 20})
+    assert_push_event(view, "harness-picker:results", %{q: ^query, results: rows})
+    Enum.map_join(rows, "\n", &"#{&1.label} #{Map.get(&1, :sublabel, "")}")
+  end
+
+  # What a click on a dropdown row sends; the component confirms with the
+  # instance's staged event so the hook clears its input.
   defp select_location_option(view, location) do
-    view
-    |> element(~s([phx-click="select_location"][phx-value-uuid="#{location.uuid}"]))
-    |> render_click()
+    html = picker(view) |> render_click("select_location", %{"uuid" => location.uuid})
+    assert_push_event(view, "harness-picker:staged", %{})
+    html
   end
 
   defp fixture_space(location_uuid, attrs) do
@@ -51,10 +60,16 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerTest do
   end
 
   describe "mount" do
-    test "renders the location search combobox", %{conn: conn} do
-      {:ok, _view, html} = live(conn, harness_path())
+    test "renders core's search picker for the location", %{conn: conn} do
+      {:ok, view, html} = live(conn, harness_path())
 
-      assert html =~ ~s(role="combobox")
+      assert has_element?(view, ~s(#harness-picker-input[phx-hook="SearchPicker"]))
+
+      assert has_element?(
+               view,
+               ~s(#harness-picker-input[data-results-event="harness-picker:results"])
+             )
+
       assert html =~ "Search locations"
       refute html =~ "selected-place"
     end

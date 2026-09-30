@@ -63,6 +63,9 @@ defmodule PhoenixKitLocations.Web.Components.SpaceTree do
   use Phoenix.Component
   use Gettext, backend: PhoenixKitLocations.Gettext
 
+  import PhoenixKitWeb.Components.Core.Badge, only: [status_badge: 1]
+  import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
+  import PhoenixKitWeb.Components.Core.EmptyState, only: [empty_state: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
 
   alias PhoenixKitLocations.Schemas.Space
@@ -112,19 +115,24 @@ defmodule PhoenixKitLocations.Web.Components.SpaceTree do
         />
       </ul>
 
-      <p :if={@tree == []} class="text-sm text-base-content/50 py-2">
-        {gettext("No spaces yet.")}
-      </p>
+      <.empty_state
+        :if={@tree == []}
+        icon="hero-squares-2x2"
+        title={gettext("No spaces yet.")}
+        class="py-6"
+      />
 
-      <button
+      <.button
         :if={@show_actions}
         type="button"
+        variant="ghost"
+        size="sm"
+        class="self-start"
         phx-click={@on_add_root}
         phx-target={@myself}
-        class="btn btn-ghost btn-sm self-start"
       >
         <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Add root space")}
-      </button>
+      </.button>
     </div>
     """
   end
@@ -230,12 +238,12 @@ defmodule PhoenixKitLocations.Web.Components.SpaceTree do
         <% else %>
           <span class="flex-1 min-w-0 truncate text-sm" title={@node.name}>{@node.name}</span>
           <span class="badge badge-sm badge-ghost shrink-0">{Space.kind_label(@node.kind)}</span>
-          <span
+          <.status_badge
             :if={@node.status == "inactive"}
-            class="badge badge-sm badge-ghost text-base-content/50 shrink-0"
-          >
-            {gettext("Inactive")}
-          </span>
+            status="inactive"
+            label={gettext("Inactive")}
+            class="shrink-0"
+          />
         <% end %>
 
         <div :if={@show_actions and !@is_renaming} class="flex items-center gap-0.5 shrink-0">

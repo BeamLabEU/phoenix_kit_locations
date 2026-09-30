@@ -18,8 +18,16 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerOwnerTest do
     %{owner: owner, mine: mine, theirs: theirs, global: global}
   end
 
-  defp search(view, query),
-    do: view |> element("#harness-picker-input") |> render_change(%{"value" => query})
+  # The dropdown is client-rendered by core's SearchPicker hook: send its
+  # search event and read the labels the component pushed back.
+  defp search(view, query) do
+    view
+    |> with_target("#harness-picker")
+    |> render_hook("location_search", %{"q" => query, "limit" => 20})
+
+    assert_push_event(view, "harness-picker:results", %{results: rows})
+    Enum.map_join(rows, "\n", & &1.label)
+  end
 
   test "without the attr every location is searchable", %{conn: conn} do
     {:ok, view, _html} = live(conn, @base)

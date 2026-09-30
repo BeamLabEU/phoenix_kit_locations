@@ -12,6 +12,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
 
   require Logger
 
+  import PhoenixKitWeb.Components.Core.Badge, only: [status_badge: 1]
   import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
   import PhoenixKitWeb.Components.Core.EmptyState, only: [empty_state: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
@@ -354,9 +355,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
               <span :if={location.location_types == []} class="text-base-content/40">—</span>
             </.table_default_cell>
             <.table_default_cell>
-              <span class={["badge badge-sm", if(location.status == "active", do: "badge-success", else: "badge-ghost")]}>
-                {status_label(location.status)}
-              </span>
+              <.status_badge status={location.status} label={status_label(location.status)} />
             </.table_default_cell>
             <.table_default_cell class="text-right whitespace-nowrap">
               <.table_row_menu mode="dropdown" id={"loc-menu-#{location.uuid}"}>
@@ -372,8 +371,8 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           <.link navigate={Paths.location_edit(location.uuid)} class="font-medium text-sm link link-hover">{location.name}</.link>
         </:card_header>
         <:card_actions :let={location}>
-          <.link navigate={Paths.location_edit(location.uuid)} class="btn btn-ghost btn-xs">{gettext("Edit")}</.link>
-          <button phx-click="show_delete_confirm" phx-value-uuid={location.uuid} phx-value-type="location" class="btn btn-ghost btn-xs text-error">{gettext("Delete")}</button>
+          <.button variant="ghost" size="xs" navigate={Paths.location_edit(location.uuid)}>{gettext("Edit")}</.button>
+          <.button type="button" variant="ghost" size="xs" class="text-error" phx-click="show_delete_confirm" phx-value-uuid={location.uuid} phx-value-type="location">{gettext("Delete")}</.button>
         </:card_actions>
       </.table_default>
     </div>
@@ -422,9 +421,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             </.table_default_cell>
             <.table_default_cell class="text-sm text-base-content/60">{t.description || "—"}</.table_default_cell>
             <.table_default_cell>
-              <span class={["badge badge-sm", if(t.status == "active", do: "badge-success", else: "badge-ghost")]}>
-                {status_label(t.status)}
-              </span>
+              <.status_badge status={t.status} label={status_label(t.status)} />
             </.table_default_cell>
             <.table_default_cell class="text-right whitespace-nowrap">
               <.table_row_menu mode="dropdown" id={"type-menu-#{t.uuid}"}>
@@ -439,8 +436,8 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           <.link navigate={Paths.type_edit(t.uuid)} class="font-medium text-sm link link-hover">{t.name}</.link>
         </:card_header>
         <:card_actions :let={t}>
-          <.link navigate={Paths.type_edit(t.uuid)} class="btn btn-ghost btn-xs">{gettext("Edit")}</.link>
-          <button phx-click="show_delete_confirm" phx-value-uuid={t.uuid} phx-value-type="location_type" class="btn btn-ghost btn-xs text-error">{gettext("Delete")}</button>
+          <.button variant="ghost" size="xs" navigate={Paths.type_edit(t.uuid)}>{gettext("Edit")}</.button>
+          <.button type="button" variant="ghost" size="xs" class="text-error" phx-click="show_delete_confirm" phx-value-uuid={t.uuid} phx-value-type="location_type">{gettext("Delete")}</.button>
         </:card_actions>
       </.table_default>
     </div>

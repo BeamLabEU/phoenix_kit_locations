@@ -55,9 +55,22 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
       %{conn: put_test_scope(conn, scope), scope: scope, owner: fixture_user()}
     end
 
+    # The picker's dropdown is client-rendered by core's SearchPicker hook, so
+    # drive its events the way the hook does and check the pushed rows.
     defp pick_owner(view, user) do
-      view |> element("#owner-search-form") |> render_change(%{"owner_search" => user.email})
-      view |> element(~s(#owner-matches button[phx-value-uuid="#{user.uuid}"])) |> render_click()
+      assert has_element?(view, "#location-owner-card #owner-search[phx-hook=SearchPicker]")
+
+      render_hook(view, "search_owner", %{"q" => user.email, "limit" => 10})
+      uuid = to_string(user.uuid)
+      email = user.email
+
+      assert_push_event(view, "owner_results", %{
+        results: [%{kind: "user", uuid: ^uuid, label: ^email} | _]
+      })
+
+      html = render_hook(view, "pick_owner", %{"kind" => "user", "uuid" => uuid})
+      assert_push_event(view, "owner_staged", %{})
+      html
     end
 
     test "new: a picked owner is set on create", %{conn: conn, owner: owner} do

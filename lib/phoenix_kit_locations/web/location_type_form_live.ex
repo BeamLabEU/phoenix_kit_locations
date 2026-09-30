@@ -2,11 +2,12 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
   @moduledoc "Create/edit form for location types with multilang support."
 
   use Phoenix.LiveView
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitLocations.Gettext
 
   require Logger
 
   import PhoenixKitWeb.Components.MultilangForm
+  import PhoenixKitWeb.Components.Core.FormActions, only: [form_actions: 1]
   import PhoenixKitWeb.Components.Core.Select
 
   alias PhoenixKitLocations.Errors
@@ -51,7 +52,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
          socket
          |> assign(
            page_title: page_title(action),
-           page_section: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+           page_section: gettext("Locations"),
            page_section_path: Paths.index(),
            page_crumbs: page_crumbs(action, location_type),
            action: action,
@@ -77,12 +78,12 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
   # Rendered by the PhoenixKit admin header as "Locations / Types / New type"
   # or "Locations / Types / <name> / Edit"; the page body has no header of its
   # own. The type crumb is text: the Types list is the record's only page.
-  defp page_title(:new), do: gettext_with_backend(PhoenixKitLocations.Gettext, "New type")
-  defp page_title(:edit), do: gettext_with_backend(PhoenixKitLocations.Gettext, "Edit")
+  defp page_title(:new), do: gettext("New type")
+  defp page_title(:edit), do: gettext("Edit")
 
   defp page_crumbs(action, location_type) do
     types = %{
-      label: gettext_with_backend(PhoenixKitLocations.Gettext, "Types"),
+      label: gettext("Types"),
       path: Paths.types()
     }
 
@@ -185,18 +186,8 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
           <.multilang_fields_wrapper
             multilang_enabled={@multilang_enabled}
             current_lang={@current_lang}
-            skeleton_class="card-body pt-0 flex flex-col gap-5"
+            skeleton_class="card-body pt-0"
           >
-            <:skeleton>
-              <div class="fieldset">
-                <div class="label"><div class="skeleton h-4 w-14"></div></div>
-                <div class="skeleton h-12 w-full rounded-lg"></div>
-              </div>
-              <div class="fieldset">
-                <div class="label"><div class="skeleton h-4 w-24"></div></div>
-                <div class="skeleton h-20 w-full rounded-lg"></div>
-              </div>
-            </:skeleton>
             <div class="card-body pt-0 flex flex-col gap-5">
               <.translatable_field
                 field_name="name"
@@ -231,8 +222,6 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
           </.multilang_fields_wrapper>
 
           <div class="card-body flex flex-col gap-5 pt-0">
-            <div class="divider my-0"></div>
-
             <div class="fieldset">
               <.select
                 field={@form[:status]}
@@ -244,22 +233,15 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
                 {gettext("Inactive types won't appear in the location type selection.")}
               </span>
             </div>
-
-            <%!-- Actions --%>
-            <div class="divider my-0"></div>
-
-            <div class="flex justify-end gap-3">
-              <.link navigate={Paths.types()} class="btn btn-ghost">{gettext("Cancel")}</.link>
-              <button
-                type="submit"
-                class="btn btn-primary phx-submit-loading:opacity-75"
-                phx-disable-with={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
-              >
-                {if @action == :new, do: gettext("Create Type"), else: gettext("Save Changes")}
-              </button>
-            </div>
           </div>
         </div>
+
+        <.form_actions
+          class="mt-6"
+          cancel_to={Paths.types()}
+          submit_label={if @action == :new, do: gettext("Create Type"), else: gettext("Save Changes")}
+          submitting_label={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
+        />
       </.form>
       </div>
     </div>

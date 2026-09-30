@@ -74,7 +74,8 @@ defmodule PhoenixKitLocations.MixProject do
 
   defp deps do
     [
-      # The floor is 2.38.0: the module runs on core's shared toolkits —
+      # The floor is 2.41.1: `status_badge`'s `label` attr first shipped there.
+      # The module also runs on core's shared toolkits (2.38.0) —
       # `PhoenixKitWeb.Actor`, `PhoenixKit.Activity.log/3`,
       # `Storage.ResourceFolders`, the reorganizer's `ResourceSource`,
       # `PhoenixKitWeb.Attachments`, `Utils.TreeQuery`, `Utils.Format`,
@@ -84,7 +85,7 @@ defmodule PhoenixKitLocations.MixProject do
       # long subsumed.) Patch-precise floor in the compound form, so the
       # ceiling stays open through every later 2.x minor (see
       # test/core_pin_conformance_test.exs).
-      pk_dep(:phoenix_kit, ">= 2.38.0 and < 3.0.0"),
+      pk_dep(:phoenix_kit, ">= 2.41.1 and < 3.0.0"),
       {:phoenix_live_view, "~> 1.1"},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

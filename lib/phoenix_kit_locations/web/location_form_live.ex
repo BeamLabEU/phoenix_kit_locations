@@ -19,18 +19,22 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   """
 
   use Phoenix.LiveView
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitLocations.Gettext
 
   require Logger
 
   import PhoenixKitWeb.Components.MultilangForm
+  import PhoenixKitWeb.Components.Core.Checkbox, only: [checkbox: 1]
+  import PhoenixKitWeb.Components.Core.FormSection, only: [form_section: 1, section_header: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
   import PhoenixKitWeb.Components.Core.Input
   import PhoenixKitWeb.Components.Core.Select
   import PhoenixKitWeb.Components.Core.Textarea
   import PhoenixKitLocations.Web.Components.FilesCard, only: [files_card_body: 1]
   import PhoenixKitLocations.Web.Components.LocationTabs, only: [location_tabs: 1]
-  import PhoenixKitLocations.Web.Components.OwnerComponents, only: [owner_picker_card: 1]
+
+  import PhoenixKitLocations.Web.Components.OwnerComponents,
+    only: [owner_picker_card: 1, owner_picker_rows: 1]
 
   alias PhoenixKit.Users.Auth
   alias PhoenixKitLocations.Attachments
@@ -85,14 +89,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
          socket
          |> assign(
            page_title: page_title(action),
-           page_section: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+           page_section: gettext("Locations"),
            page_section_path: Paths.index(),
            page_crumbs: page_crumbs(action, location),
            mode: mode,
            action: action,
            location: location,
            owner: load_owner(mode, location),
-           owner_query: "",
            owner_matches: [],
            all_types: all_types,
            # Types a `toggle_type` may name: the active ones offered, plus
@@ -168,8 +171,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   # "Locations / <name> / Edit"; the page body has no header of its own. The
   # location crumb is text: the list is the record's only page (the Structure
   # tab is a sibling of this one, not the record's page).
-  defp page_title(:new), do: gettext_with_backend(PhoenixKitLocations.Gettext, "New location")
-  defp page_title(:edit), do: gettext_with_backend(PhoenixKitLocations.Gettext, "Edit")
+  defp page_title(:new), do: gettext("New location")
+  defp page_title(:edit), do: gettext("Edit")
 
   defp page_crumbs(:new, _location), do: []
   defp page_crumbs(:edit, location), do: [%{label: location.name}]
@@ -193,14 +196,18 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         preserve_fields: @preserve_fields
       )
 
-    params = Map.put(params, "features", socket.assigns.features)
+    features = put_features(socket.assigns.features, params)
+    params = Map.put(params, "features", features)
 
     changeset =
       socket.assigns.location
       |> Locations.change_location(params)
       |> Map.put(:action, :validate)
 
-    {:noreply, socket |> assign_form(changeset) |> assign(:address_warning, nil)}
+    {:noreply,
+     socket
+     |> assign_form(changeset)
+     |> assign(features: features, address_warning: nil)}
   end
 
   def handle_event("toggle_type", %{"uuid" => uuid}, socket) do
@@ -216,13 +223,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     else
       {:noreply, socket}
     end
-  end
-
-  def handle_event("toggle_feature", %{"key" => key}, socket) do
-    features = socket.assigns.features
-    current = Map.get(features, key, false)
-    features = Map.put(features, key, !current)
-    {:noreply, assign(socket, :features, features)}
   end
 
   # `phx-blur` payloads carry only event metadata (`%{"key" => ..., "value" => ...}`),
@@ -265,7 +265,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
     params =
       params
-      |> Map.put("features", socket.assigns.features)
+      |> Map.put("features", put_features(socket.assigns.features, params))
       |> Attachments.inject_attachment_data(socket, location_scope())
       |> drop_admin_only_params(socket)
 
@@ -291,8 +291,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     if manage_all?(socket), do: attachment_event(event, params, socket), else: {:noreply, socket}
   end
 
-  defp owner_event("search_owner", %{"owner_search" => query}, socket) do
-    {:noreply, assign(socket, owner_query: query, owner_matches: safe_search_users(query))}
+  # `pick_owner` only accepts a uuid from the rows this socket last sent, so a
+  # forged payload can't pick an arbitrary user. `owner_staged` tells the
+  # picker the pick landed (it clears its input).
+  defp owner_event("search_owner", %{"q" => query}, socket) when is_binary(query) do
+    users = safe_search_users(query)
+
+    {:noreply,
+     socket
+     |> assign(owner_matches: users)
+     |> push_event("owner_results", %{
+       q: query,
+       results: owner_picker_rows(users),
+       has_more: false
+     })}
   end
 
   defp owner_event("pick_owner", %{"uuid" => uuid}, socket) do
@@ -302,11 +314,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
       user ->
         {:noreply,
-         assign(socket,
-           owner: %{uuid: to_string(user.uuid), email: user.email},
-           owner_query: "",
-           owner_matches: []
-         )}
+         socket
+         |> assign(owner: %{uuid: to_string(user.uuid), email: user.email}, owner_matches: [])
+         |> push_event("owner_staged", %{})}
     end
   end
 
@@ -499,12 +509,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       <div class="max-w-5xl mx-auto w-full">
         <%!-- Structure tab needs a persisted uuid; :new has none. --%>
         <.location_tabs :if={@action == :edit} location={@location} active={:details} />
-        <%!-- Outside #location-form: the picker carries its own search form. --%>
+        <%!-- Outside #location-form, so owner searches never fire its phx-change. --%>
         <.owner_picker_card
           :if={@mode == :all}
           owner={@owner}
-          query={@owner_query}
-          matches={@owner_matches}
         />
         <.form
           for={@form}
@@ -532,16 +540,16 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
           >
             <:skeleton>
               <div class="fieldset">
-                <div class="label"><div class="skeleton h-4 w-14"></div></div>
-                <div class="skeleton h-12 w-full rounded-lg"></div>
+                <div class="label"><div class="bg-base-content/15 rounded h-4 w-14 animate-pulse"></div></div>
+                <div class="bg-base-content/15 rounded-lg h-12 w-full animate-pulse"></div>
               </div>
               <div class="fieldset">
-                <div class="label"><div class="skeleton h-4 w-24"></div></div>
-                <div class="skeleton h-20 w-full rounded-lg"></div>
+                <div class="label"><div class="bg-base-content/15 rounded h-4 w-24 animate-pulse"></div></div>
+                <div class="bg-base-content/15 rounded-lg h-20 w-full animate-pulse"></div>
               </div>
               <div class="fieldset">
-                <div class="label"><div class="skeleton h-4 w-20"></div></div>
-                <div class="skeleton h-20 w-full rounded-lg"></div>
+                <div class="label"><div class="bg-base-content/15 rounded h-4 w-20 animate-pulse"></div></div>
+                <div class="bg-base-content/15 rounded-lg h-20 w-full animate-pulse"></div>
               </div>
             </:skeleton>
             <div class="card-body pt-0 flex flex-col gap-5">
@@ -593,9 +601,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
           </.multilang_fields_wrapper>
 
           <div class="card-body flex flex-col gap-5 pt-0">
-            <div class="divider my-0"></div>
-
-            <.section_heading icon="hero-map-pin">{gettext("Address")}</.section_heading>
+            <.section_header icon="hero-map-pin" title={gettext("Address")} />
 
             <div :if={@address_warning} class="alert alert-warning text-sm py-2">
               <.icon name="hero-exclamation-triangle" class="h-4 w-4 shrink-0" />
@@ -635,9 +641,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               <.input field={@form[:country]} type="text" label={gettext("Country")} />
             </div>
 
-            <div class="divider my-0"></div>
-
-            <.section_heading icon="hero-envelope">{gettext("Contact")}</.section_heading>
+            <.section_header icon="hero-envelope" title={gettext("Contact")} />
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <.input
@@ -660,20 +664,21 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               />
             </div>
 
-            <div class="divider my-0"></div>
+            <.section_header icon="hero-check-circle" title={gettext("Features & Amenities")} />
 
-            <.section_heading icon="hero-check-circle">{gettext("Features & Amenities")}</.section_heading>
-
+            <%!-- Real form fields: `validate` / `save` read them from the
+                 params (`put_features/2`), so they are keyboard-reachable
+                 and submit like any other input. --%>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <label
+              <.checkbox
                 :for={key <- @feature_keys}
-                class="flex items-center gap-2 cursor-pointer select-none"
-                phx-click="toggle_feature"
-                phx-value-key={key}
-              >
-                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" checked={Map.get(@features, key, false)} tabindex="-1" />
-                <span class="fieldset-legend text-sm">{feature_label(key)}</span>
-              </label>
+                id={"location-feature-#{key}"}
+                name={"location[features][#{key}]"}
+                checked={Map.get(@features, key, false) == true}
+                label={feature_label(key)}
+                class="checkbox-sm"
+                wrapper_class="gap-2"
+              />
             </div>
           </div>
         </div>
@@ -697,13 +702,15 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         <%!-- ═══════════════════════════════════════════════════════ --%>
         <%!-- INTERNAL                                               --%>
         <%!-- ═══════════════════════════════════════════════════════ --%>
-        <div class="card bg-base-100 shadow-lg mt-6">
-          <div class="card-body flex flex-col gap-5">
-            <.section_heading :if={@mode == :all} icon="hero-lock-closed">{gettext("Internal")}</.section_heading>
-            <.section_heading :if={@mode == :own} icon="hero-adjustments-horizontal">{gettext("Status")}</.section_heading>
-            <p :if={@mode == :all} class="text-sm text-base-content/50 -mt-3">
-              {gettext("This information is only visible to administrators.")}
-            </p>
+        <.form_section
+          title={if @mode == :all, do: gettext("Internal"), else: gettext("Status")}
+          icon={if @mode == :all, do: "hero-lock-closed", else: "hero-adjustments-horizontal"}
+          class="mt-6"
+          body_class="gap-5"
+        >
+          <:subtitle :if={@mode == :all}>
+            {gettext("This information is only visible to administrators.")}
+          </:subtitle>
 
             <.textarea
               :if={@mode == :all}
@@ -723,9 +730,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
             <%!-- Location types --%>
             <div :if={@all_types != []} class="flex flex-col gap-4">
-              <div class="divider my-0"></div>
-
-              <.section_heading icon="hero-tag">{gettext("Location Types")}</.section_heading>
+              <.section_header icon="hero-tag" title={gettext("Location Types")} />
               <p class="text-sm text-base-content/50 -mt-2">
                 {gettext("Click to toggle. A location can have multiple types.")}
               </p>
@@ -753,25 +758,25 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               </div>
             </div>
 
-            <%!-- Actions --%>
-            <div class="divider my-0"></div>
+        </.form_section>
 
-            <div class="flex justify-end gap-3">
-              <.link navigate={Paths.index()} class="btn btn-ghost">{gettext("Cancel")}</.link>
-              <button
-                type="submit"
-                class="btn btn-primary phx-submit-loading:opacity-75"
-                disabled={uploads_in_flight?(assigns)}
-                phx-disable-with={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
-              >
-                {cond do
-                  uploads_in_flight?(assigns) -> gettext("Waiting for uploads...")
-                  @action == :new -> gettext("Create Location")
-                  true -> gettext("Save Changes")
-                end}
-              </button>
-            </div>
-          </div>
+        <%!-- Actions. Hand-rolled rather than core's `form_actions`:
+             Save is disabled while uploads are in flight, and
+             `form_actions` has no way to disable its submit button. --%>
+        <div class="flex justify-end gap-3 mt-6">
+          <.link navigate={Paths.index()} class="btn btn-ghost">{gettext("Cancel")}</.link>
+          <button
+            type="submit"
+            class="btn btn-primary phx-submit-loading:opacity-75"
+            disabled={uploads_in_flight?(assigns)}
+            phx-disable-with={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
+          >
+            {cond do
+              uploads_in_flight?(assigns) -> gettext("Waiting for uploads...")
+              @action == :new -> gettext("Create Location")
+              true -> gettext("Save Changes")
+            end}
+          </button>
         </div>
       </.form>
       </div>
@@ -779,20 +784,19 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     """
   end
 
-  # Small local component — keeps the five section headings in the
-  # form template identical in shape (icon + label) without repeating
-  # the `<h2>` chrome five times.
-  attr(:icon, :string, required: true)
-  slot(:inner_block, required: true)
-
-  defp section_heading(assigns) do
-    ~H"""
-    <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-      <.icon name={@icon} class="h-4 w-4" />
-      {render_slot(@inner_block)}
-    </h2>
-    """
+  # The feature checkboxes submit `"true"` / `"false"` (core's checkbox adds a
+  # hidden `"false"`). Only known keys are read from the params, and keys the
+  # form doesn't offer keep their stored value.
+  defp put_features(features, %{"features" => submitted}) when is_map(submitted) do
+    Enum.reduce(@feature_keys, features, fn key, acc ->
+      case Map.fetch(submitted, key) do
+        {:ok, value} -> Map.put(acc, key, value == "true")
+        :error -> acc
+      end
+    end)
   end
+
+  defp put_features(features, _params), do: features
 
   # Every security decision reads the LIVE scope, never the mount-time `@mode`.
   defp manage_all?(socket), do: Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope])
