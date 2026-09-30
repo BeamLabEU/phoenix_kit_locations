@@ -8,10 +8,13 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   """
 
   use Phoenix.LiveView
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitLocations.Gettext
 
   require Logger
 
+  import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
+  import PhoenixKitWeb.Components.Core.EmptyState, only: [empty_state: 1]
+  import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
   import PhoenixKitWeb.Components.Core.Modal, only: [confirm_modal: 1]
   import PhoenixKitWeb.Components.Core.TableDefault
   import PhoenixKitWeb.Components.Core.TableRowMenu
@@ -28,7 +31,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+       page_title: gettext("Locations"),
        locations: [],
        location_types: [],
        manage_all: false,
@@ -67,32 +70,25 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
     end
   end
 
-  # The page title, trail and create button live in the PhoenixKit admin
-  # header (`page_title` / `page_section` / `page_action`), not in the body.
-  # Both actions share this LiveView, so a patch between them resets them all.
+  # The page title and trail live in the PhoenixKit admin header
+  # (`page_title` / `page_section`); the create button sits in the table's
+  # toolbar, not the header. Both actions share this LiveView, so a patch
+  # between them resets every header key, `page_action` included.
   defp assign_header(socket, :index) do
     assign(socket,
-      page_title: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+      page_title: gettext("Locations"),
       page_section: nil,
       page_section_path: nil,
-      page_action: %{
-        icon: "hero-plus",
-        label: gettext_with_backend(PhoenixKitLocations.Gettext, "New Location"),
-        navigate: Paths.location_new()
-      }
+      page_action: nil
     )
   end
 
   defp assign_header(socket, :types) do
     assign(socket,
-      page_title: gettext_with_backend(PhoenixKitLocations.Gettext, "Types"),
-      page_section: gettext_with_backend(PhoenixKitLocations.Gettext, "Locations"),
+      page_title: gettext("Types"),
+      page_section: gettext("Locations"),
       page_section_path: Paths.index(),
-      page_action: %{
-        icon: "hero-plus",
-        label: gettext_with_backend(PhoenixKitLocations.Gettext, "New Type"),
-        navigate: Paths.type_new()
-      }
+      page_action: nil
     )
   end
 
@@ -258,19 +254,18 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col w-full px-4 py-6 gap-6">
-      <%!-- Title, trail and the New Location / New Type button render in
-           the PhoenixKit admin header (`assign_header/2`); Locations / Types
-           switching lives in its subtab nav. --%>
-      <%!-- Locations tab content --%>
-      <div :if={@active_tab == :index} class="flex flex-col gap-4">
-        <.owner_filter :if={@manage_all} active={@owner_filter} />
-        <.locations_table locations={@locations} owner_emails={@owner_emails} manage_all={@manage_all} />
-      </div>
+      <%!-- Title and trail render in the PhoenixKit admin header
+           (`assign_header/2`); the owner filter, view toggle and the create
+           button share the table's toolbar row. --%>
+      <.locations_table
+        :if={@active_tab == :index}
+        locations={@locations}
+        owner_emails={@owner_emails}
+        manage_all={@manage_all}
+        owner_filter={@owner_filter}
+      />
 
-      <%!-- Types tab content --%>
-      <div :if={@active_tab == :types}>
-        <.types_table location_types={@location_types} />
-      </div>
+      <.types_table :if={@active_tab == :types} location_types={@location_types} />
 
       <.confirm_modal
         show={match?({"location", _}, @confirm_delete)}
@@ -299,13 +294,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
 
   defp locations_table(assigns) do
     ~H"""
-    <div :if={@locations == []} class="card bg-base-100 shadow">
-      <div class="card-body items-center text-center py-12">
-        <p class="text-base-content/60">{gettext("No locations yet.")}</p>
-      </div>
-    </div>
-
-    <div :if={@locations != []}>
+    <div>
       <.table_default
         variant="zebra" size="sm" toggleable={true}
         id="locations-list" items={@locations}
@@ -316,6 +305,18 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           %{label: gettext("Status"), value: status_label(l.status)}
         ] end}
       >
+        <:toolbar_title>
+          <.owner_filter :if={@manage_all} active={@owner_filter} />
+        </:toolbar_title>
+        <:toolbar_actions>
+          <.button size="sm" navigate={Paths.location_new()} title={gettext("New Location")}>
+            <.icon name="hero-plus" class="h-4 w-4" />
+            <span class="hidden sm:inline">{gettext("New Location")}</span>
+          </.button>
+        </:toolbar_actions>
+        <:above_cards :if={@locations == []}>
+          <.locations_empty owner_filter={@owner_filter} />
+        </:above_cards>
         <.table_default_header>
           <.table_default_row>
             <.table_default_header_cell>{gettext("Name")}</.table_default_header_cell>
@@ -328,6 +329,11 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           </.table_default_row>
         </.table_default_header>
         <.table_default_body>
+          <.table_default_row :if={@locations == []}>
+            <.table_default_cell colspan={if @manage_all, do: 7, else: 6}>
+              <.locations_empty owner_filter={@owner_filter} />
+            </.table_default_cell>
+          </.table_default_row>
           <.table_default_row :for={location <- @locations}>
             <.table_default_cell>
               <.link navigate={Paths.location_edit(location.uuid)} class="link link-hover font-medium">
@@ -376,13 +382,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
 
   defp types_table(assigns) do
     ~H"""
-    <div :if={@location_types == []} class="card bg-base-100 shadow">
-      <div class="card-body items-center text-center py-12">
-        <p class="text-base-content/60">{gettext("No location types yet.")}</p>
-      </div>
-    </div>
-
-    <div :if={@location_types != []}>
+    <div>
       <.table_default
         variant="zebra" size="sm" toggleable={true}
         id="types-list" items={@location_types}
@@ -391,6 +391,15 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           %{label: gettext("Status"), value: status_label(t.status)}
         ] end}
       >
+        <:toolbar_actions>
+          <.button size="sm" navigate={Paths.type_new()} title={gettext("New Type")}>
+            <.icon name="hero-plus" class="h-4 w-4" />
+            <span class="hidden sm:inline">{gettext("New Type")}</span>
+          </.button>
+        </:toolbar_actions>
+        <:above_cards :if={@location_types == []}>
+          <.empty_state icon="hero-tag" title={gettext("No location types yet.")} />
+        </:above_cards>
         <.table_default_header>
           <.table_default_row>
             <.table_default_header_cell>{gettext("Name")}</.table_default_header_cell>
@@ -400,6 +409,11 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           </.table_default_row>
         </.table_default_header>
         <.table_default_body>
+          <.table_default_row :if={@location_types == []}>
+            <.table_default_cell colspan={4}>
+              <.empty_state icon="hero-tag" title={gettext("No location types yet.")} />
+            </.table_default_cell>
+          </.table_default_row>
           <.table_default_row :for={t <- @location_types}>
             <.table_default_cell>
               <.link navigate={Paths.type_edit(t.uuid)} class="link link-hover font-medium">
@@ -430,6 +444,23 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         </:card_actions>
       </.table_default>
     </div>
+    """
+  end
+
+  attr(:owner_filter, :atom, required: true)
+
+  # A filtered list that comes back empty says so, rather than claiming
+  # there are no locations at all.
+  defp locations_empty(assigns) do
+    ~H"""
+    <.empty_state
+      icon="hero-map-pin"
+      title={
+        if @owner_filter == :all,
+          do: gettext("No locations yet."),
+          else: gettext("No locations match this filter.")
+      }
+    />
     """
   end
 

@@ -19,16 +19,31 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       assert html =~ "No locations yet."
     end
 
-    test "puts the title and New Location button in the admin header", %{conn: conn} do
+    test "puts the title in the admin header and New Location in the table toolbar",
+         %{conn: conn} do
       {:ok, view, _html} = live(conn, "/en/admin/locations/")
       assert has_element?(view, "#header-title", "Locations")
       refute has_element?(view, "#header-section")
+      refute has_element?(view, "#header-action")
 
       assert has_element?(
                view,
-               ~s(#header-action[href="#{Paths.location_new()}"]),
+               ~s(#locations-list a[href="#{Paths.location_new()}"]),
                "New Location"
              )
+    end
+
+    test "keeps the toolbar and says a filter matched nothing on an empty filtered list",
+         %{conn: conn} do
+      fixture_location(%{name: "GlobalOnly"})
+      conn = put_test_scope(conn, fake_scope())
+
+      {:ok, view, html} = live(conn, "/en/admin/locations/?owner=owned")
+
+      refute html =~ "GlobalOnly"
+      assert html =~ "No locations match this filter."
+      assert has_element?(view, "#locations-list #owner-filter")
+      assert has_element?(view, ~s(#locations-list a[href="#{Paths.location_new()}"]))
     end
 
     test "row menu links to the Structure page for the location", %{conn: conn} do
@@ -45,11 +60,13 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
   end
 
   describe "types tab" do
-    test "puts Locations / Types and the New Type button in the admin header", %{conn: conn} do
+    test "puts Locations / Types in the admin header and New Type in the table toolbar",
+         %{conn: conn} do
       {:ok, view, _html} = live(conn, "/en/admin/locations/types")
       assert has_element?(view, ~s(#header-section[href="#{Paths.index()}"]), "Locations")
       assert has_element?(view, "#header-title", "Types")
-      assert has_element?(view, ~s(#header-action[href="#{Paths.type_new()}"]), "New Type")
+      refute has_element?(view, "#header-action")
+      assert has_element?(view, ~s(#types-list a[href="#{Paths.type_new()}"]), "New Type")
     end
 
     test "renders the types list", %{conn: conn} do
