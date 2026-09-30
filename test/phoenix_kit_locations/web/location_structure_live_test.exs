@@ -215,6 +215,26 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
     end
   end
 
+  describe "add form beside the detail panel" do
+    # Both forms submit as `space[...]`; with one id namespace the add form's
+    # Kind select and the detail panel's shared the id `space_kind`, and the
+    # browser showed the detail panel's Kind empty once the add form opened.
+    test "their fields keep distinct ids", %{conn: conn} do
+      location = fixture_location()
+      floor = fixture_space(location.uuid, %{"kind" => "floor", "name" => "Floor 1"})
+
+      {:ok, view, _html} = live(conn, structure_path(location))
+      render_click(view, "select_space", %{"uuid" => floor.uuid})
+      html = render_click(view, "open_add_root", %{})
+
+      assert has_element?(view, ~s(#new-space-form select#new_space_kind[name="space[kind]"]))
+      assert has_element?(view, ~s(#space-detail-form select#space_kind[name="space[kind]"]))
+
+      ids = Regex.scan(~r/\sid="([^"]+)"/, html, capture: :all_but_first) |> List.flatten()
+      assert ids -- Enum.uniq(ids) == []
+    end
+  end
+
   describe "inline rename" do
     test "start_rename_space then rename_space persists the new name and logs activity",
          %{conn: conn} do

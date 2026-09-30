@@ -248,7 +248,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
       |> Spaces.change_space(params)
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, :new_space_form, to_form(changeset, as: :space))}
+    {:noreply, assign(socket, :new_space_form, to_form(changeset, as: :space, id: "new_space"))}
   end
 
   def handle_event("create_space", %{"space" => params}, socket) do
@@ -272,7 +272,8 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
          |> assign_selected_space(space)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :new_space_form, to_form(changeset, as: :space))}
+        {:noreply,
+         assign(socket, :new_space_form, to_form(changeset, as: :space, id: "new_space"))}
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, Errors.message(reason))}
@@ -646,7 +647,9 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   defp uploads_in_flight?(assigns),
     do: match?(%{attachment_files: %{entries: [_ | _]}}, assigns[:uploads])
 
-  defp new_space_form, do: to_form(Spaces.change_space(%Space{}), as: :space)
+  # Its own id namespace: the detail panel's form is also `as: :space`, and
+  # shared ids (`space_kind`) blanked the panel's Kind select in the browser.
+  defp new_space_form, do: to_form(Spaces.change_space(%Space{}), as: :space, id: "new_space")
 
   # Warning copy for the delete-confirmation modal. `nil` (modal
   # closed) renders into `confirm_modal`'s `messages` assign anyway —
