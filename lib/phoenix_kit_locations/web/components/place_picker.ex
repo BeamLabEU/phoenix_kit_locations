@@ -331,16 +331,32 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
          %{assigns: %{selected_location: %Location{} = location}} = socket,
          space_uuid
        ) do
-    send(
-      self(),
-      {:place_picker_select, socket.assigns.id,
-       %{location_uuid: location.uuid, space_uuid: space_uuid}}
-    )
+    # Browsing a tree and confirming a place are separate events. Re-read
+    # both records: ownership, types and availability may have changed.
+    with %Location{} = current <- selectable_location(location.uuid, socket.assigns),
+         true <- current_space_allowed?(space_uuid, current.uuid) do
+      send(
+        self(),
+        {:place_picker_select, socket.assigns.id,
+         %{location_uuid: current.uuid, space_uuid: space_uuid}}
+      )
 
-    assign(socket, :selected_space_uuid, space_uuid)
+      assign(socket, selected_location: current, selected_space_uuid: space_uuid)
+    else
+      _ -> socket
+    end
   end
 
   defp send_selection(socket, _space_uuid), do: socket
+
+  defp current_space_allowed?(nil, _location_uuid), do: true
+
+  defp current_space_allowed?(space_uuid, location_uuid) do
+    case Spaces.get_space(space_uuid) do
+      %{location_uuid: ^location_uuid, status: "active"} -> true
+      _ -> false
+    end
+  end
 
   # ─────────────────────────────────────────────────────────────────
   # Display helpers

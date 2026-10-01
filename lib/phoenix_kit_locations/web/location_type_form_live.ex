@@ -154,7 +154,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
          |> put_flash(:info, gettext("Location type created."))
          |> push_navigate(to: Paths.types())}
 
-      {:error, changeset} ->
+      {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
     end
   end
@@ -167,8 +167,14 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
          |> put_flash(:info, gettext("Location type updated."))
          |> push_navigate(to: Paths.types())}
 
-      {:error, changeset} ->
+      {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, Errors.message(reason))
+         |> push_navigate(to: Paths.types())}
     end
   end
 

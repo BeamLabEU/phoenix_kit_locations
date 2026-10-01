@@ -81,6 +81,29 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
       assert to == "/en/admin/locations/types"
       assert flash["error"] =~ "Location type not found"
     end
+
+    test "edit with malformed UUID redirects with flash", %{conn: conn} do
+      {:error, {:live_redirect, %{to: to, flash: flash}}} =
+        live(conn, "/en/admin/locations/types/not-a-uuid/edit")
+
+      assert to == "/en/admin/locations/types"
+      assert flash["error"] =~ "Location type not found"
+    end
+
+    test "saving a type deleted since mount redirects with a not-found error", %{conn: conn} do
+      type = fixture_location_type(%{name: "Original"})
+      {:ok, view, _html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+      {:ok, _} = Locations.delete_location_type(type)
+
+      result =
+        view
+        |> form("#location-type-form", location_type: %{"name" => "Renamed"})
+        |> render_submit()
+
+      {:ok, _view, html} = follow_redirect(result, conn, "/en/admin/locations/types")
+      assert html =~ "Location type not found"
+      assert is_nil(Locations.get_location_type(type.uuid))
+    end
   end
 
   describe "inline validation errors" do

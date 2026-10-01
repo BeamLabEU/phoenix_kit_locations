@@ -255,6 +255,52 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerTest do
     end
   end
 
+  describe "availability changes after loading the tree" do
+    test "an inactive or deleted location cannot be confirmed", %{conn: conn} do
+      location = fixture_location()
+      {:ok, view, _html} = live(conn, harness_path())
+      select_location_option(view, location)
+
+      {:ok, location} = Locations.update_location(location, %{status: "inactive"})
+      picker(view) |> render_click("select_location_only", %{})
+      refute has_element?(view, "#selected-place")
+
+      {:ok, _} = Locations.delete_location(location)
+      picker(view) |> render_click("select_location_only", %{})
+      refute has_element?(view, "#selected-place")
+    end
+
+    test "a removed location type blocks both location and space confirmation", %{conn: conn} do
+      type = fixture_location_type()
+      location = fixture_location()
+      floor = fixture_space(location.uuid, %{"name" => "Floor"})
+      {:ok, _} = Locations.add_location_type(location.uuid, type.uuid)
+      {:ok, view, _html} = live(conn, harness_path(location_type_uuid: type.uuid))
+      select_location_option(view, location)
+
+      {:ok, 1} = Locations.remove_location_type(location.uuid, type.uuid)
+
+      picker(view) |> render_click("select_location_only", %{})
+      picker(view) |> render_click("select_space", %{"uuid" => floor.uuid})
+      refute has_element?(view, "#selected-place")
+    end
+
+    test "an inactive or deleted space cannot be confirmed from a stale tree", %{conn: conn} do
+      location = fixture_location()
+      floor = fixture_space(location.uuid, %{"name" => "Floor"})
+      {:ok, view, _html} = live(conn, harness_path())
+      select_location_option(view, location)
+
+      {:ok, floor} = Spaces.update_space(floor, %{status: "inactive"})
+      picker(view) |> render_click("select_space", %{"uuid" => floor.uuid})
+      refute has_element?(view, "#selected-place")
+
+      {:ok, _} = Spaces.delete_space(floor)
+      picker(view) |> render_click("select_space", %{"uuid" => floor.uuid})
+      refute has_element?(view, "#selected-place")
+    end
+  end
+
   describe "update/2 seed-once behavior" do
     test "local selection highlight survives a parent re-render triggered by place_picker_select",
          %{conn: conn} do

@@ -81,4 +81,16 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerOwnerTest do
 
     refute html =~ "Use this location"
   end
+
+  test "a location reassigned after browsing cannot be confirmed",
+       %{conn: conn, owner: owner, theirs: theirs, mine: mine} do
+    {:ok, view, _html} = live(conn, "#{@base}?owner_uuid=#{owner.uuid}")
+    target = with_target(view, "#harness-picker")
+    render_click(target, "select_location", %{"uuid" => mine.uuid})
+
+    {:ok, _} = Locations.set_location_owner(mine, theirs.owner_uuid)
+    render_click(target, "select_location_only", %{})
+
+    refute has_element?(view, "#selected-place")
+  end
 end

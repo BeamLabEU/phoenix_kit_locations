@@ -59,6 +59,21 @@ defmodule PhoenixKitLocations.LocationsTest do
       assert updated.name == "Updated"
     end
 
+    test "get_location_type/1 treats malformed UUIDs as missing" do
+      assert is_nil(Locations.get_location_type("not-a-uuid"))
+    end
+
+    test "update_location_type/2 returns not-found for a deleted type, even without changes" do
+      t = create_location_type()
+      {:ok, _} = Locations.delete_location_type(t)
+
+      assert {:error, :location_type_not_found} =
+               Locations.update_location_type(t, %{name: "Updated"})
+
+      assert {:error, :location_type_not_found} =
+               Locations.update_location_type(t, %{name: t.name})
+    end
+
     test "delete_location_type/1" do
       t = create_location_type()
       assert {:ok, _} = Locations.delete_location_type(t)

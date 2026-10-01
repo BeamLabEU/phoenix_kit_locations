@@ -80,9 +80,14 @@ defmodule PhoenixKitLocations.Locations do
     repo().all(query)
   end
 
-  @doc "Fetches a location type by UUID. Returns `nil` if not found."
+  @doc "Fetches a location type by UUID. Returns `nil` if missing or malformed."
   @spec get_location_type(String.t()) :: LocationType.t() | nil
-  def get_location_type(uuid), do: repo().get(LocationType, uuid)
+  def get_location_type(uuid) do
+    case Ecto.UUID.cast(uuid) do
+      {:ok, uuid} -> repo().get(LocationType, uuid)
+      :error -> nil
+    end
+  end
 
   @doc "Fetches a location type by name (case-sensitive). Returns `nil` if not found."
   @spec get_location_type_by_name(String.t()) :: LocationType.t() | nil
@@ -114,13 +119,25 @@ defmodule PhoenixKitLocations.Locations do
     |> log_activity("location_type.created", "location_type", opts, &type_metadata/1)
   end
 
-  @doc "Updates a location type with the given attributes."
+  @doc """
+  Updates a location type with the given attributes. Returns
+  `{:error, :location_type_not_found}` if deleted since the caller loaded it.
+  """
   @spec update_location_type(LocationType.t(), map(), opts) ::
-          {:ok, LocationType.t()} | {:error, Ecto.Changeset.t()}
+          {:ok, LocationType.t()} | {:error, Ecto.Changeset.t() | :location_type_not_found}
   def update_location_type(%LocationType{} = location_type, attrs, opts \\ []) do
-    location_type
-    |> LocationType.changeset(attrs)
-    |> repo().update()
+    repo().transaction(fn ->
+      case lock_row(LocationType, location_type.uuid) do
+        nil ->
+          repo().rollback(:location_type_not_found)
+
+        _stored ->
+          location_type
+          |> LocationType.changeset(attrs)
+          |> repo().update()
+          |> ok_or_rollback()
+      end
+    end)
     |> log_activity("location_type.updated", "location_type", opts, &type_metadata/1)
   end
 
