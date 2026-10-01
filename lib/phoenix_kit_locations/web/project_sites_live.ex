@@ -23,6 +23,8 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
   import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
   import PhoenixKitWeb.Components.Core.EmptyState, only: [empty_state: 1]
 
+  require Logger
+
   alias PhoenixKitLocations.{Locations, Paths}
 
   @impl true
@@ -70,6 +72,13 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
     _ -> nil
   catch
     :exit, _ -> nil
+  end
+
+  # Embedded in the host's project page: a stray message must not crash it.
+  @impl true
+  def handle_info(msg, socket) do
+    Logger.debug("[ProjectSitesLive] ignoring unrelated message: #{inspect(msg)}")
+    {:noreply, socket}
   end
 
   @impl true

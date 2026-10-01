@@ -100,11 +100,11 @@ defmodule PhoenixKitLocations.Schemas.Space do
     |> assoc_constraint(:parent)
     |> check_constraint(:kind,
       name: :phoenix_kit_location_spaces_kind_check,
-      message: "must be one of: #{Enum.join(@kinds, ", ")}"
+      message: gettext("must be one of: %{values}", values: Enum.join(@kinds, ", "))
     )
     |> check_constraint(:status,
       name: :phoenix_kit_location_spaces_status_check,
-      message: "must be one of: #{Enum.join(@statuses, ", ")}"
+      message: gettext("must be one of: %{values}", values: Enum.join(@statuses, ", "))
     )
   end
 
@@ -115,7 +115,7 @@ defmodule PhoenixKitLocations.Schemas.Space do
     case {get_field(changeset, :uuid), get_change(changeset, :parent_uuid)} do
       {nil, _} -> changeset
       {_, nil} -> changeset
-      {uuid, uuid} -> add_error(changeset, :parent_uuid, "cannot be its own parent")
+      {uuid, uuid} -> add_error(changeset, :parent_uuid, gettext("cannot be its own parent"))
       _ -> changeset
     end
   end

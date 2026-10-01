@@ -177,6 +177,10 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
     {:noreply, assign_space_form(socket, changeset)}
   end
 
+  # Nothing selected (a forged or late event): nothing to update.
+  def handle_event("update_space_form", _params, %{assigns: %{selected_space: nil}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("update_space_form", %{"space" => params}, socket) do
     params =
       merge_translatable_params(params, socket, @space_translatable_fields,
@@ -377,6 +381,14 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
   def handle_info({:media_selector_closed}, socket),
     do: {:noreply, Attachments.close_media_selector(socket)}
+
+  # Anything else (a future broadcast, a component fall-through) is ignored:
+  # without this, a stray message crashes the page and the reconnect wipes
+  # the open space form.
+  def handle_info(msg, socket) do
+    Logger.debug("[LocationStructureLive] ignoring unrelated message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
 
   @impl true
   def render(assigns) do

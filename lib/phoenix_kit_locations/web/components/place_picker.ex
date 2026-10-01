@@ -219,7 +219,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   end
 
   def handle_event("select_space", %{"uuid" => uuid}, socket) do
-    if space_in_tree?(socket.assigns.tree, uuid) do
+    if selectable_space?(socket.assigns.tree, uuid) do
       {:noreply, send_selection(socket, uuid)}
     else
       {:noreply, socket}
@@ -296,10 +296,21 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   # Selection messaging
   # ─────────────────────────────────────────────────────────────────
 
-  # Returns true when `uuid` is found anywhere in the nested tree list.
-  # The tree is already scoped to `selected_location`, so any UUID found
-  # here belongs to the current location — guards `select_space` against
-  # stale / forged event payloads.
+  # True when `uuid` is an ACTIVE space anywhere in the nested tree. The
+  # tree is already scoped to `selected_location`, so a space found here
+  # belongs to the current location — guards `select_space` against stale /
+  # forged event payloads; the status check is the same rule
+  # `selectable_location` applies one level up (the tree lists every
+  # status).
+  defp selectable_space?([], _uuid), do: false
+  defp selectable_space?([%{uuid: uuid} = node | _], uuid), do: node.status == "active"
+
+  defp selectable_space?([node | rest], uuid) do
+    selectable_space?(node.children, uuid) or selectable_space?(rest, uuid)
+  end
+
+  # Whether `uuid` is anywhere in the tree, whatever its status (keeps an
+  # existing selection across a tree refresh).
   defp space_in_tree?([], _uuid), do: false
   defp space_in_tree?([%{uuid: uuid} | _], uuid), do: true
 

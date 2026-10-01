@@ -53,7 +53,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
   # Feature keys are paired with a translatable label at render time via
   # `feature_label/1` — keeping the call site literal is what lets
-  # `mix gettext.extract` (run in core) pick these up.
+  # `mix gettext.extract` (run in this repo) pick these up.
   @feature_keys ~w(
     wheelchair_accessible
     elevator
@@ -828,7 +828,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   # Translatable feature labels. Each literal string is picked up by
-  # `mix gettext.extract` (run in core). Falls back to the raw key so
+  # `mix gettext.extract` (run in this repo). Falls back to the raw key so
   # unknown feature keys render *something* instead of crashing.
   defp feature_label("wheelchair_accessible"), do: gettext("Wheelchair Accessible")
   defp feature_label("elevator"), do: gettext("Elevator")

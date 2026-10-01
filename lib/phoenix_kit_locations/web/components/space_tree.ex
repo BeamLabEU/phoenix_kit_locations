@@ -251,6 +251,7 @@ defmodule PhoenixKitLocations.Web.Components.SpaceTree do
             :if={!@is_first}
             type="button"
             phx-click="move_space_up"
+            phx-disable-with="…"
             phx-target={@myself}
             phx-value-uuid={@node.uuid}
             class="btn btn-ghost btn-xs p-0 min-h-0 h-5 w-5"
@@ -262,6 +263,7 @@ defmodule PhoenixKitLocations.Web.Components.SpaceTree do
             :if={!@is_last}
             type="button"
             phx-click="move_space_down"
+            phx-disable-with="…"
             phx-target={@myself}
             phx-value-uuid={@node.uuid}
             class="btn btn-ghost btn-xs p-0 min-h-0 h-5 w-5"

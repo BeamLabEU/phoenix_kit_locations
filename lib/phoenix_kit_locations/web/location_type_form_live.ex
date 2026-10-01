@@ -118,6 +118,16 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
   end
 
   def handle_event("save", %{"location_type" => params}, socket) do
+    # Re-read the LIVE scope: a role revoked after mount must not still
+    # create or edit site-wide types.
+    if Policy.manage_all?(socket.assigns[:phoenix_kit_current_scope]) do
+      do_save(socket, params)
+    else
+      {:noreply, put_flash(socket, :error, Errors.message(:not_allowed))}
+    end
+  end
+
+  defp do_save(socket, params) do
     params =
       merge_translatable_params(params, socket, @translatable_fields,
         changeset: socket.assigns.changeset,

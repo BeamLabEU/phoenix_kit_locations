@@ -664,4 +664,18 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
       assert rendered =~ "Lang Test"
     end
   end
+
+  describe "robustness" do
+    test "a stray message and a space-form event with nothing selected leave the page alive",
+         %{conn: conn} do
+      location = fixture_location(%{name: "Robust #{System.unique_integer([:positive])}"})
+      {:ok, view, _html} = live(conn, structure_path(location))
+
+      send(view.pid, :some_unrelated_message)
+      render_change(view, "update_space_form", %{"space" => %{"name" => "Ghost"}})
+
+      assert Process.alive?(view.pid)
+      assert render(view) =~ location.name
+    end
+  end
 end
