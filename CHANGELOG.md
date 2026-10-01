@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.1 - 2026-10-01
+
+### Changed
+
+- Every page now uses core's components (form sections, buttons, empty states,
+  status badges, checkboxes, the search picker), and every module file uses the
+  module's own gettext backend, with the catalogue translated for en, et and ru.
+- The feature checkboxes on the location form are real form fields.
+- The create buttons sit in the table toolbar instead of the admin header, and an
+  empty list offers "Create your first ..." (or "Clear filter" when a filter
+  emptied it). Requires `phoenix_kit >= 2.41.1 and < 3.0.0`.
+
+### Fixed
+
+- `PlacePicker` re-applies its active, type and owner filters to a client-sent
+  location uuid and refuses an inactive space.
+- Saving a location type re-reads the live scope, so a revoked role cannot still
+  create or edit types.
+- The Structure page's Kind select no longer goes blank when the add form opens,
+  and a stray message no longer crashes the page.
+- The Sites tab applies the project hub's locale.
+- The new-location and new-type buttons no longer crash the Locations and Types
+  lists on a published `phoenix_kit`: they use the toolbar slot that releases
+  carry, not one that exists only in unreleased core.
+
 ## 0.6.0 - 2026-09-26
 
 ### Changed
