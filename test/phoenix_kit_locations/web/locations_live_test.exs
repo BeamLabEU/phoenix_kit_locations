@@ -33,13 +33,16 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
              )
     end
 
-    test "New Location is the toolbar's last control, after the view toggle", %{conn: conn} do
+    # Core's published `table_default` has no `:toolbar_primary` slot (it is
+    # unreleased): passing one crashes the render, so the button rides the
+    # `:toolbar_actions` slot, in the toolbar row above the table.
+    test "New Location sits in the toolbar row, above the table", %{conn: conn} do
       fixture_location(%{name: "Somewhere"})
       {:ok, _view, html} = live(conn, "/en/admin/locations/")
 
-      {toggle, _} = :binary.match(html, ~s(data-view-action="table"))
       {button, _} = :binary.match(html, ~s(aria-label="New Location"))
-      assert toggle < button
+      {table, _} = :binary.match(html, "data-table-view")
+      assert button < table
     end
 
     test "an empty list offers the first location", %{conn: conn} do

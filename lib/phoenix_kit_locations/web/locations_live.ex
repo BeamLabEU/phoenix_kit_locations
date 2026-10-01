@@ -309,7 +309,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         <:toolbar_title>
           <.owner_filter :if={@manage_all} active={@owner_filter} />
         </:toolbar_title>
-        <:toolbar_primary>
+        <:toolbar_actions>
           <.button
             size="sm"
             navigate={Paths.location_new()}
@@ -319,7 +319,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             <.icon name="hero-plus" class="h-4 w-4" />
             <span class="hidden sm:inline">{gettext("New Location")}</span>
           </.button>
-        </:toolbar_primary>
+        </:toolbar_actions>
         <:above_cards :if={@locations == []}>
           <.locations_empty owner_filter={@owner_filter} />
         </:above_cards>
@@ -395,7 +395,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           %{label: gettext("Status"), value: status_label(t.status)}
         ] end}
       >
-        <:toolbar_primary>
+        <:toolbar_actions>
           <.button
             size="sm"
             navigate={Paths.type_new()}
@@ -405,7 +405,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             <.icon name="hero-plus" class="h-4 w-4" />
             <span class="hidden sm:inline">{gettext("New Type")}</span>
           </.button>
-        </:toolbar_primary>
+        </:toolbar_actions>
         <:above_cards :if={@location_types == []}>
           <.types_empty />
         </:above_cards>
