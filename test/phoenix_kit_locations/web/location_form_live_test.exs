@@ -144,14 +144,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     end
   end
 
-  describe "feature toggling" do
-    test "toggle on then off cleanly persists empty features map", %{conn: conn} do
+  describe "feature checkboxes" do
+    test "are real form fields: checking then unchecking persists false", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/en/admin/locations/new")
 
-      # On
-      render_click(view, "toggle_feature", %{"key" => "wifi"})
-      # Off
-      render_click(view, "toggle_feature", %{"key" => "wifi"})
+      html =
+        view
+        |> form("#location-form", location: %{"features" => %{"wifi" => "true"}})
+        |> render_change()
+
+      assert html =~ ~r/id="location-feature-wifi"[^>]*checked/
+
+      view
+      |> form("#location-form", location: %{"features" => %{"wifi" => "false"}})
+      |> render_change()
 
       {:error, {:live_redirect, _}} =
         view
@@ -159,25 +165,52 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
         |> render_submit()
 
       location = Locations.get_location_by(:name, "ToggledTwice")
-      # After toggle on + off, the key is present but false
       assert Map.get(location.features, "wifi") in [false, nil]
     end
 
-    test "persists features through save", %{conn: conn} do
+    test "persist through save, and an unknown key is ignored", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/en/admin/locations/new")
-
-      render_click(view, "toggle_feature", %{"key" => "parking"})
-      render_click(view, "toggle_feature", %{"key" => "wifi"})
 
       {:error, {:live_redirect, _}} =
         view
-        |> form("#location-form", location: %{"name" => "Feature HQ"})
-        |> render_submit()
+        |> form("#location-form",
+          location: %{
+            "name" => "Feature HQ",
+            "features" => %{"parking" => "true", "wifi" => "true"}
+          }
+        )
+        |> render_submit(%{"location" => %{"features" => %{"bogus" => "true"}}})
 
       location = Locations.get_location_by(:name, "Feature HQ")
       assert location.features["parking"] == true
       assert location.features["wifi"] == true
       assert Map.get(location.features, "cctv", false) == false
+      refute Map.has_key?(location.features, "bogus")
+    end
+  end
+
+  describe "stored feature values" do
+    # A features map written as strings (an import, an older client) must
+    # render checked and survive a save that doesn't touch it.
+    test "a stored \"true\" string renders checked and stays on after a save",
+         %{conn: conn} do
+      location = fixture_location(%{name: "StringFeatures"})
+
+      {:ok, _} =
+        Locations.update_location(location, %{
+          "features" => %{"wifi" => "true", "cctv" => "false"}
+        })
+
+      {:ok, view, html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      assert html =~ ~r/id="location-feature-wifi"[^>]*checked/
+      refute html =~ ~r/id="location-feature-cctv"[^>]*checked/
+
+      {:error, {:live_redirect, _}} =
+        view |> form("#location-form", location: %{"name" => "StringFeatures"}) |> render_submit()
+
+      features = Locations.get_location(location.uuid).features
+      assert features["wifi"] == true
+      assert features["cctv"] == false
     end
   end
 

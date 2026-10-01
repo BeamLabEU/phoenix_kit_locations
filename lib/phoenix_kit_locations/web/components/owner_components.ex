@@ -4,15 +4,16 @@ defmodule PhoenixKitLocations.Web.Components.OwnerComponents do
   All / Global / Owned filter, owner labels, and the owner picker card.
 
   Pure presentation. The picker's events (`search_owner`, `pick_owner`,
-  `clear_owner`) are handled by the hosting LiveView. The picker renders its
-  own small search form, so it must sit outside `#location-form` (forms
-  cannot nest).
+  `clear_owner`) are handled by the hosting LiveView.
   """
 
   use Phoenix.Component
   use Gettext, backend: PhoenixKitLocations.Gettext
 
+  import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
+  import PhoenixKitWeb.Components.Core.FormSection, only: [form_section: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
+  import PhoenixKitWeb.Components.Core.SearchPicker, only: [search_picker: 1]
 
   alias PhoenixKitLocations.Paths
 
@@ -64,63 +65,73 @@ defmodule PhoenixKitLocations.Web.Components.OwnerComponents do
   end
 
   attr(:owner, :map, default: nil, doc: "`%{uuid: _, email: _}` or `nil`")
-  attr(:query, :string, default: "")
-  attr(:matches, :list, default: [])
 
-  @doc "Owner card for the admin location form. The chosen owner applies on save."
+  @doc """
+  Owner card for the admin location form. The chosen owner applies on save.
+
+  The search box is core's `<.search_picker>`: the hosting LiveView answers
+  `search_owner` with `push_event("owner_results", …)` and confirms a
+  `pick_owner` with `push_event("owner_staged", %{})`. Keep the card outside
+  `#location-form`, so typing a search never fires the form's `phx-change`.
+  """
   def owner_picker_card(assigns) do
     ~H"""
-    <div id="location-owner-card" class="card bg-base-100 shadow-lg mb-6">
-      <div class="card-body flex flex-col gap-3">
-        <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-          <.icon name="hero-user-circle" class="h-4 w-4" />
-          {gettext("Owner")}
-        </h2>
-        <p class="text-sm text-base-content/50 -mt-1">
-          {gettext("A location with an owner is private to that account; without one it is global. The change applies when you save.")}
-        </p>
+    <.form_section
+      id="location-owner-card"
+      title={gettext("Owner")}
+      icon="hero-user-circle"
+      class="mb-6"
+      body_class="gap-3"
+    >
+      <:subtitle>
+        {gettext("A location with an owner is private to that account; without one it is global. The change applies when you save.")}
+      </:subtitle>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <span :if={@owner} id="location-owner-current" class="badge badge-lg badge-primary gap-1">
-            <.icon name="hero-user" class="h-3.5 w-3.5" />
-            {@owner.email}
-          </span>
-          <button :if={@owner} type="button" phx-click="clear_owner" class="btn btn-ghost btn-xs">
-            {gettext("Remove owner")}
-          </button>
-          <span :if={!@owner} id="location-owner-current" class="badge badge-lg badge-ghost">
-            {gettext("No owner (global)")}
-          </span>
-        </div>
-
-        <form id="owner-search-form" phx-change="search_owner" phx-submit="search_owner">
-          <input
-            type="text"
-            name="owner_search"
-            value={@query}
-            placeholder={gettext("Search users by email or name…")}
-            phx-debounce="300"
-            autocomplete="off"
-            class="input input-sm w-full"
-          />
-        </form>
-
-        <ul :if={@matches != []} id="owner-matches" class="menu bg-base-200 rounded-box w-full">
-          <li :for={user <- @matches}>
-            <button type="button" phx-click="pick_owner" phx-value-uuid={user.uuid}>
-              {user.email}
-            </button>
-          </li>
-        </ul>
-
-        <p
-          :if={@matches == [] and String.length(String.trim(@query)) >= 2}
-          class="text-sm text-base-content/50"
-        >
-          {gettext("No users found.")}
-        </p>
+      <div class="flex flex-wrap items-center gap-2">
+        <span :if={@owner} id="location-owner-current" class="badge badge-lg badge-primary gap-1">
+          <.icon name="hero-user" class="h-3.5 w-3.5" />
+          {@owner.email}
+        </span>
+        <.button :if={@owner} type="button" variant="ghost" size="xs" phx-click="clear_owner">
+          {gettext("Remove owner")}
+        </.button>
+        <span :if={!@owner} id="location-owner-current" class="badge badge-lg badge-ghost">
+          {gettext("No owner (global)")}
+        </span>
       </div>
-    </div>
+
+      <.search_picker
+        id="owner-search"
+        dropdown_id="owner-dropdown"
+        search_event="search_owner"
+        results_event="owner_results"
+        pick_event="pick_owner"
+        staged_event="owner_staged"
+        placeholder={gettext("Search users by email or name…")}
+        class="input input-sm w-full"
+        searching_label={gettext("Searching…")}
+        more_label={gettext("Load more")}
+        loading_more_label={gettext("Loading…")}
+        no_matches_label={gettext("No users found.")}
+      />
+    </.form_section>
     """
+  end
+
+  @doc """
+  Rows for the owner picker's `owner_results` push: the user's email as the
+  label and their name, when they have one, underneath.
+  """
+  @spec owner_picker_rows([map()]) :: [map()]
+  def owner_picker_rows(users) do
+    Enum.map(users, fn user ->
+      name =
+        [Map.get(user, :first_name), Map.get(user, :last_name)]
+        |> Enum.reject(&(&1 in [nil, ""]))
+        |> Enum.join(" ")
+
+      %{kind: "user", uuid: to_string(user.uuid), label: user.email, icon: "hero-user"}
+      |> then(&if(name == "", do: &1, else: Map.put(&1, :sublabel, name)))
+    end)
   end
 end

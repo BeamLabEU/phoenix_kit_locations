@@ -16,12 +16,13 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
 
   ## Two halves
 
-    * **Location** — a search-combobox mirroring
-      `PhoenixKitCatalogue.Web.Components.ItemPicker`: type to filter,
-      click a result to select. Locations are typically few, so
+    * **Location** — core's `<.search_picker>`: its hook renders the
+      dropdown client-side and asks this component for rows
+      (`location_search` → a `"<id>:results"` push, one event name per
+      instance so two pickers on a page never fill each other's list);
+      a pick sends `select_location`. Locations are typically few, so
       filtering happens in Elixir over `Locations.list_locations/1`'s
-      full result rather than a dedicated search function (unlike
-      `Catalogue.search_items/2`).
+      full result rather than a dedicated search function.
     * **Space** — once a Location is picked, its tree
       (`Spaces.list_tree/1`) renders through `SpaceTree.space_tree/1`
       with `show_actions={false}` — the same read-only mode built for
@@ -79,10 +80,11 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   use Phoenix.LiveComponent
   use Gettext, backend: PhoenixKitLocations.Gettext
 
+  import PhoenixKitWeb.Components.Core.Button, only: [button: 1]
   import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
+  import PhoenixKitWeb.Components.Core.SearchPicker, only: [search_picker: 1]
   import PhoenixKitLocations.Web.Components.SpaceTree, only: [space_tree: 1]
 
-  alias Phoenix.LiveView.JS
   alias PhoenixKit.Utils.Multilang
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Schemas.Location
@@ -94,7 +96,6 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
      assign(socket,
        query: "",
        matches: [],
-       open: false,
        selected_location: nil,
        tree: [],
        expanded: MapSet.new(),
@@ -144,28 +145,22 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   # Events — Location search
   # ─────────────────────────────────────────────────────────────────
 
+  # The SearchPicker hook asks for rows — on focus with an empty query too,
+  # so the list is offered before any typing — and renders them itself.
   @impl true
-  def handle_event("location_query_change", %{"value" => value}, socket) do
-    {:noreply, socket |> assign(:query, value) |> assign(:open, true) |> run_search()}
-  end
+  def handle_event("location_search", %{"q" => query}, socket) when is_binary(query) do
+    socket = socket |> assign(:query, query) |> run_search()
 
-  def handle_event("open", _params, socket) do
-    socket =
-      if socket.assigns.matches == [] and socket.assigns.query == "" do
-        run_search(assign(socket, :open, true))
-      else
-        assign(socket, :open, true)
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("close", _params, socket) do
-    {:noreply, assign(socket, :open, false)}
+    {:noreply,
+     push_event(socket, results_event(socket.assigns.id), %{
+       q: query,
+       results: Enum.map(socket.assigns.matches, &location_row(&1, socket.assigns.locale)),
+       has_more: false
+     })}
   end
 
   def handle_event("select_location", %{"uuid" => uuid}, socket) do
-    case selectable_location(uuid, socket.assigns.owner_filter) do
+    case selectable_location(uuid, socket.assigns) do
       nil ->
         {:noreply, socket}
 
@@ -189,9 +184,9 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
          |> assign(:tree, tree)
          |> assign(:expanded, MapSet.new())
          |> assign(:selected_space_uuid, selected_space_uuid)
-         |> assign(:open, false)
          |> assign(:query, "")
-         |> assign(:matches, [])}
+         |> assign(:matches, [])
+         |> push_event(staged_event(socket.assigns.id), %{})}
     end
   end
 
@@ -203,8 +198,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
      |> assign(:expanded, MapSet.new())
      |> assign(:selected_space_uuid, nil)
      |> assign(:query, "")
-     |> assign(:matches, [])
-     |> assign(:open, false)}
+     |> assign(:matches, [])}
   end
 
   # ─────────────────────────────────────────────────────────────────
@@ -225,7 +219,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   end
 
   def handle_event("select_space", %{"uuid" => uuid}, socket) do
-    if space_in_tree?(socket.assigns.tree, uuid) do
+    if selectable_space?(socket.assigns.tree, uuid) do
       {:noreply, send_selection(socket, uuid)}
     else
       {:noreply, socket}
@@ -250,18 +244,27 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
     assign(socket, :matches, matches)
   end
 
-  # The event payload's uuid is client-supplied: resolve it and re-apply the
-  # owner filter, so a forged `select_location` can't reach a location the
-  # search would never have offered.
-  defp selectable_location(uuid, owner_filter) do
+  # The event payload's uuid is client-supplied: resolve it and re-apply
+  # every filter the search applies (active, the type, the owner), so a
+  # forged `select_location` can't reach a location the search would never
+  # have offered.
+  defp selectable_location(uuid, assigns) do
     with {:ok, _} <- Ecto.UUID.cast(uuid),
-         %Location{} = location <- Locations.get_location(uuid),
-         true <- owner_allowed?(location, owner_filter) do
+         %Location{status: "active"} = location <- Locations.get_location(uuid),
+         true <- type_allowed?(location, assigns.location_type_uuid),
+         true <- owner_allowed?(location, assigns.owner_filter) do
       location
     else
       _ -> nil
     end
   end
+
+  defp type_allowed?(_location, nil), do: true
+
+  defp type_allowed?(%Location{location_types: types}, type_uuid) when is_list(types),
+    do: Enum.any?(types, &(&1.uuid == type_uuid))
+
+  defp type_allowed?(_location, _type_uuid), do: false
 
   defp put_owner_opt(opts, :none), do: opts
   defp put_owner_opt(opts, {:only, owner_uuid}), do: Keyword.put(opts, :owner_uuid, owner_uuid)
@@ -293,10 +296,21 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   # Selection messaging
   # ─────────────────────────────────────────────────────────────────
 
-  # Returns true when `uuid` is found anywhere in the nested tree list.
-  # The tree is already scoped to `selected_location`, so any UUID found
-  # here belongs to the current location — guards `select_space` against
-  # stale / forged event payloads.
+  # True when `uuid` is an ACTIVE space anywhere in the nested tree. The
+  # tree is already scoped to `selected_location`, so a space found here
+  # belongs to the current location — guards `select_space` against stale /
+  # forged event payloads; the status check is the same rule
+  # `selectable_location` applies one level up (the tree lists every
+  # status).
+  defp selectable_space?([], _uuid), do: false
+  defp selectable_space?([%{uuid: uuid} = node | _], uuid), do: node.status == "active"
+
+  defp selectable_space?([node | rest], uuid) do
+    selectable_space?(node.children, uuid) or selectable_space?(rest, uuid)
+  end
+
+  # Whether `uuid` is anywhere in the tree, whatever its status (keeps an
+  # existing selection across a tree refresh).
   defp space_in_tree?([], _uuid), do: false
   defp space_in_tree?([%{uuid: uuid} | _], uuid), do: true
 
@@ -339,6 +353,25 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
     Map.get(translation, "_name") || Map.get(translation, "name") || name
   end
 
+  # Per-instance push names: `push_event` reaches every hook listening on a
+  # name, so a shared one would fill every picker on the page.
+  defp results_event(id), do: "#{id}:results"
+  defp staged_event(id), do: "#{id}:staged"
+
+  defp location_row(%Location{} = location, locale) do
+    row = %{
+      kind: "location",
+      uuid: location.uuid,
+      label: location_display_name(location, locale),
+      icon: "hero-map-pin"
+    }
+
+    case location_subtitle(location) do
+      "" -> row
+      subtitle -> Map.put(row, :sublabel, subtitle)
+    end
+  end
+
   defp location_subtitle(%Location{address_line_1: line1, city: city}) do
     [line1, city]
     |> Enum.reject(&(&1 in [nil, ""]))
@@ -352,33 +385,36 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="relative w-full" phx-click-away={JS.push("close", target: @myself)}>
+    <div id={@id} class="relative w-full">
       <div class="flex flex-col gap-2">
         <div :if={@selected_location} class="flex items-center justify-between gap-2">
           <span class="text-sm font-medium truncate flex items-center gap-1">
             <.icon name="hero-map-pin" class="w-4 h-4 shrink-0 text-base-content/50" />
             {location_display_name(@selected_location, @locale)}
           </span>
-          <button
+          <.button
             type="button"
+            variant="ghost"
+            size="xs"
             phx-click="clear_location"
             phx-target={@myself}
-            class="btn btn-ghost btn-xs"
           >
             {gettext("Change")}
-          </button>
+          </.button>
         </div>
 
-        <button
+        <.button
           :if={@selected_location}
           type="button"
+          variant="ghost"
+          size="sm"
+          class="justify-start"
           phx-click="select_location_only"
           phx-target={@myself}
-          class="btn btn-ghost btn-sm justify-start"
         >
           <.icon name="hero-check" class="w-4 h-4 mr-1" />
           {gettext("Use this location (no specific space)")}
-        </button>
+        </.button>
 
         <.space_tree
           :if={@selected_location}
@@ -389,58 +425,22 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
           show_actions={false}
         />
 
-        <input
+        <.search_picker
           :if={!@selected_location}
           id={"#{@id}-input"}
-          type="text"
-          role="combobox"
-          aria-expanded={to_string(@open)}
-          aria-controls={"#{@id}-listbox"}
-          aria-autocomplete="list"
-          autocomplete="off"
-          value={@query}
+          dropdown_id={"#{@id}-listbox"}
+          search_event="location_search"
+          results_event={results_event(@id)}
+          pick_event="select_location"
+          staged_event={staged_event(@id)}
+          search_on_focus
           placeholder={gettext("Search locations…")}
-          phx-target={@myself}
-          phx-change="location_query_change"
-          phx-debounce="300"
-          phx-focus="open"
           class="input input-sm w-full"
+          searching_label={gettext("Searching…")}
+          more_label={gettext("Load more")}
+          loading_more_label={gettext("Loading…")}
+          no_matches_label={gettext("No locations found")}
         />
-      </div>
-
-      <ul
-        :if={!@selected_location and @open and @matches != []}
-        id={"#{@id}-listbox"}
-        role="listbox"
-        class="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-base-100 border border-base-300 rounded-box shadow-lg"
-      >
-        <li
-          :for={location <- @matches}
-          role="option"
-          class="flex items-center justify-between px-3 py-2 cursor-pointer select-none hover:bg-base-200"
-          phx-click="select_location"
-          phx-value-uuid={location.uuid}
-          phx-target={@myself}
-        >
-          <div class="min-w-0 flex-1">
-            <div class="font-medium text-sm truncate">
-              {location_display_name(location, @locale)}
-            </div>
-            <div
-              :if={location_subtitle(location) != ""}
-              class="text-xs text-base-content/50 truncate"
-            >
-              {location_subtitle(location)}
-            </div>
-          </div>
-        </li>
-      </ul>
-
-      <div
-        :if={!@selected_location and @open and @matches == [] and @query != ""}
-        class="absolute z-50 mt-1 w-full bg-base-100 border border-base-300 rounded-box shadow-lg px-3 py-2 text-sm text-base-content/50"
-      >
-        {gettext("No locations found")}
       </div>
     </div>
     """

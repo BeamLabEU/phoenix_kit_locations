@@ -3,6 +3,7 @@ defmodule PhoenixKitLocations.Schemas.Location do
 
   use Ecto.Schema
   use PhoenixKit.SchemaPrefix
+  use Gettext, backend: PhoenixKitLocations.Gettext
   import Ecto.Changeset
 
   @type t :: %__MODULE__{}
@@ -112,9 +113,16 @@ defmodule PhoenixKitLocations.Schemas.Location do
 
   defp maybe_validate_email(changeset) do
     case get_field(changeset, :email) do
-      nil -> changeset
-      "" -> changeset
-      _ -> validate_format(changeset, :email, ~r/@/, message: "must be a valid email address")
+      nil ->
+        changeset
+
+      "" ->
+        changeset
+
+      _ ->
+        validate_format(changeset, :email, ~r/@/,
+          message: gettext("must be a valid email address")
+        )
     end
   end
 
@@ -128,7 +136,7 @@ defmodule PhoenixKitLocations.Schemas.Location do
 
       _ ->
         validate_format(changeset, :website, ~r/^https?:\/\//,
-          message: "must start with http:// or https://"
+          message: gettext("must start with http:// or https://")
         )
     end
   end

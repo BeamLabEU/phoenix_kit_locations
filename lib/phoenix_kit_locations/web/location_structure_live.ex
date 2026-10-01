@@ -32,9 +32,9 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
   require Logger
 
-  import PhoenixKitWeb.Components.LanguageSwitcher, only: [language_switcher: 1]
   import PhoenixKitWeb.Components.MultilangForm
-  import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]
+  import PhoenixKitWeb.Components.Core.FormActions, only: [form_actions: 1]
+  import PhoenixKitWeb.Components.Core.FormSection, only: [form_section: 1]
   import PhoenixKitWeb.Components.Core.Input
   import PhoenixKitWeb.Components.Core.Modal, only: [confirm_modal: 1]
   import PhoenixKitWeb.Components.Core.Select
@@ -177,6 +177,10 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
     {:noreply, assign_space_form(socket, changeset)}
   end
 
+  # Nothing selected (a forged or late event): nothing to update.
+  def handle_event("update_space_form", _params, %{assigns: %{selected_space: nil}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("update_space_form", %{"space" => params}, socket) do
     params =
       merge_translatable_params(params, socket, @space_translatable_fields,
@@ -248,7 +252,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
       |> Spaces.change_space(params)
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, :new_space_form, to_form(changeset, as: :space))}
+    {:noreply, assign(socket, :new_space_form, to_form(changeset, as: :space, id: "new_space"))}
   end
 
   def handle_event("create_space", %{"space" => params}, socket) do
@@ -272,7 +276,8 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
          |> assign_selected_space(space)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :new_space_form, to_form(changeset, as: :space))}
+        {:noreply,
+         assign(socket, :new_space_form, to_form(changeset, as: :space, id: "new_space"))}
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, Errors.message(reason))}
@@ -377,6 +382,14 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   def handle_info({:media_selector_closed}, socket),
     do: {:noreply, Attachments.close_media_selector(socket)}
 
+  # Anything else (a future broadcast, a component fall-through) is ignored:
+  # without this, a stray message crashes the page and the reconnect wipes
+  # the open space form.
+  def handle_info(msg, socket) do
+    Logger.debug("[LocationStructureLive] ignoring unrelated message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
+
   @impl true
   def render(assigns) do
     assigns =
@@ -420,13 +433,12 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
           </div>
         </div>
 
-        <div :if={@adding_parent_uuid} class="card bg-base-100 shadow-lg">
-          <div class="card-body gap-4">
-            <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-              <.icon name="hero-plus" class="w-4 h-4" />
-              {add_space_heading(@tree, @adding_parent_uuid)}
-            </h2>
-
+        <.form_section
+          :if={@adding_parent_uuid}
+          title={add_space_heading(@tree, @adding_parent_uuid)}
+          icon="hero-plus"
+          body_class="gap-4"
+        >
             <.form
               for={@new_space_form}
               id="new-space-form"
@@ -435,60 +447,58 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
               phx-submit="create_space"
               class="flex flex-col gap-4"
             >
+              <%!-- `select` has no wrapper_class: size it through a wrapping div. --%>
               <div class="flex flex-col sm:flex-row gap-4">
-                <.select
-                  field={@new_space_form[:kind]}
-                  label={gettext("Kind")}
-                  options={Enum.map(Space.kinds(), &{Space.kind_label(&1), &1})}
-                  class="sm:w-48"
-                />
+                <div class="sm:w-48 shrink-0">
+                  <.select
+                    field={@new_space_form[:kind]}
+                    label={gettext("Kind")}
+                    options={Enum.map(Space.kinds(), &{Space.kind_label(&1), &1})}
+                  />
+                </div>
                 <.input
                   field={@new_space_form[:name]}
                   type="text"
                   label={gettext("Name")}
                   required
-                  class="flex-1"
+                  wrapper_class="flex-1"
+                  phx-mounted={Phoenix.LiveView.JS.focus()}
                 />
               </div>
 
-              <div class="flex items-center gap-2">
-                <button type="submit" class="btn btn-primary btn-sm">
-                  {gettext("Add")}
-                </button>
-                <button type="button" phx-click="cancel_add_space" class="btn btn-ghost btn-sm">
-                  {gettext("Cancel")}
-                </button>
-              </div>
+              <.form_actions
+                cancel_click="cancel_add_space"
+                submit_label={gettext("Add")}
+                submitting_label={gettext("Adding...")}
+                submit_class="btn btn-primary btn-sm"
+              />
             </.form>
-          </div>
-        </div>
+        </.form_section>
 
         <%!-- Detail panel — appears once a tree node is selected. Full
              multilang edit form (kind/status/name/description/notes)
              plus the selected Space's own Files + Featured Image card,
              scoped by its uuid. --%>
-        <div :if={@selected_uuid} class="card bg-base-100 shadow-lg">
-          <div class="card-body gap-4">
-            <div class="flex flex-col gap-1">
-              <p class="text-xs text-base-content/50 truncate">
+        <.form_section
+          :if={@selected_uuid}
+          id="space-detail"
+          title={@selected_space.name}
+          icon={Space.kind_icon(@selected_space.kind)}
+          body_class="gap-4"
+        >
+            <:subtitle>
+              <span class="block truncate">
                 {breadcrumb(@location, @tree, @selected_uuid, @current_lang)}
-              </p>
-              <h2 class="text-base font-semibold text-base-content/80 flex items-center gap-2">
-                <.icon name={Space.kind_icon(@selected_space.kind)} class="w-4 h-4" />
-                {@selected_space.name}
-              </h2>
-            </div>
+              </span>
+            </:subtitle>
 
-            <.language_switcher
-              :if={@multilang_enabled and match?([_, _ | _], @language_tabs)}
-              languages={@language_tabs}
-              current_language={@current_lang}
-              on_click="switch_language"
-              show_flags={true}
-              show_primary={true}
-              primary_divider={true}
-              variant={:tabs}
-              size={:sm}
+            <%!-- The forms' language switch: skeletons swap in client-side at
+                 once, and the server's `switch_language` answer fills them. --%>
+            <.multilang_tabs
+              multilang_enabled={@multilang_enabled}
+              language_tabs={@language_tabs}
+              current_lang={@current_lang}
+              class=""
             />
 
             <.form
@@ -500,20 +510,28 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
               class="flex flex-col gap-4"
             >
               <div class="flex flex-col sm:flex-row gap-4">
-                <.select
-                  field={@space_form[:kind]}
-                  label={gettext("Kind")}
-                  options={Enum.map(Space.kinds(), &{Space.kind_label(&1), &1})}
-                  class="sm:w-48"
-                />
-                <.select
-                  field={@space_form[:status]}
-                  label={gettext("Status")}
-                  options={[{gettext("Active"), "active"}, {gettext("Inactive"), "inactive"}]}
-                  class="sm:w-48"
-                />
+                <div class="sm:w-48 shrink-0">
+                  <.select
+                    field={@space_form[:kind]}
+                    label={gettext("Kind")}
+                    options={Enum.map(Space.kinds(), &{Space.kind_label(&1), &1})}
+                  />
+                </div>
+                <div class="sm:w-48 shrink-0">
+                  <.select
+                    field={@space_form[:status]}
+                    label={gettext("Status")}
+                    options={[{gettext("Active"), "active"}, {gettext("Inactive"), "inactive"}]}
+                  />
+                </div>
               </div>
 
+              <.multilang_fields_wrapper
+                multilang_enabled={@multilang_enabled}
+                current_lang={@current_lang}
+                skeleton_class=""
+                fields_class="flex flex-col gap-4"
+              >
               <.translatable_field
                 field_name="name"
                 form_prefix="space"
@@ -541,6 +559,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
                 type="textarea"
                 class="w-full"
               />
+              </.multilang_fields_wrapper>
 
               <.textarea
                 :if={@manage_all}
@@ -566,6 +585,8 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
                 />
               </div>
 
+              <%!-- Hand-rolled rather than core's `form_actions`: Save is
+                   disabled while uploads are in flight, which it can't do. --%>
               <div class="flex justify-end pt-2">
                 <button
                   type="submit"
@@ -577,8 +598,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
                 </button>
               </div>
             </.form>
-          </div>
-        </div>
+        </.form_section>
       </div>
 
       <%!-- Delete confirmation — decision #5: hard delete cascades to the
@@ -640,7 +660,9 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
   defp uploads_in_flight?(assigns),
     do: match?(%{attachment_files: %{entries: [_ | _]}}, assigns[:uploads])
 
-  defp new_space_form, do: to_form(Spaces.change_space(%Space{}), as: :space)
+  # Its own id namespace: the detail panel's form is also `as: :space`, and
+  # shared ids (`space_kind`) blanked the panel's Kind select in the browser.
+  defp new_space_form, do: to_form(Spaces.change_space(%Space{}), as: :space, id: "new_space")
 
   # Warning copy for the delete-confirmation modal. `nil` (modal
   # closed) renders into `confirm_modal`'s `messages` assign anyway —

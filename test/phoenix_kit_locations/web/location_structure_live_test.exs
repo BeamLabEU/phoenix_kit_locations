@@ -215,6 +215,28 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
     end
   end
 
+  describe "add form beside the detail panel" do
+    # Both forms submit as `space[...]`; with one id namespace the add form's
+    # Kind select and the detail panel's shared the id `space_kind`, and the
+    # browser showed the detail panel's Kind empty once the add form opened.
+    test "their fields keep distinct ids", %{conn: conn} do
+      location = fixture_location()
+      floor = fixture_space(location.uuid, %{"kind" => "floor", "name" => "Floor 1"})
+
+      {:ok, view, _html} = live(conn, structure_path(location))
+      render_click(view, "select_space", %{"uuid" => floor.uuid})
+      html = render_click(view, "open_add_root", %{})
+
+      assert has_element?(view, ~s(#new-space-form select#new_space_kind[name="space[kind]"]))
+      # Opening the form puts the cursor in Name.
+      assert has_element?(view, "#new-space-form input#new_space_name[phx-mounted]")
+      assert has_element?(view, ~s(#space-detail-form select#space_kind[name="space[kind]"]))
+
+      ids = Regex.scan(~r/\sid="([^"]+)"/, html, capture: :all_but_first) |> List.flatten()
+      assert ids -- Enum.uniq(ids) == []
+    end
+  end
+
   describe "inline rename" do
     test "start_rename_space then rename_space persists the new name and logs activity",
          %{conn: conn} do
@@ -640,6 +662,20 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
       rendered = render_click(view, "switch_language", %{"lang" => "fr"})
       assert is_binary(rendered)
       assert rendered =~ "Lang Test"
+    end
+  end
+
+  describe "robustness" do
+    test "a stray message and a space-form event with nothing selected leave the page alive",
+         %{conn: conn} do
+      location = fixture_location(%{name: "Robust #{System.unique_integer([:positive])}"})
+      {:ok, view, _html} = live(conn, structure_path(location))
+
+      send(view.pid, :some_unrelated_message)
+      render_change(view, "update_space_form", %{"space" => %{"name" => "Ghost"}})
+
+      assert Process.alive?(view.pid)
+      assert render(view) =~ location.name
     end
   end
 end
