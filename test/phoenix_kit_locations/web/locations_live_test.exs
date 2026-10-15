@@ -14,6 +14,17 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       assert html =~ "Springfield"
     end
 
+    test "shows the country by name, and a dash when there is none", %{conn: conn} do
+      fixture_location(%{name: "Tallinn HQ", city: "Tallinn", country: "EE"})
+      fixture_location(%{name: "Nowhere HQ"})
+
+      {:ok, view, _html} = live(conn, "/admin/locations/")
+
+      assert has_element?(view, "th", "Country")
+      assert has_element?(view, "td", "Estonia")
+      refute render(view) =~ ">EE<"
+    end
+
     test "renders empty state when no locations exist", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/admin/locations/")
       assert html =~ "No locations yet."

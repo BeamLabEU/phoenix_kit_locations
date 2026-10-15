@@ -23,6 +23,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
 
   alias PhoenixKit.Users.Auth
   alias PhoenixKitLocations.Errors
+  alias PhoenixKitLocations.Geo
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
   alias PhoenixKitLocations.Policy
@@ -300,7 +301,8 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         variant="zebra" size="sm" toggleable={true}
         id="locations-list" items={@locations}
         card_fields={fn l -> [
-          %{label: gettext("Address"), value: l.address_line_1 || "—"}
+          %{label: gettext("Address"), value: l.address_line_1 || "—"},
+          %{label: gettext("Country"), value: Geo.country_name(l.country) || "—"}
         ] ++ owner_card_field(l, @manage_all, @owner_emails) ++ [
           %{label: gettext("Types"), value: type_names(l)},
           %{label: gettext("Status"), value: status_label(l.status)}
@@ -328,6 +330,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             <.table_default_header_cell>{gettext("Name")}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("Address")}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("City")}</.table_default_header_cell>
+            <.table_default_header_cell>{gettext("Country")}</.table_default_header_cell>
             <.table_default_header_cell :if={@manage_all}>{owner_column_title()}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("Type")}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("Status")}</.table_default_header_cell>
@@ -336,7 +339,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         </.table_default_header>
         <.table_default_body>
           <.table_default_row :if={@locations == []}>
-            <.table_default_cell colspan={if @manage_all, do: 7, else: 6}>
+            <.table_default_cell colspan={if @manage_all, do: 8, else: 7}>
               <.locations_empty owner_filter={@owner_filter} />
             </.table_default_cell>
           </.table_default_row>
@@ -348,6 +351,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
             </.table_default_cell>
             <.table_default_cell class="text-sm text-base-content/60">{location.address_line_1 || "—"}</.table_default_cell>
             <.table_default_cell class="text-sm text-base-content/60">{location.city || "—"}</.table_default_cell>
+            <.table_default_cell class="text-sm text-base-content/60">{Geo.country_name(location.country) || "—"}</.table_default_cell>
             <.table_default_cell :if={@manage_all} class="text-sm">
               <span class={if location.owner_uuid, do: "", else: "text-base-content/40"}>
                 {owner_text(location.owner_uuid, @owner_emails)}
