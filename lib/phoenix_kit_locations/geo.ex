@@ -203,9 +203,20 @@ defmodule PhoenixKitLocations.Geo do
   def cities_by_subdivision?(country_code), do: country_code in @city_subdivision_countries
 
   defp cities(country_code, subdivision) when is_binary(country_code) do
-    if cities_by_subdivision?(country_code) and is_binary(subdivision) and subdivision != "",
-      do: Cities.for_subdivision(country_code, subdivision),
-      else: Cities.for_country(country_code)
+    cond do
+      cities_by_subdivision?(country_code) and is_binary(subdivision) and subdivision != "" ->
+        Cities.for_subdivision(country_code, subdivision)
+
+      # Hundreds of places across the country; the state list narrows them.
+      cities_by_subdivision?(country_code) ->
+        Cities.for_country(country_code)
+
+      # `limit: :all` is everything the library has for the country: the ten
+      # largest places and the capital, plus any city it added by request
+      # (the default list leaves those out).
+      true ->
+        Cities.for_country(country_code, limit: :all)
+    end
   end
 
   defp cities(_country_code, _subdivision), do: []

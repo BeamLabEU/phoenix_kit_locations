@@ -65,6 +65,10 @@ defmodule PhoenixKitLocations.GeoTest do
       assert length(options) <= 11
     end
 
+    test "a city the library added beyond the ten largest is offered" do
+      assert {"Suwałki", "Suwałki"} in Geo.city_options("PL", nil, nil)
+    end
+
     test "the US and Canada list cities per state or province" do
       ny = Geo.city_options("US", "NY", nil)
       assert {"New York", "New York"} in ny
