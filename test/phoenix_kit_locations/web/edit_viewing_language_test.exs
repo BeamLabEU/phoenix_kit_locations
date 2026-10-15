@@ -24,8 +24,8 @@ defmodule PhoenixKitLocations.Web.EditViewingLanguageTest do
 
   test "viewed in French, the edit forms open on the French tab", ctx do
     for path <- [
-          "/en/admin/locations/#{ctx.location.uuid}/edit",
-          "/en/admin/locations/types/#{ctx.type.uuid}/edit"
+          "/admin/locations/#{ctx.location.uuid}/edit",
+          "/admin/locations/types/#{ctx.type.uuid}/edit"
         ] do
       {:ok, view, _html} = live(ctx.conn, path)
       assert open_lang(view) == "fr-FR", path
@@ -33,7 +33,7 @@ defmodule PhoenixKitLocations.Web.EditViewingLanguageTest do
   end
 
   test "viewed in French, a new record starts on the main tab", ctx do
-    for path <- ["/en/admin/locations/new", "/en/admin/locations/types/new"] do
+    for path <- ["/admin/locations/new", "/admin/locations/types/new"] do
       {:ok, view, _html} = live(ctx.conn, path)
       assert open_lang(view) == "en-US", path
     end

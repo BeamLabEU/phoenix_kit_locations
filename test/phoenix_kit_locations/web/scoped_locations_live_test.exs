@@ -65,7 +65,7 @@ defmodule PhoenixKitLocations.Web.ScopedLocationsLiveTest do
       owned_location(user, %{name: "My Depot"})
       fixture_location(%{name: "Global Depot"})
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/?owner=global")
+      {:ok, _view, html} = live(conn, "/admin/locations/?owner=global")
 
       assert html =~ "My Depot"
       refute html =~ "Global Depot"

@@ -6,9 +6,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
   describe "new form" do
     test "renders the New Location heading", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, html} = live(conn, "/admin/locations/new")
       # Title lives in the admin header as "Locations / New location".
-      assert has_element?(view, ~s(#header-section[href="/en/admin/locations"]), "Locations")
+      assert has_element?(view, ~s(#header-section[href="/admin/locations"]), "Locations")
       assert has_element?(view, "#header-title", "New location")
       refute html =~ "New Location"
       assert html =~ "Address"
@@ -23,14 +23,14 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       scope = fake_scope()
       conn = put_test_scope(conn, scope)
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       {:error, {:live_redirect, %{to: to}}} =
         view
         |> form("#location-form", location: %{"name" => "Fresh HQ", "city" => "Berlin"})
         |> render_submit()
 
-      assert to == "/en/admin/locations"
+      assert to == "/admin/locations"
       created = Locations.get_location_by(:name, "Fresh HQ")
       assert %{name: "Fresh HQ", city: "Berlin"} = created
 
@@ -41,7 +41,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     end
 
     test "submit with missing name shows validation error", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       rendered =
         view
@@ -52,7 +52,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     end
 
     test "invalid email produces field error on submit", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       rendered =
         view
@@ -69,7 +69,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     test "renders existing location values", %{conn: conn} do
       location = fixture_location(%{name: "Original", city: "Oldtown"})
 
-      {:ok, view, html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
       # "Locations / Original / Edit" — the location crumb is text, the list
       # being its only page.
@@ -83,7 +83,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     test "renders the Details/Structure tabs linking to the Structure page", %{conn: conn} do
       location = fixture_location(%{name: "Has Tabs"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
       assert has_element?(view, "a.tab-active", "Details")
 
@@ -100,7 +100,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       scope = fake_scope()
       conn = put_test_scope(conn, scope)
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
       {:error, {:live_redirect, %{to: to}}} =
         view
@@ -109,7 +109,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
         )
         |> render_submit()
 
-      assert to == "/en/admin/locations"
+      assert to == "/admin/locations"
       assert %{city: "Newcity"} = Locations.get_location(location.uuid)
 
       assert_activity_logged("location.updated",
@@ -120,9 +120,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
     test "edit with nonexistent UUID redirects to index with flash", %{conn: conn} do
       {:error, {:live_redirect, %{to: to, flash: flash}}} =
-        live(conn, "/en/admin/locations/#{Ecto.UUID.generate()}/edit")
+        live(conn, "/admin/locations/#{Ecto.UUID.generate()}/edit")
 
-      assert to == "/en/admin/locations"
+      assert to == "/admin/locations"
       assert flash["error"] =~ "Location not found"
     end
   end
@@ -130,7 +130,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
   describe "type toggling" do
     test "clicking a type badge toggles it", %{conn: conn} do
       fixture_location_type(%{name: "Showroom"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       # Toggle "Showroom" on
       type = Locations.get_location_type_by_name("Showroom")
@@ -146,7 +146,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
   describe "feature checkboxes" do
     test "are real form fields: checking then unchecking persists false", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       html =
         view
@@ -169,7 +169,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     end
 
     test "persist through save, and an unknown key is ignored", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       {:error, {:live_redirect, _}} =
         view
@@ -201,7 +201,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
           "features" => %{"wifi" => "true", "cctv" => "false"}
         })
 
-      {:ok, view, html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, html} = live(conn, "/admin/locations/#{location.uuid}/edit")
       assert html =~ ~r/id="location-feature-wifi"[^>]*checked/
       refute html =~ ~r/id="location-feature-cctv"[^>]*checked/
 
@@ -216,7 +216,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
   describe "status select binding" do
     test "save with status=inactive persists", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       {:error, {:live_redirect, _}} =
         view
@@ -230,7 +230,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
   describe "type toggling (state assertions)" do
     test "toggle on then off restores empty assignment set", %{conn: conn} do
       type = fixture_location_type(%{name: "TypeX"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       render_click(view, "toggle_type", %{"uuid" => type.uuid})
       render_click(view, "toggle_type", %{"uuid" => type.uuid})
@@ -247,7 +247,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
     test "toggle on + save persists the link", %{conn: conn} do
       type = fixture_location_type(%{name: "TypeOn"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       render_click(view, "toggle_type", %{"uuid" => type.uuid})
 
@@ -263,7 +263,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
   describe "inline validation errors" do
     test "validate event with bad email surfaces error inline (before save)", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       rendered =
         view
@@ -274,7 +274,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     end
 
     test "validate event with too-long name surfaces length error", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       rendered =
         view
@@ -289,7 +289,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     test "submit with blank name preserves user-typed city (changeset re-rendered)", %{
       conn: conn
     } do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       rendered =
         view
@@ -303,13 +303,13 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
   describe "phx-disable-with" do
     test "new-form submit button has phx-disable-with", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/en/admin/locations/new")
+      {:ok, _view, html} = live(conn, "/admin/locations/new")
       assert html =~ ~s(phx-disable-with="Creating...")
     end
 
     test "edit-form submit button has phx-disable-with", %{conn: conn} do
       location = fixture_location(%{name: "X"})
-      {:ok, _view, html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, _view, html} = live(conn, "/admin/locations/#{location.uuid}/edit")
       assert html =~ ~s(phx-disable-with="Saving...")
     end
   end
@@ -347,7 +347,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
           postal_code: "62701"
         })
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       seed_address(view, "123 Main St", "Springfield", "62701")
       rendered = blur_postal_code(view)
@@ -356,7 +356,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     end
 
     test "no warning when no match", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       seed_address(view, "999 Nowhere Rd", "Anywhere", "00000")
       rendered = blur_postal_code(view)
@@ -373,7 +373,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
           postal_code: "99"
         })
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       seed_address(view, "12 Oak St", "C", "99")
       warned = blur_postal_code(view)
@@ -397,7 +397,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
           postal_code: "55"
         })
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
       # On :edit the loaded record already populates the changeset's data —
       # no need to re-seed via render_change before blur.
@@ -414,7 +414,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
     # auto-reconnected, and remounted the form — wiping every typed field.
     test "blur on an address field does not crash the LV and preserves typed fields",
          %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       # User types a name and city, then blurs the address field. With the
       # old handler this triggered a FunctionClauseError → LV crash → reconnect.
@@ -438,7 +438,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
   describe "switch_language event" do
     test "switch_language event does not crash and rerenders", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       rendered = render_click(view, "switch_language", %{"lang" => "fr"})
 
@@ -453,7 +453,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       conn: conn
     } do
       location = fixture_location(%{name: "Original"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
       rendered =
         view
@@ -479,7 +479,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       # accepts the offered types.)
       location = fixture_location(%{name: "Stale"})
       type = fixture_location_type(%{name: "Soon Gone"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
       render_click(view, "toggle_type", %{"uuid" => type.uuid})
       {:ok, _} = Locations.delete_location_type(type)
@@ -488,7 +488,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
         view
         |> form("#location-form", location: %{"name" => "Stale"})
         |> render_submit()
-        |> follow_redirect(conn, "/en/admin/locations")
+        |> follow_redirect(conn, "/admin/locations")
 
       # Follow the live_redirect — the warning flash is replayed on
       # the index page via our flash-rendering test layout.
@@ -498,7 +498,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
   describe "handle_info catch-all" do
     test "ignores unrelated messages without crashing", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       send(view.pid, :unknown_msg_from_another_module)
       send(view.pid, {:something_we_dont_care_about, %{}})

@@ -13,6 +13,7 @@ defmodule PhoenixKitLocations.Web.LocationFormUploadTest do
   alias Ecto.Adapters.SQL
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Modules.Storage.File, as: StorageFile
+  alias PhoenixKit.Modules.Storage.Profiles
   alias PhoenixKitLocations.Test.Repo
 
   @buckets_cache :phoenix_kit_buckets_cache
@@ -20,8 +21,14 @@ defmodule PhoenixKitLocations.Web.LocationFormUploadTest do
   setup %{conn: conn} do
     :persistent_term.erase(@buckets_cache)
     # Stored files go to every enabled bucket; keep them all in this one.
-    for bucket <- Storage.list_enabled_buckets(),
-        do: {:ok, _} = Storage.update_bucket(bucket, %{enabled: false})
+    # Core refuses to disable a bucket a storage profile still lists, so take
+    # each out of the Default profile first.
+    default_profile = Profiles.default_profile()
+
+    for bucket <- Storage.list_enabled_buckets() do
+      :ok = Profiles.remove_bucket(default_profile, bucket.uuid)
+      {:ok, _} = Storage.update_bucket(bucket, %{enabled: false})
+    end
 
     n = System.unique_integer([:positive])
     root = Path.join(System.tmp_dir!(), "locations_upload_#{n}")
@@ -75,7 +82,7 @@ defmodule PhoenixKitLocations.Web.LocationFormUploadTest do
 
   test "the dropzone carries the bundled scope hook", %{conn: conn} do
     location = fixture_location()
-    {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+    {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
     assert has_element?(
              view,
@@ -85,7 +92,7 @@ defmodule PhoenixKitLocations.Web.LocationFormUploadTest do
 
   test "an upload lands in the location's folder, and a duplicate is reported", %{conn: conn} do
     location = fixture_location(%{name: "Upload HQ"})
-    {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+    {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
     html = upload(view, "../../plan.pdf", "plan #{location.uuid}")
 
@@ -107,7 +114,7 @@ defmodule PhoenixKitLocations.Web.LocationFormUploadTest do
 
   test "an upload that cannot be filed says so and leaves the list", %{conn: conn} do
     location = fixture_location()
-    {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+    {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
     # No file area was chosen (the scope hook never fired).
     file =

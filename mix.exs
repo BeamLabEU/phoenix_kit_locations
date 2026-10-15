@@ -62,13 +62,13 @@ defmodule PhoenixKitLocations.MixProject do
   # local checkout, export <APP>_PATH — e.g. PHOENIX_KIT_PATH=../phoenix_kit or
   # PHOENIX_KIT_AI_PATH=../phoenix_kit_ai. Unset or blank => the published pin,
   # so mix hex.publish is unaffected.
-  defp pk_dep(app, requirement, opts \\ []) do
+  defp pk_dep(app, requirement, opts) do
     env_var = String.upcase(Atom.to_string(app)) <> "_PATH"
 
     case System.get_env(env_var, "") |> String.trim() do
       "" when opts == [] -> {app, requirement}
       "" -> {app, requirement, opts}
-      path -> {app, [path: path, override: true] ++ opts}
+      path -> {app, [path: path, override: true] ++ Keyword.drop(opts, [:github, :branch])}
     end
   end
 
@@ -85,7 +85,16 @@ defmodule PhoenixKitLocations.MixProject do
       # long subsumed.) Patch-precise floor in the compound form, so the
       # ceiling stays open through every later 2.x minor (see
       # test/core_pin_conformance_test.exs).
-      pk_dep(:phoenix_kit, ">= 2.41.1 and < 3.0.0"),
+      # TEMPORARY: core `main` is ahead of Hex (beamlab_countries 2.x for the
+      # country/city dropdowns), so the dep comes from GitHub. The requirement
+      # stays as the floor; `override: true` keeps core's own pins from
+      # blocking resolution. Drop the options (back to the bare Hex pin)
+      # before any release: Hex rejects git deps.
+      pk_dep(:phoenix_kit, ">= 2.41.1 and < 3.0.0",
+        github: "BeamLabEU/phoenix_kit",
+        branch: "main",
+        override: true
+      ),
       {:phoenix_live_view, "~> 1.1"},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

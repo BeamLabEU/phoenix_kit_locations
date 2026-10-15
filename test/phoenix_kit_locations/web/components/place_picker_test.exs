@@ -21,7 +21,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerTest do
   alias PhoenixKitLocations.Spaces
 
   defp harness_path(opts \\ []) do
-    base = "/en/admin/locations/__test__/place-picker"
+    base = "/admin/locations/__test__/place-picker"
 
     params =
       opts

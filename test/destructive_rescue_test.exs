@@ -57,7 +57,7 @@ defmodule PhoenixKitLocations.DestructiveRescueTest do
       location =
         TestRepo.insert!(LocationSchema.changeset(%LocationSchema{}, %{name: "WillBeOrphaned"}))
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => location.uuid,
@@ -79,7 +79,7 @@ defmodule PhoenixKitLocations.DestructiveRescueTest do
 
       TestRepo.query!("DROP TABLE phoenix_kit_locations CASCADE")
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
 
       assert html =~ "Failed to load locations."
     end
@@ -89,7 +89,7 @@ defmodule PhoenixKitLocations.DestructiveRescueTest do
 
       TestRepo.query!("DROP TABLE phoenix_kit_location_types CASCADE")
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/types")
+      {:ok, _view, html} = live(conn, "/admin/locations/types")
 
       assert html =~ "Failed to load location types."
     end

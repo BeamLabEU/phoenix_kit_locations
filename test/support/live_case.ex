@@ -14,7 +14,7 @@ defmodule PhoenixKitLocations.LiveCase do
         use PhoenixKitLocations.LiveCase
 
         test "renders", %{conn: conn} do
-          {:ok, _view, html} = live(conn, "/en/admin/locations/new")
+          {:ok, _view, html} = live(conn, "/admin/locations/new")
           assert html =~ "New Location"
         end
       end
@@ -88,7 +88,7 @@ defmodule PhoenixKitLocations.LiveCase do
   ## Example
 
       conn = put_test_scope(conn, fake_scope())
-      {:ok, view, _} = live(conn, "/en/admin/locations/")
+      {:ok, view, _} = live(conn, "/admin/locations/")
   """
   def fake_scope(opts \\ []) do
     user_uuid = Keyword.get(opts, :user_uuid, Ecto.UUID.generate())

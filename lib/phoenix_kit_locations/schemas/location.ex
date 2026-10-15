@@ -6,6 +6,8 @@ defmodule PhoenixKitLocations.Schemas.Location do
   use Gettext, backend: PhoenixKitLocations.Gettext
   import Ecto.Changeset
 
+  alias PhoenixKitLocations.Geo
+
   @type t :: %__MODULE__{}
 
   @primary_key {:uuid, UUIDv7, autogenerate: true}
@@ -95,6 +97,7 @@ defmodule PhoenixKitLocations.Schemas.Location do
     |> validate_inclusion(:status, @statuses)
     |> maybe_validate_email()
     |> maybe_validate_website()
+    |> Geo.normalize_changeset()
   end
 
   @doc """

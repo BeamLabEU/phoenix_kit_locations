@@ -39,6 +39,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   alias PhoenixKit.Users.Auth
   alias PhoenixKitLocations.Attachments
   alias PhoenixKitLocations.Errors
+  alias PhoenixKitLocations.Geo
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
   alias PhoenixKitLocations.Policy
@@ -136,7 +137,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         {:not_found, params["uuid"]}
 
       location ->
-        {location, Locations.change_location(location), safe_linked_type_uuids(location)}
+        # A row saved before the country/state dropdowns holds typed text;
+        # the form opens on its codes, which the next save writes.
+        {location, Locations.change_location(location, Geo.legacy_fixes(location)),
+         safe_linked_type_uuids(location)}
     end
   end
 
@@ -181,7 +185,55 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   # (for core `<.input>` / `<.select>` / `<.textarea>` which want a
   # `Phoenix.HTML.FormField` via `@form[:field]`) in sync.
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
-    assign(socket, changeset: changeset, form: to_form(changeset, as: :location))
+    assign(socket,
+      changeset: changeset,
+      form: to_form(changeset, as: :location),
+      address: address_view(changeset)
+    )
+  end
+
+  # What the address block renders for the chosen country: its own labels, a
+  # dropdown where the library has data (states, cities), free text elsewhere.
+  # Until a country is picked, state and city stay plain text.
+  defp address_view(changeset) do
+    country = Geo.normalize_country(field(changeset, :country))
+    state = field(changeset, :state)
+    city = field(changeset, :city)
+    subdivisions? = country != nil and Geo.subdivisions?(country)
+    cities? = country != nil and Geo.cities?(country, state)
+
+    %{
+      country: country,
+      country_options: Geo.country_options(field(changeset, :country)),
+      subdivisions?: subdivisions?,
+      state_label:
+        if(subdivisions?, do: Geo.subdivision_label(country), else: gettext("State / Region")),
+      state_options: if(subdivisions?, do: Geo.subdivision_options(country, state), else: []),
+      cities?: cities?,
+      city_options: if(cities?, do: Geo.city_options(country, state, city), else: []),
+      postal_code_label: Geo.postal_code_label(country)
+    }
+  end
+
+  defp field(changeset, key), do: Ecto.Changeset.get_field(changeset, key) |> to_string()
+
+  # A different country invalidates the state and city picked for the previous
+  # one; in the US and Canada the city list belongs to the state, so a new
+  # state clears the city too.
+  defp reset_dependent_address_fields(params, changeset) do
+    country = Map.get(params, "country", field(changeset, :country))
+    state = Map.get(params, "state", field(changeset, :state))
+
+    cond do
+      country != field(changeset, :country) ->
+        Map.merge(params, %{"state" => "", "city" => ""})
+
+      state != field(changeset, :state) and Geo.cities_by_subdivision?(country) ->
+        Map.put(params, "city", "")
+
+      true ->
+        params
+    end
   end
 
   @impl true
@@ -197,7 +249,11 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       )
 
     features = put_features(socket.assigns.features, params)
-    params = Map.put(params, "features", features)
+
+    params =
+      params
+      |> Map.put("features", features)
+      |> reset_dependent_address_fields(socket.assigns.changeset)
 
     changeset =
       socket.assigns.location
@@ -244,7 +300,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         Ecto.Changeset.get_field(changeset, :city),
         Ecto.Changeset.get_field(changeset, :postal_code),
         exclude_uuid,
-        Policy.similar_address_opts(socket.assigns[:phoenix_kit_current_scope])
+        [country: Ecto.Changeset.get_field(changeset, :country)] ++
+          Policy.similar_address_opts(socket.assigns[:phoenix_kit_current_scope])
       )
 
     warning =
@@ -606,6 +663,15 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               <span>{@address_warning}</span>
             </div>
 
+            <%!-- Country leads: it decides the state and city lists and the
+                 labels below. Picking another one clears them (`validate`). --%>
+            <.select
+              field={@form[:country]}
+              label={gettext("Country")}
+              prompt={gettext("Select a country")}
+              options={@address.country_options}
+            />
+
             <.input
               field={@form[:address_line_1]}
               type="text"
@@ -620,23 +686,45 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
               placeholder={gettext("Apartment, suite, unit, building, floor")}
             />
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <.input field={@form[:city]} type="text" label={gettext("City")} />
-              <.input field={@form[:state]} type="text" label={gettext("State / Region")} />
-            </div>
-
             <%!-- `check_address` reads all 3 address fields off the
                  changeset; one blur on postal_code (the natural
                  "I'm done with the address" point) does the same job
                  as binding to all three. --%>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <.select
+                :if={@address.subdivisions?}
+                field={@form[:state]}
+                label={@address.state_label}
+                prompt={gettext("Select…")}
+                options={@address.state_options}
+              />
+              <.input
+                :if={not @address.subdivisions?}
+                field={@form[:state]}
+                type="text"
+                label={@address.state_label}
+              />
+
+              <div>
+                <.select
+                  :if={@address.cities?}
+                  field={@form[:city]}
+                  label={gettext("City")}
+                  prompt={gettext("Select…")}
+                  options={@address.city_options}
+                />
+                <.input :if={not @address.cities?} field={@form[:city]} type="text" label={gettext("City")} />
+                <p :if={@address.cities?} id="city-missing-hint" class="mt-1 text-xs text-base-content/60">
+                  {gettext("Don't see your city? Please contact the support team and we will add it.")}
+                </p>
+              </div>
+
               <.input
                 field={@form[:postal_code]}
                 type="text"
-                label={gettext("Postal Code")}
+                label={@address.postal_code_label}
                 phx-blur="check_address"
               />
-              <.input field={@form[:country]} type="text" label={gettext("Country")} />
             </div>
 
             <.section_header icon="hero-envelope" title={gettext("Contact")} />

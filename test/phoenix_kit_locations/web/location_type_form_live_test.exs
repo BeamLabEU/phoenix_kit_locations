@@ -5,10 +5,10 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
   describe "new form" do
     test "puts Locations / Types / New type in the admin header, not the body", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/new")
 
-      assert has_element?(view, ~s(#header-section[href="/en/admin/locations"]), "Locations")
-      assert has_element?(view, ~s(.header-crumb[href="/en/admin/locations/types"]), "Types")
+      assert has_element?(view, ~s(#header-section[href="/admin/locations"]), "Locations")
+      assert has_element?(view, ~s(.header-crumb[href="/admin/locations/types"]), "Types")
       assert has_element?(view, "#header-title", "New type")
       refute render(view) =~ "New Location Type"
     end
@@ -18,14 +18,14 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
       scope = fake_scope()
       conn = put_test_scope(conn, scope)
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/new")
 
       {:error, {:live_redirect, %{to: to}}} =
         view
         |> form("#location-type-form", location_type: %{"name" => "Warehouse"})
         |> render_submit()
 
-      assert to == "/en/admin/locations/types"
+      assert to == "/admin/locations/types"
       created = Locations.get_location_type_by_name("Warehouse")
       assert created
 
@@ -36,7 +36,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
     end
 
     test "submit with blank name shows validation error", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/new")
 
       rendered =
         view
@@ -51,10 +51,10 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
     test "renders existing type values", %{conn: conn} do
       type = fixture_location_type(%{name: "Original"})
 
-      {:ok, view, html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+      {:ok, view, html} = live(conn, "/admin/locations/types/#{type.uuid}/edit")
 
       # "Locations / Types / Original / Edit" — the type crumb is text.
-      assert has_element?(view, ~s(a.header-crumb[href="/en/admin/locations/types"]), "Types")
+      assert has_element?(view, ~s(a.header-crumb[href="/admin/locations/types"]), "Types")
       assert has_element?(view, "span.header-crumb", "Original")
       assert has_element?(view, "#header-title", "Edit")
       assert html =~ ~s(value="Original")
@@ -63,36 +63,36 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
     test "updating name persists the change", %{conn: conn} do
       type = fixture_location_type(%{name: "Original"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/#{type.uuid}/edit")
 
       {:error, {:live_redirect, %{to: to}}} =
         view
         |> form("#location-type-form", location_type: %{"name" => "Renamed"})
         |> render_submit()
 
-      assert to == "/en/admin/locations/types"
+      assert to == "/admin/locations/types"
       assert %{name: "Renamed"} = Locations.get_location_type(type.uuid)
     end
 
     test "edit with nonexistent UUID redirects with flash", %{conn: conn} do
       {:error, {:live_redirect, %{to: to, flash: flash}}} =
-        live(conn, "/en/admin/locations/types/#{Ecto.UUID.generate()}/edit")
+        live(conn, "/admin/locations/types/#{Ecto.UUID.generate()}/edit")
 
-      assert to == "/en/admin/locations/types"
+      assert to == "/admin/locations/types"
       assert flash["error"] =~ "Location type not found"
     end
 
     test "edit with malformed UUID redirects with flash", %{conn: conn} do
       {:error, {:live_redirect, %{to: to, flash: flash}}} =
-        live(conn, "/en/admin/locations/types/not-a-uuid/edit")
+        live(conn, "/admin/locations/types/not-a-uuid/edit")
 
-      assert to == "/en/admin/locations/types"
+      assert to == "/admin/locations/types"
       assert flash["error"] =~ "Location type not found"
     end
 
     test "saving a type deleted since mount redirects with a not-found error", %{conn: conn} do
       type = fixture_location_type(%{name: "Original"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/#{type.uuid}/edit")
       {:ok, _} = Locations.delete_location_type(type)
 
       result =
@@ -100,7 +100,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
         |> form("#location-type-form", location_type: %{"name" => "Renamed"})
         |> render_submit()
 
-      {:ok, _view, html} = follow_redirect(result, conn, "/en/admin/locations/types")
+      {:ok, _view, html} = follow_redirect(result, conn, "/admin/locations/types")
       assert html =~ "Location type not found"
       assert is_nil(Locations.get_location_type(type.uuid))
     end
@@ -108,7 +108,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
   describe "inline validation errors" do
     test "validate with blank name shows error before save", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/new")
 
       rendered =
         view
@@ -121,7 +121,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
   describe "status select binding" do
     test "save with status=inactive persists", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/new")
 
       {:error, {:live_redirect, _}} =
         view
@@ -136,20 +136,20 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
   describe "phx-disable-with" do
     test "new-form submit button has phx-disable-with", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, _view, html} = live(conn, "/admin/locations/types/new")
       assert html =~ ~s(phx-disable-with="Creating...")
     end
 
     test "edit-form submit button has phx-disable-with", %{conn: conn} do
       type = fixture_location_type(%{name: "X"})
-      {:ok, _view, html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+      {:ok, _view, html} = live(conn, "/admin/locations/types/#{type.uuid}/edit")
       assert html =~ ~s(phx-disable-with="Saving...")
     end
   end
 
   describe "switch_language event" do
     test "switch_language event does not crash and rerenders", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/new")
 
       rendered = render_click(view, "switch_language", %{"lang" => "fr"})
 
@@ -163,7 +163,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
       conn: conn
     } do
       type = fixture_location_type(%{name: "Original"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/#{type.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/#{type.uuid}/edit")
 
       rendered =
         view
@@ -177,7 +177,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLiveTest do
 
   describe "handle_info catch-all" do
     test "ignores unrelated messages without crashing", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/types/new")
 
       send(view.pid, :unknown_msg_from_another_module)
       send(view.pid, {:something_we_dont_care_about, %{}})

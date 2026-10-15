@@ -13,7 +13,7 @@ defmodule PhoenixKitLocations.Web.PlacePickerHarnessLive do
   assigns so tests can assert on it via `render/1`/`element/2`.
 
   Not part of any real admin page — routed only from the test router,
-  at `/en/admin/locations/__test__/place-picker`. Optionally accepts a
+  at `/admin/locations/__test__/place-picker`. Optionally accepts a
   `location_type_uuid` query param, forwarded straight to the picker's
   own `:location_type_uuid` attr, so tests can exercise the type
   filter without the harness needing any other state of its own.

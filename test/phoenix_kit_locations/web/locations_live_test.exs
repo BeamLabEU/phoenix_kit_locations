@@ -9,19 +9,19 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     test "renders the locations list", %{conn: conn} do
       fixture_location(%{name: "HQ", city: "Springfield"})
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
       assert html =~ "HQ"
       assert html =~ "Springfield"
     end
 
     test "renders empty state when no locations exist", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
       assert html =~ "No locations yet."
     end
 
     test "puts the title in the admin header and New Location in the table toolbar",
          %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
       assert has_element?(view, "#header-title", "Locations")
       refute has_element?(view, "#header-section")
       refute has_element?(view, "#header-action")
@@ -38,7 +38,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     # `:toolbar_actions` slot, in the toolbar row above the table.
     test "New Location sits in the toolbar row, above the table", %{conn: conn} do
       fixture_location(%{name: "Somewhere"})
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
 
       {button, _} = :binary.match(html, ~s(aria-label="New Location"))
       {table, _} = :binary.match(html, "data-table-view")
@@ -46,7 +46,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     end
 
     test "an empty list offers the first location", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       assert has_element?(
                view,
@@ -62,7 +62,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       fixture_location(%{name: "GlobalOnly"})
       conn = put_test_scope(conn, fake_scope())
 
-      {:ok, view, html} = live(conn, "/en/admin/locations/?owner=owned")
+      {:ok, view, html} = live(conn, "/admin/locations/?owner=owned")
 
       refute html =~ "GlobalOnly"
       assert html =~ "No locations match this filter."
@@ -77,7 +77,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     test "row menu links to the Structure page for the location", %{conn: conn} do
       location = fixture_location(%{name: "HasStructureLink"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       assert has_element?(
                view,
@@ -90,7 +90,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
   describe "types tab" do
     test "puts Locations / Types in the admin header and New Type in the table toolbar",
          %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types")
+      {:ok, view, _html} = live(conn, "/admin/locations/types")
       assert has_element?(view, ~s(#header-section[href="#{Paths.index()}"]), "Locations")
       assert has_element?(view, "#header-title", "Types")
       refute has_element?(view, "#header-action")
@@ -100,12 +100,12 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     test "renders the types list", %{conn: conn} do
       fixture_location_type(%{name: "Showroom"})
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/types")
+      {:ok, _view, html} = live(conn, "/admin/locations/types")
       assert html =~ "Showroom"
     end
 
     test "renders empty state when no types exist", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/en/admin/locations/types")
+      {:ok, view, html} = live(conn, "/admin/locations/types")
       assert html =~ "No location types yet."
 
       assert has_element?(
@@ -123,7 +123,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       scope = fake_scope()
       conn = put_test_scope(conn, scope)
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => location.uuid,
@@ -152,7 +152,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       scope = fake_scope()
       conn = put_test_scope(conn, scope)
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types")
+      {:ok, view, _html} = live(conn, "/admin/locations/types")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => type.uuid,
@@ -174,7 +174,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     test "cancel_delete clears the confirm state", %{conn: conn} do
       location = fixture_location(%{name: "Still here"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => location.uuid,
@@ -190,7 +190,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     test "delete of missing UUID flashes not-found and leaves other records alone", %{conn: conn} do
       surviving = fixture_location(%{name: "Present"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => Ecto.UUID.generate(),
@@ -207,7 +207,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     test "delete of missing type flashes not-found", %{conn: conn} do
       _surviving = fixture_location_type(%{name: "Stays"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types")
+      {:ok, view, _html} = live(conn, "/admin/locations/types")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => Ecto.UUID.generate(),
@@ -220,7 +220,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
     end
 
     test "delete event with unexpected type is a safe no-op", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       # confirm_delete stays nil; delete_location event with no prior
       # show_delete_confirm should simply clear state without crashing
@@ -233,7 +233,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
 
     test "cancel_delete clears confirm state and shows no flash", %{conn: conn} do
       location = fixture_location(%{name: "KeepMe"})
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => location.uuid,
@@ -256,7 +256,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       loc = fixture_location(%{name: "WithTypes"})
       {:ok, :synced} = Locations.sync_location_types(loc.uuid, [type_a.uuid, type_b.uuid])
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
 
       # The :for span clause that renders one badge per type.
       assert html =~ "Showroom"
@@ -280,7 +280,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       # test for the location-side, but for location_type — covers
       # the LocationsLive `handle_event("delete_location_type", _, _)`
       # `_ -> ...` branch.
-      {:ok, view, _html} = live(conn, "/en/admin/locations/types")
+      {:ok, view, _html} = live(conn, "/admin/locations/types")
 
       rendered = render_click(view, "delete_location_type", %{})
 
@@ -296,7 +296,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
       # in `actor_opts/1` (LocationsLive) when scope is unset.
       location = fixture_location(%{name: "AnonDelete"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       render_click(view, "show_delete_confirm", %{
         "uuid" => location.uuid,
@@ -312,7 +312,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
 
   describe "handle_info catch-all" do
     test "ignores unrelated messages without crashing", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       send(view.pid, :unknown_msg_from_another_module)
       send(view.pid, {:something_we_dont_care_about, %{}, %{}})
@@ -327,7 +327,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
   describe "translated status column" do
     test "renders translated Active label (not raw lowercase string)", %{conn: conn} do
       fixture_location(%{name: "StatusTest", status: "active"})
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
 
       # Raw `"active"` (lowercase) must not appear in the status badge —
       # only the translated, capitalised form.
@@ -336,7 +336,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
 
     test "renders translated Inactive label", %{conn: conn} do
       fixture_location(%{name: "InactiveOne", status: "inactive"})
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
 
       assert html =~ "Inactive"
     end
@@ -363,7 +363,7 @@ defmodule PhoenixKitLocations.Web.LocationsLiveTest do
         }
       ])
 
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
       assert html =~ "WeirdStatus"
       assert html =~ "pending"
     end

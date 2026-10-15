@@ -5,7 +5,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePickerOwnerTest do
 
   alias PhoenixKitLocations.Locations
 
-  @base "/en/admin/locations/__test__/place-picker"
+  @base "/admin/locations/__test__/place-picker"
 
   setup do
     owner = fixture_user()

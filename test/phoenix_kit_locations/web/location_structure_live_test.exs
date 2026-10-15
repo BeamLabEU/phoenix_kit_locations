@@ -20,7 +20,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
     |> Map.new(&{&1.uuid, &1.position})
   end
 
-  defp structure_path(location), do: "/en/admin/locations/#{location.uuid}/structure"
+  defp structure_path(location), do: "/admin/locations/#{location.uuid}/structure"
 
   describe "mount" do
     test "renders the tabs and the location's Space tree", %{conn: conn} do
@@ -59,9 +59,9 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
 
     test "mount with a nonexistent Location UUID redirects to index with flash", %{conn: conn} do
       {:error, {:live_redirect, %{to: to, flash: flash}}} =
-        live(conn, "/en/admin/locations/#{Ecto.UUID.generate()}/structure")
+        live(conn, "/admin/locations/#{Ecto.UUID.generate()}/structure")
 
-      assert to == "/en/admin/locations"
+      assert to == "/admin/locations"
       assert flash["error"] =~ "Location not found"
     end
   end

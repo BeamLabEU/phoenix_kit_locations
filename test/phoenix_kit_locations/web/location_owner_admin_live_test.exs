@@ -21,7 +21,7 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
     end
 
     test "shows the owner's email, and Global for unowned rows", %{conn: conn, owner: owner} do
-      {:ok, _view, html} = live(conn, "/en/admin/locations/")
+      {:ok, _view, html} = live(conn, "/admin/locations/")
 
       assert html =~ "Seller Warehouse"
       assert html =~ "Shared Showroom"
@@ -30,21 +30,21 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
     end
 
     test "?owner=global and ?owner=owned filter the list", %{conn: conn} do
-      {:ok, _view, global} = live(conn, "/en/admin/locations/?owner=global")
+      {:ok, _view, global} = live(conn, "/admin/locations/?owner=global")
       assert global =~ "Shared Showroom"
       refute global =~ "Seller Warehouse"
 
-      {:ok, _view, owned} = live(conn, "/en/admin/locations/?owner=owned")
+      {:ok, _view, owned} = live(conn, "/admin/locations/?owner=owned")
       assert owned =~ "Seller Warehouse"
       refute owned =~ "Shared Showroom"
     end
 
     test "the filter buttons patch the URL", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/")
+      {:ok, view, _html} = live(conn, "/admin/locations/")
 
       html = view |> element("#owner-filter-owned") |> render_click()
 
-      assert_patch(view, "/en/admin/locations?owner=owned")
+      assert_patch(view, "/admin/locations?owner=owned")
       refute html =~ "Shared Showroom"
     end
   end
@@ -74,7 +74,7 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
     end
 
     test "new: a picked owner is set on create", %{conn: conn, owner: owner} do
-      {:ok, view, html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, html} = live(conn, "/admin/locations/new")
       assert html =~ "No owner (global)"
 
       html = pick_owner(view, owner)
@@ -87,7 +87,7 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
     end
 
     test "new: without a pick the location is global", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       {:error, {:live_redirect, _}} =
         view |> form("#location-form", location: %{"name" => "Unpicked"}) |> render_submit()
@@ -97,7 +97,7 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
 
     test "pick_owner ignores a uuid that isn't in the search results",
          %{conn: conn, owner: owner} do
-      {:ok, view, _html} = live(conn, "/en/admin/locations/new")
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
 
       html = render_click(view, "pick_owner", %{"uuid" => owner.uuid})
 
@@ -109,7 +109,7 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
       new_owner = fixture_user()
       location = owned_location(owner, %{name: "Moving"})
 
-      {:ok, view, html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, html} = live(conn, "/admin/locations/#{location.uuid}/edit")
       assert html =~ owner.email
 
       pick_owner(view, new_owner)
@@ -129,7 +129,7 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
     test "edit: removing the owner makes the location global", %{conn: conn, owner: owner} do
       location = owned_location(owner, %{name: "Released"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
       html = view |> element("button", "Remove owner") |> render_click()
       assert html =~ "No owner (global)"
 
@@ -143,7 +143,7 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
          %{conn: conn, owner: owner} do
       location = owned_location(owner, %{name: "Untouched"})
 
-      {:ok, view, _html} = live(conn, "/en/admin/locations/#{location.uuid}/edit")
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
       {:error, {:live_redirect, _}} =
         view |> form("#location-form", location: %{"name" => "Untouched 2"}) |> render_submit()

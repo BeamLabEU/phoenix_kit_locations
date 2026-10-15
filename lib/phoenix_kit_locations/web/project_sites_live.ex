@@ -25,7 +25,7 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
 
   require Logger
 
-  alias PhoenixKitLocations.{Locations, Paths}
+  alias PhoenixKitLocations.{Geo, Locations, Paths}
 
   @impl true
   def mount(_params, session, socket) do
@@ -110,7 +110,7 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
             <div class="card-body py-4 gap-1">
               <h3 class="font-semibold text-sm">{location.name}</h3>
               <p class="text-xs opacity-70">
-                {[location.address_line_1, location.city, location.country]
+                {[location.address_line_1, location.city, Geo.country_name(location.country)]
                 |> Enum.reject(&(&1 in [nil, ""]))
                 |> Enum.join(", ")}
               </p>

@@ -42,6 +42,7 @@ defmodule PhoenixKitLocations.Locations do
 
   require Logger
 
+  alias PhoenixKitLocations.Geo
   alias PhoenixKitLocations.Schemas.{Location, LocationType, LocationTypeAssignment}
 
   @type opts :: keyword()
@@ -598,7 +599,8 @@ defmodule PhoenixKitLocations.Locations do
   # ═══════════════════════════════════════════════════════════════════
 
   @doc """
-  Finds locations with the same address_line_1, city, and postal_code.
+  Finds locations with the same address_line_1, city, and postal_code, and the
+  same country when one is given.
 
   Returns a list of matching locations, excluding the given `exclude_uuid`.
   Only checks if address_line_1 is non-empty. Returns `[]` on any error
@@ -609,13 +611,17 @@ defmodule PhoenixKitLocations.Locations do
     * `:owner_uuid` — same meaning as in `list_locations/1`; omitted checks
       every location. Tenant-facing pages pass the current user's uuid, so the
       warning can never name another owner's location.
+    * `:country` — a country code (or a legacy country name). A stored country
+      matches by code or name, and a stored location with no country counts as
+      a match, so rows saved before countries were chosen are still caught.
   """
   @spec find_similar_addresses(
           String.t() | nil,
           String.t() | nil,
           String.t() | nil,
           String.t() | nil,
-          owner_uuid: owner_filter()
+          owner_uuid: owner_filter(),
+          country: String.t() | nil
         ) :: [map()]
   def find_similar_addresses(address_line_1, city, postal_code, exclude_uuid \\ nil, opts \\ []) do
     address_line_1 = (address_line_1 || "") |> String.trim()
@@ -645,6 +651,7 @@ defmodule PhoenixKitLocations.Locations do
 
       query
       |> filter_owner(opts)
+      |> filter_country(Keyword.get(opts, :country))
       |> repo().all()
     end
   rescue
@@ -659,6 +666,21 @@ defmodule PhoenixKitLocations.Locations do
 
   # `Keyword.fetch/2`, not `Keyword.get/2`: an omitted option means "no
   # filter", while an explicit `nil` means "unowned only".
+  defp filter_country(query, country) do
+    case Geo.country_aliases(country) do
+      [] ->
+        query
+
+      aliases ->
+        where(
+          query,
+          [l],
+          fragment("LOWER(TRIM(COALESCE(?, ''))) = ANY(?)", l.country, ^aliases) or
+            fragment("TRIM(COALESCE(?, '')) = ''", l.country)
+        )
+    end
+  end
+
   defp filter_owner(query, opts) do
     case Keyword.fetch(opts, :owner_uuid) do
       :error ->

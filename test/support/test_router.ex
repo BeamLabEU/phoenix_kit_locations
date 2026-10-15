@@ -5,9 +5,9 @@ defmodule PhoenixKitLocations.Test.Router do
   work with exactly the same URLs the LiveViews push themselves to.
 
   `PhoenixKit.Utils.Routes.path/1` defaults to no URL prefix when the
-  phoenix_kit_settings table is unavailable, and admin paths always get
-  the default locale ("en") prefix — so our base becomes
-  `/en/admin/locations`.
+  phoenix_kit_settings table is unavailable, and emits no locale segment on
+  a single-language site (which the test environment is) — so our base is
+  `/admin/locations`.
   """
 
   use Phoenix.Router
@@ -22,7 +22,7 @@ defmodule PhoenixKitLocations.Test.Router do
     plug(:protect_from_forgery)
   end
 
-  scope "/en/admin/locations", PhoenixKitLocations.Web do
+  scope "/admin/locations", PhoenixKitLocations.Web do
     pipe_through(:browser)
 
     live_session :locations_test,
