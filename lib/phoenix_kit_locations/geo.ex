@@ -42,9 +42,24 @@ defmodule PhoenixKitLocations.Geo do
   `{label, code}` pairs for a country `<select>`. A stored value that is not a
   known code (a legacy free-text country) leads the list, so editing a row
   never silently blanks its country.
+
+  Core labels each country with its flag (`"🇪🇪 Estonia"`). A native select
+  jumps to an option by the first characters typed, so a flag in front stops
+  typing "Est" from finding anything; the labels here start with the name.
   """
   @spec country_options(String.t() | nil) :: [{String.t(), String.t()}]
-  def country_options(current), do: with_current(CountryData.countries_for_select(), current)
+  def country_options(current) do
+    CountryData.countries_for_select()
+    |> Enum.map(fn {label, code} -> {strip_flag(label), code} end)
+    |> with_current(current)
+  end
+
+  defp strip_flag(label) do
+    case String.replace(label, ~r/^[^\p{L}\p{N}]+/u, "") do
+      "" -> label
+      name -> name
+    end
+  end
 
   @doc """
   Display name of a stored country: the localized name for a known code, the
