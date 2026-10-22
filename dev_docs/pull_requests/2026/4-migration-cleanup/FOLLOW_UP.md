@@ -45,7 +45,7 @@ None — all reviewer findings actionable.
 
 ## Verification
 
-- `mix compile` clean (from `/www/app`) — `Generated phoenix_kit_locations app`
+- `mix compile` clean (from `<host-app>`) — `Generated phoenix_kit_locations app`
 - `mix format --check-formatted` clean (note: this surfaced unrelated
   pre-existing format drift in `location_form_live.ex` +
   `attachments.ex` resolved in commit `05471c4` before this batch)
