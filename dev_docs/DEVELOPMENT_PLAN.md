@@ -1,11 +1,11 @@
 # PhoenixKit Locations — план доработки (иерархия площадок)
 
-Дата: 2026-07-10. Статус: форк `timujinne/phoenix_kit_locations` (upstream `BeamLabEU/phoenix_kit_locations`) подключён в andi как path dep (Hex-строка `~> 0.2.0` закомментирована в mix.exs), v0.2.1. Связанные планы: `phoenix_kit_manufacturing/dev_docs/DEVELOPMENT_PLAN.md` (производство), `phoenix_kit_warehouse/dev_docs/DEVELOPMENT_PLAN.md` (склад).
+Дата: 2026-07-10. Статус: форк `timujinne/phoenix_kit_locations` (upstream `BeamLabEU/phoenix_kit_locations`) подключён в хост-приложении как path dep (Hex-строка `~> 0.2.0` закомментирована в mix.exs), v0.2.1. Связанные планы: `phoenix_kit_manufacturing/dev_docs/DEVELOPMENT_PLAN.md` (производство), `phoenix_kit_warehouse/dev_docs/DEVELOPMENT_PLAN.md` (склад).
 
 ## 0. Что уже есть в модуле
 
 - **Location** (`phoenix_kit_locations`) — плоская карточка площадки: адрес (междунар. формат), контакты, статус, `features` map, мультиязычный `data`. Иерархии на уровне Location нет.
-- **LocationType** (`phoenix_kit_location_types`) — пользовательские типы, many-to-many через `location_type_assignments`. В БД andi создан один тип: **Warehouse** («Physical warehouse / stock-keeping location»). Локации: Test, Main storage.
+- **LocationType** (`phoenix_kit_location_types`) — пользовательские типы, many-to-many через `location_type_assignments`. В БД хоста создан один тип: **Warehouse** («Physical warehouse / stock-keeping location»). Локации: Test, Main storage.
 - **Space** (`phoenix_kit_location_spaces`) — **готовое дерево вложенных зон внутри локации**: обязательный FK на Location + self-ref `parent_uuid` (произвольная глубина), `position` + `reorder_siblings/4`, статусы, мультиязычный `data`. App-слой пока разрешает kinds `floor | room`; CHECK в БД (миграция ядра V122) уже допускает `hall, suite, section, zone, aisle, shelf, corner`.
 - **Attachments** — файлы + заглавное изображение и у Location, и у каждого Space (folder_uuid/featured_image_uuid в `data`), мульти-ресурсный паттерн (несколько карточек файлов на одной странице).
 - LiveViews: список локаций, форма локации, форма типа. **UI для Spaces ещё нет** — только контекст `Spaces` (list_tree, CRUD, reorder).
@@ -63,7 +63,7 @@
 
 ## 6. Этапы
 
-1. **v0.3 — kinds + типы**: расширение `@kinds`, gettext, создание типов Workshop/Office в andi (данные, не код).
+1. **v0.3 — kinds + типы**: расширение `@kinds`, gettext, создание типов Workshop/Office в хосте (данные, не код).
 2. **v0.4 — UI дерева Spaces** во вкладке локации + файлы на Space.
 3. **v0.5 — пикер места + full_path API** — контракт для склада и производства.
 4. Дальше (по потребности): QR/штрихкод узла (для инвентаризации и адресного хранения), поля вместимости, права (view/manage locations).

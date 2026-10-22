@@ -25,7 +25,7 @@
 The pending-folder rename writes both the name and the parent. Also included:
 a CHANGELOG `Unreleased` entry and a 4-test file.
 
-The only real host is `tim-dev-manager-andi` (`Andi.Media.Containers` /
+The only real host is the consuming application (its media-containers module /
 `LocationTree`). It names folders after the sanitized resource name and adds
 `" (n)"` for twins. Every location sits under one shared `Locations`
 container, and each space sits under its parent's folder.
@@ -55,7 +55,7 @@ account's location. That is the first finding.
 ### BUG - HIGH — a same-named location adopted another location's folder
 
 Without a stored pointer, `find_resource_folder/2` matched a folder by the
-host name alone. Host names carry no uuid. With Andi's hook, two locations
+host name alone. Host names carry no uuid. With the host's hook, two locations
 called "Warehouse", owned by different users or organizations, both map to
 `Locations/Warehouse`.
 
@@ -78,12 +78,12 @@ prepare the files folder".
 - A folder found by host name is adopted only when no *other* Location or
   Space has it in `data->>'files_folder_uuid'`. The check fails closed if the
   query errors. The two deterministic lookups carry the uuid and need no check.
-- An unsaved (`:pending`) resource never adopts a folder. Andi names an
+- An unsaved (`:pending`) resource never adopts a folder. The host names an
   unnamed one `"untitled"`.
 - When core rejects the host name on `:name` (taken, or invalid such as over
   255 characters), create and rename retry once with the deterministic
   `location-<uuid>` name, which cannot collide. The host can rename it later
-  (Andi's `reconcile` adds `" (n)"`).
+  (the host's `reconcile` adds `" (n)"`).
 
 **Tests:**
 
@@ -148,7 +148,7 @@ bug. It now creates the folder under the parent, as `ensure_folder/2` does.
 
 `parent_folder_uuid/2` and `folder_name/2` called `apply/3` with no guard.
 If a hook raised, the LiveView crashed from `handle_progress/3` mid-upload
-or from opening the picker. Examples: Andi's `LocationTree.expected_parent/2`
+or from opening the picker. Examples: the host's `LocationTree.expected_parent/2`
 does `Repo.get!`, a host DB error, or a mistyped hook. Before the
 rename fix, the same call also ran after `create_location` had committed.
 AGENTS.md's convention is that host and DB problems degrade instead of crashing.
