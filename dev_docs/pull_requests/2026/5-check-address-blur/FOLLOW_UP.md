@@ -38,7 +38,7 @@ Triaged 2026-05-28.
 
 ## Verification
 
-- `mix compile` clean (from `/www/app`) — `Generated phoenix_kit_locations app`
+- `mix compile` clean (from `<host-app>`) — `Generated phoenix_kit_locations app`
 - Mechanical change: handler signature + test names; no DB or
   runtime-logic changes. The regression test from PR #5 (lines 357-378
   in `location_form_live_test.exs`) still seeds + blurs + asserts

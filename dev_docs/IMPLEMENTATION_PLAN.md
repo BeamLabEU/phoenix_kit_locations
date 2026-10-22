@@ -25,7 +25,7 @@
 - `PhoenixKitLocations.Attachments` (`lib/phoenix_kit_locations/attachments.ex`) — multi-scope файлы/featured image, уже поддерживает `%Space{}` в `folder_name_for/1`. Работает без изменений.
 - Модуль **не имеет собственного gettext backend** — `use Gettext, backend: PhoenixKitWeb.Gettext` (core). Core — Hex-зависимость, править `.po` там нельзя (INERT). Прецедент решения уже есть в двух соседних path-dep модулях: `PhoenixKitManufacturing.Gettext` (`phoenix_kit_manufacturing/lib/phoenix_kit_manufacturing/gettext.ex`) и `PhoenixKitWarehouse.Gettext` — тонкий `use Gettext.Backend, otp_app: :app_name`, локали `en/et/ru` (`priv/gettext/{en,et,ru}/LC_MESSAGES/default.po` + `default.pot`).
 - `PhoenixKitWarehouse.Web.Components.WarehouseHeader` (`phoenix_kit_warehouse/lib/phoenix_kit_warehouse/web/components/warehouse_header.ex`) — прецедент "общий tab-header между несколькими LiveView одной сущности": `role="tablist"` + `<.link navigate>` + daisyUI `tabs tabs-border` / `tab-active`. Это модель для новой вкладки "Structure" (два разных route/LiveView, примечание 2026-08-22: `<.nav_tabs>` умеет и `navigate` (и всегда умел), так что `LocationTabs` теперь рендерится через него — обёртка осталась только ради локального API).
-- `PhoenixKitWeb.Components.FolderExplorer` (`/www/app/deps/phoenix_kit/lib/phoenix_kit_web/components/folder_explorer.ex`) — модель рекурсивного узла дерева: MapSet-based expand state, `on_navigate`/`on_toggle`/`show_rename`/`enable_drag` как настраиваемые атрибуты (уже используется в двух режимах — сайдбар и move-picker в MediaBrowser). Это прямой прототип для `space_tree_node/1`.
+- `PhoenixKitWeb.Components.FolderExplorer` (`<host-app>/deps/phoenix_kit/lib/phoenix_kit_web/components/folder_explorer.ex`) — модель рекурсивного узла дерева: MapSet-based expand state, `on_navigate`/`on_toggle`/`show_rename`/`enable_drag` как настраиваемые атрибуты (уже используется в двух режимах — сайдбар и move-picker в MediaBrowser). Это прямой прототип для `space_tree_node/1`.
 - `PhoenixKitCatalogue.Web.Components.ItemPicker` (`phoenix_kit_catalogue/lib/phoenix_kit_catalogue/web/components/item_picker.ex`) — прецедент self-contained search-combobox LiveComponent с сообщением `{:item_picker_select, id, item}`, N экземпляров на странице по `id`. Тестируется через реальный host LiveView (`test/web/item_picker_events_test.exs`), не изолированно.
 - `PhoenixKitCatalogue.Catalogue.Tree` (`phoenix_kit_catalogue/lib/phoenix_kit_catalogue/catalogue/tree.ex`) — `ancestor_uuids/1` + `ancestors_in_order/1`: рекурсивный CTE (`UNION`, не `UNION ALL` — cycle-safe) + `walk_up/3`. Прямой шаблон для `Spaces.full_path/2`.
 - `Locations.list_locations/1` уже принимает `type_uuid:`, `Locations.get_location_type_by_name/1` уже существует — связка "тип по имени → locations по type_uuid" из §5 DEVELOPMENT_PLAN **уже реализована**, новый код не нужен.
@@ -41,7 +41,7 @@
 
 ## Общее по проверке
 
-`phoenix_kit_locations` — path dep в `/www/app` (`{:phoenix_kit_locations, path: "../phoenix_kit_locations", override: true}`). Любое изменение файла в этом репо не хот-релоадится в andi — после каждого блока задач, который нужно увидеть живьём в UI andi, требуется `sudo /usr/bin/supervisorctl restart elixir` (для admin_tabs — обязательно, boot-time discovery). Внутри самого `phoenix_kit_locations` для быстрой проверки логики используем `mix test` / `mix compile --warnings-as-errors` / `mix format` — эти команды не требуют andi вообще.
+`phoenix_kit_locations` — path dep в `<host-app>` (`{:phoenix_kit_locations, path: "../phoenix_kit_locations", override: true}`). Любое изменение файла в этом репо не хот-релоадится в хосте — после каждого блока задач, который нужно увидеть живьём в UI хоста, требуется `sudo /usr/bin/supervisorctl restart elixir` (для admin_tabs — обязательно, boot-time discovery). Внутри самого `phoenix_kit_locations` для быстрой проверки логики используем `mix test` / `mix compile --warnings-as-errors` / `mix format` — эти команды не требуют хост-приложения вообще.
 
 ---
 
@@ -108,11 +108,11 @@ mix gettext.merge priv/gettext --locale ru
 ```
 Затем вручную заполнить `msgstr` в `priv/gettext/et/LC_MESSAGES/default.po` и `priv/gettext/ru/LC_MESSAGES/default.po` для 6 новых msgid (Floor/Room/Zone/Section/Aisle/Shelf) — `en/default.po` можно оставить пустым (msgid == отображаемый текст по умолчанию в Gettext).
 
-**Проверка:** `mix compile` (нет warning о непереведённых msgid), затем через Tidewave в andi (после restart, см. общий раздел проверки) — `Gettext.put_locale(PhoenixKitLocations.Gettext, "ru"); PhoenixKitLocations.Schemas.Space.kind_label("zone")` должно вернуть русский текст.
+**Проверка:** `mix compile` (нет warning о непереведённых msgid), затем через Tidewave в хосте (после restart, см. общий раздел проверки) — `Gettext.put_locale(PhoenixKitLocations.Gettext, "ru"); PhoenixKitLocations.Schemas.Space.kind_label("zone")` должно вернуть русский текст.
 
 ## Задача 4. Данные: создать LocationType Workshop и Office
 
-Не код — ручной шаг в UI andi (`/admin/locations/types/new`, поля Name + опционально Description, как в `location_type_form_live.ex`) **или** через Tidewave:
+Не код — ручной шаг в UI хоста (`/admin/locations/types/new`, поля Name + опционально Description, как в `location_type_form_live.ex`) **или** через Tidewave:
 ```elixir
 PhoenixKitLocations.Locations.create_location_type(%{name: "Workshop", description: "Production floor location"})
 PhoenixKitLocations.Locations.create_location_type(%{name: "Office", description: "Office building location"})
@@ -240,7 +240,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 
 **Проверка:**
 1. В `phoenix_kit_locations`: `mix test test/phoenix_kit_locations_test.exs` (или любой существующий тест, трогающий `admin_tabs/0`, если есть) + `mix compile --warnings-as-errors`.
-2. В andi: пересобрать и **перезапустить** (`sudo /usr/bin/supervisorctl restart elixir` — boot-time discovery admin_tabs). Открыть `/admin/locations/:uuid/structure` для существующей локации — страница грузится, показывает вкладки Details/Structure и (пока) пустое/наполненное дерево без интерактива.
+2. В хосте: пересобрать и **перезапустить** (`sudo /usr/bin/supervisorctl restart elixir` — boot-time discovery admin_tabs). Открыть `/admin/locations/:uuid/structure` для существующей локации — страница грузится, показывает вкладки Details/Structure и (пока) пустое/наполненное дерево без интерактива.
 
 ## Задача 11. Ссылка "Structure" в списке локаций
 
@@ -251,7 +251,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 <.table_row_menu_link navigate={Paths.location_structure(location.uuid)} icon="hero-squares-2x2" label={gettext("Structure")} />
 ```
 
-**Проверка:** `mix test test/phoenix_kit_locations/web/locations_live_test.exs`; в UI andi `/admin/locations` — пункт меню "Structure" у каждой строки ведёт на новую страницу.
+**Проверка:** `mix test test/phoenix_kit_locations/web/locations_live_test.exs`; в UI хоста `/admin/locations` — пункт меню "Structure" у каждой строки ведёт на новую страницу.
 
 ## Задача 12. `LocationStructureLive` — CRUD-хендлеры дерева
 
@@ -295,7 +295,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 - Добавить те же 5 attachment-хендлеров, что в `LocationFormLive` (делегируют в `Attachments`): `open_featured_image_picker`, `close_media_selector`, `cancel_upload`, `remove_file`, `clear_featured_image`, `set_active_upload_scope`; и `handle_info({:media_selected, ...})` / `{:media_selector_closed}` — копия существующих клауз из `location_form_live.ex:391-409` и `:1244-1248`.
 - Добавить в `render/1` тот же `<.live_component module={PhoenixKitWeb.Live.Components.MediaSelectorModal} .../>`. Отдельный JS hook в `render/1` добавлять не нужно (см. выше — приходит вместе с `FilesCard`).
 
-**Проверка:** в UI andi (после restart) — выбрать узел дерева, переключить язык детали-панели и убедиться, что `name`/`description` редактируются отдельно на каждом языке (паритет с Location), отредактировать поля, сохранить; загрузить файл/установить featured image для конкретного Space; убедиться, что файл Space'а не путается с файлами Location или других Spaces (разные scope-папки `location-space-<uuid>`).
+**Проверка:** в UI хоста (после restart) — выбрать узел дерева, переключить язык детали-панели и убедиться, что `name`/`description` редактируются отдельно на каждом языке (паритет с Location), отредактировать поля, сохранить; загрузить файл/установить featured image для конкретного Space; убедиться, что файл Space'а не путается с файлами Location или других Spaces (разные scope-папки `location-space-<uuid>`).
 
 ## Задача 14. Демонтаж staged floor/room-черновика в `LocationFormLive`
 
@@ -436,6 +436,6 @@ type = Locations.get_location_type_by_name("Warehouse")
 
 1. `cd /www/phoenix_kit_locations && mix format && mix quality` (format + credo --strict + dialyzer) — чисто.
 2. `mix test` — весь набор зелёный (включая новые `spaces_test.exs`, `location_structure_live_test.exs`, `place_picker_test.exs`).
-3. В `/www/app`: пересобрать зависимость и `sudo /usr/bin/supervisorctl restart elixir`.
-4. UI-прогон в andi: `/admin/locations` → строка локации → "Structure" → создать 2-3 уровня (Floor → Zone → Shelf), переименовать, переместить, прикрепить файл к Zone, деактивировать Shelf, удалить Zone (убедиться, что Shelf исчез каскадно) → вернуться на "Details", сохранить локацию (без Spaces-секции, форма работает как обычная CRUD-форма) → `/admin/locations/types/new` создать Workshop/Office, если ещё не создан (задача 4).
+3. В `<host-app>`: пересобрать зависимость и `sudo /usr/bin/supervisorctl restart elixir`.
+4. UI-прогон в хосте: `/admin/locations` → строка локации → "Structure" → создать 2-3 уровня (Floor → Zone → Shelf), переименовать, переместить, прикрепить файл к Zone, деактивировать Shelf, удалить Zone (убедиться, что Shelf исчез каскадно) → вернуться на "Details", сохранить локацию (без Spaces-секции, форма работает как обычная CRUD-форма) → `/admin/locations/types/new` создать Workshop/Office, если ещё не создан (задача 4).
 5. Через Tidewave: `PhoenixKitLocations.Spaces.full_path(some_shelf_uuid)` возвращает читаемую строку пути.
