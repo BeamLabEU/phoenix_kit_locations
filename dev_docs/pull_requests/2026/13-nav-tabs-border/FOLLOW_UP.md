@@ -35,3 +35,18 @@ Read the form's tab import and render, `version/0`, the version test and the
 ## Open
 
 None.
+
+## Claude review (CLAUDE_REVIEW.md)
+Resolution of CLAUDE_REVIEW.md findings. Triaged 2026-10-22.
+
+### Claude review: fixed
+
+- Dropped the stale `WarehouseHeader` reference from the `LocationTabs` moduledoc.
+
+### Claude review: open
+
+- None.
+
+### Claude review: verification
+
+`mix test`: 588 tests, 0 failures. `mix precommit` (compile `--warnings-as-errors`, format, credo `--strict`, dialyzer, deps/hex audit) passed.

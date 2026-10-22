@@ -76,6 +76,6 @@
 
 ## 8. Процесс
 
-- Работаем в форке (`/www/phoenix_kit_locations`, origin timujinne), PR в upstream BeamLabEU по мере готовности блоков.
+- Работаем в форке (`<repo>`, origin timujinne), PR в upstream BeamLabEU по мере готовности блоков.
 - Новые значения kind укладываются в существующий CHECK; если понадобятся новые kinds сверх списка V122 или новые поля — PR в ядро phoenix_kit (versioned migration), как у склада.
 - CHANGELOG/@version не трогаем (maintainer-owned).

@@ -50,7 +50,7 @@
 ## Задача 1. Собственный gettext backend модуля
 
 **Файлы:**
-- Создать `/www/phoenix_kit_locations/lib/phoenix_kit_locations/gettext.ex`:
+- Создать `lib/phoenix_kit_locations/gettext.ex`:
   ```elixir
   defmodule PhoenixKitLocations.Gettext do
     @moduledoc "Gettext backend for phoenix_kit_locations."
@@ -63,11 +63,11 @@
 
 **Важно:** это НЕ заменяет `PhoenixKitWeb.Gettext` в существующих файлах (`location_form_live.ex`, `locations_live.ex`, `location_type_form_live.ex`) — трогать их backend не нужно, риск потерять уже работающие (пусть и случайные) переводы. Новый backend используется **только** для нового кода этого рефакторинга: `kind_label/1`/`kind_icon/1` (задача 2), новые компоненты и `LocationStructureLive`/`PlacePicker` (v0.4/v0.5).
 
-**Проверка:** `cd /www/phoenix_kit_locations && mix compile` — модуль компилируется, `mix gettext.extract` (dry run, каталог пуст) отрабатывает без ошибок.
+**Проверка:** `mix compile` — модуль компилируется, `mix gettext.extract` (dry run, каталог пуст) отрабатывает без ошибок.
 
 ## Задача 2. Расширение `Space.@kinds` + `kind_label/1` + `kind_icon/1`
 
-**Файл:** `/www/phoenix_kit_locations/lib/phoenix_kit_locations/schemas/space.ex`
+**Файл:** `lib/phoenix_kit_locations/schemas/space.ex`
 
 - Заменить `@kinds ~w(floor room)` на `@kinds ~w(floor room zone section aisle shelf)` (список из §3 DEVELOPMENT_PLAN — без `hall/suite/corner`, они остаются зарезервированы в CHECK, но не используются на app-уровне).
 - Обновить `@moduledoc`/комментарий над `@kinds` (сейчас гласит "V1 of the Spaces UI only exposes two kinds") — привести в соответствие с новым списком.
@@ -99,7 +99,7 @@
 
 ## Задача 3. Наполнение gettext-каталогов
 
-**Команды (в `/www/phoenix_kit_locations`):**
+**Команды (в `<repo>`):**
 ```
 mix gettext.extract
 mix gettext.merge priv/gettext --locale en
@@ -127,7 +127,7 @@ PhoenixKitLocations.Locations.create_location_type(%{name: "Office", description
 ## Задача 5. Вынести `files_card_body/1` в общий компонент
 
 **Файлы:**
-- Создать `/www/phoenix_kit_locations/lib/phoenix_kit_locations/web/components/files_card.ex` — модуль `PhoenixKitLocations.Web.Components.FilesCard`, публичная функция `files_card_body/1` (перенести 1:1 из `location_form_live.ex` — `attr` декларации начинаются ~2021, сама функция `files_card_body/1` фактически начинается на строке **2028** (не 2015 — это уже attr-декларации), заканчивается ~2228; ориентироваться по имени функции/`attr`, а не по номерам строк; `use Phoenix.Component`, `use Gettext, backend: PhoenixKitWeb.Gettext` — backend НЕ менять, это существующие строки core, просто переехавшие; `import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]`; `alias PhoenixKit.Modules.Storage.URLSigner`; `alias PhoenixKitLocations.Attachments`).
+- Создать `lib/phoenix_kit_locations/web/components/files_card.ex` — модуль `PhoenixKitLocations.Web.Components.FilesCard`, публичная функция `files_card_body/1` (перенести 1:1 из `location_form_live.ex` — `attr` декларации начинаются ~2021, сама функция `files_card_body/1` фактически начинается на строке **2028** (не 2015 — это уже attr-декларации), заканчивается ~2228; ориентироваться по имени функции/`attr`, а не по номерам строк; `use Phoenix.Component`, `use Gettext, backend: PhoenixKitWeb.Gettext` — backend НЕ менять, это существующие строки core, просто переехавшие; `import PhoenixKitWeb.Components.Core.Icon, only: [icon: 1]`; `alias PhoenixKit.Modules.Storage.URLSigner`; `alias PhoenixKitLocations.Attachments`).
 - В `location_form_live.ex`: удалить `attr` декларации (~2021-2026) и private `files_card_body/1` (начинается ~2028, заканчивается ~2228 — ориентироваться по имени функции), добавить `import PhoenixKitLocations.Web.Components.FilesCard, only: [files_card_body: 1]`. Удалить ставший неиспользуемым `alias PhoenixKit.Modules.Storage.URLSigner` в `location_form_live.ex` — все 5 обращений к `URLSigner.signed_url/2` живут внутри переносимого `files_card_body/1`, больше нигде в файле алиас не используется, иначе `mix compile --warnings-as-errors` (шаг "Проверка" этой же задачи) упадёт на unused-alias. Три существующих call-сайта (`location_scope()`, `@floor.id`, `@room.id`) продолжают работать без изменений.
 - JS hook `PkLocationsUploadScope` (сейчас raw `<script>` на строках 1297-1312 в `location_form_live.ex`, регистрирует хук глобально через `window.PhoenixKitHooks`, вне `files_card_body/1`) — при переносе конвертировать в **ColocatedHook** и разместить внутри `FilesCard`, рядом с `files_card_body/1` (конвенция CLAUDE.md: раздельные raw `<script>` запрещены, только `:type={Phoenix.LiveView.ColocatedHook}` с именем хука через точку — по образцу `ItemPicker` в catalogue): `<script :type={Phoenix.LiveView.ColocatedHook} name=".PkLocationsUploadScope">export default { mounted() { ... } }</script>`, тело `mounted()` — 1:1 перенос текущей логики (`dragenter` → `pushEvent("set_active_upload_scope", %{scope: ...})`). Обновить атрибут дропзоны внутри самой `files_card_body/1` (строка 2131) — `phx-hook="PkLocationsUploadScope"` → `phx-hook=".PkLocationsUploadScope"`. Удалить старый raw `<script>`-блок (1297-1312) и его doc-комментарий из `location_form_live.ex` целиком: колокированный хук компилируется в общий JS-манифест один раз при сборке ассетов и автоматически доступен любому LiveView, рендерящему `<.files_card_body>` — дублировать регистрацию в `LocationStructureLive` (задача 13) не требуется.
 
@@ -135,7 +135,7 @@ PhoenixKitLocations.Locations.create_location_type(%{name: "Office", description
 
 ## Задача 6. `Paths.location_structure/1`
 
-**Файл:** `/www/phoenix_kit_locations/lib/phoenix_kit_locations/paths.ex`
+**Файл:** `lib/phoenix_kit_locations/paths.ex`
 
 Добавить рядом с `location_edit/1`:
 ```elixir
@@ -147,7 +147,7 @@ def location_structure(uuid), do: Routes.path("#{@base}/#{uuid}/structure")
 
 ## Задача 7. Общий tab-header "Details / Structure"
 
-**Файл:** создать `/www/phoenix_kit_locations/lib/phoenix_kit_locations/web/components/location_tabs.ex` — модуль `PhoenixKitLocations.Web.Components.LocationTabs`, мирроринг `PhoenixKitWarehouse.Web.Components.WarehouseHeader`:
+**Файл:** создать `lib/phoenix_kit_locations/web/components/location_tabs.ex` — модуль `PhoenixKitLocations.Web.Components.LocationTabs`, мирроринг `PhoenixKitWarehouse.Web.Components.WarehouseHeader`:
 
 ```elixir
 defmodule PhoenixKitLocations.Web.Components.LocationTabs do
@@ -181,7 +181,7 @@ end
 
 ## Задача 8. `SpaceTree` компонент (рекурсивный узел дерева)
 
-**Файл:** создать `/www/phoenix_kit_locations/lib/phoenix_kit_locations/web/components/space_tree.ex` — модуль `PhoenixKitLocations.Web.Components.SpaceTree`, адаптация `PhoenixKitWeb.Components.FolderExplorer.folder_tree_node/1` под узлы `Spaces.list_tree/1`.
+**Файл:** создать `lib/phoenix_kit_locations/web/components/space_tree.ex` — модуль `PhoenixKitLocations.Web.Components.SpaceTree`, адаптация `PhoenixKitWeb.Components.FolderExplorer.folder_tree_node/1` под узлы `Spaces.list_tree/1`.
 
 **Важно про форму узла:** `Spaces.list_tree/1` возвращает список `%Space{}` (не `Folder` struct и НЕ обёртку `%{space: ..., children: ...}`) — `build_tree/2` кладёт вложенный список детей прямо в поле `:children` того же struct (`Map.put(space, :children, ...)`, `spaces.ex:73-79`, `:children` — существующая `has_many` ассоциация схемы). Значит все поля узла читаются напрямую: `node.kind`, `node.uuid`, `node.name`, `node.status`, `node.children` — **не** `node.space.kind`/`node.space.uuid`.
 
@@ -199,7 +199,7 @@ end
 
 ## Задача 9. `LocationStructureLive` — каркас (mount + read-only рендер дерева)
 
-**Файл:** создать `/www/phoenix_kit_locations/lib/phoenix_kit_locations/web/location_structure_live.ex` — модуль `PhoenixKitLocations.Web.LocationStructureLive`.
+**Файл:** создать `lib/phoenix_kit_locations/web/location_structure_live.ex` — модуль `PhoenixKitLocations.Web.LocationStructureLive`.
 
 ```elixir
 use Phoenix.LiveView
@@ -221,7 +221,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 ## Задача 10. Регистрация роута + admin_tab (boot-time)
 
 **Файлы:**
-- `/www/phoenix_kit_locations/lib/phoenix_kit_locations.ex` — добавить в `admin_tabs/0`, сразу после `:admin_locations_edit`:
+- `lib/phoenix_kit_locations.ex` — добавить в `admin_tabs/0`, сразу после `:admin_locations_edit`:
   ```elixir
   %Tab{
     id: :admin_locations_structure,
@@ -236,7 +236,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
     live_view: {PhoenixKitLocations.Web.LocationStructureLive, :edit}
   }
   ```
-- `/www/phoenix_kit_locations/test/support/test_router.ex` — добавить `live("/:uuid/structure", LocationStructureLive, :edit)` рядом с `live("/:uuid/edit", LocationFormLive, :edit)`.
+- `test/support/test_router.ex` — добавить `live("/:uuid/structure", LocationStructureLive, :edit)` рядом с `live("/:uuid/edit", LocationFormLive, :edit)`.
 
 **Проверка:**
 1. В `phoenix_kit_locations`: `mix test test/phoenix_kit_locations_test.exs` (или любой существующий тест, трогающий `admin_tabs/0`, если есть) + `mix compile --warnings-as-errors`.
@@ -244,7 +244,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 
 ## Задача 11. Ссылка "Structure" в списке локаций
 
-**Файл:** `/www/phoenix_kit_locations/lib/phoenix_kit_locations/web/locations_live.ex`
+**Файл:** `lib/phoenix_kit_locations/web/locations_live.ex`
 
 В row menu (рядом со строкой 309, между `Edit` и divider'ом перед `Delete`):
 ```heex
@@ -299,7 +299,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 
 ## Задача 14. Демонтаж staged floor/room-черновика в `LocationFormLive`
 
-**Файл:** `/www/phoenix_kit_locations/lib/phoenix_kit_locations/web/location_form_live.ex`
+**Файл:** `lib/phoenix_kit_locations/web/location_form_live.ex`
 
 Удалить (диапазоны строк — по состоянию файла на момент исследования 2026-07-10, до задачи 5/этого рефакторинга; при удалении ориентироваться на именованные секции/комментарии, не только на номера):
 
@@ -324,7 +324,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 
 ## Задача 15. Актуализация `location_form_live_test.exs`
 
-**Файл:** `/www/phoenix_kit_locations/test/phoenix_kit_locations/web/location_form_live_test.exs`
+**Файл:** `test/phoenix_kit_locations/web/location_form_live_test.exs`
 
 Найти и удалить/переписать все тесты, ссылающиеся на `add_floor`/`add_room`/`space_drafts`/floor-room UI (grep по `"floor"`, `"room"`, `"Add floor"`, `"Spaces"` в файле). Тесты на сохранение самой локации (name/address/features/types/файлы) должны остаться и продолжать проходить.
 
@@ -332,7 +332,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 
 ## Задача 16. `test/spaces_test.exs` — контекстные тесты (закрывает документированный пробел)
 
-**Файл:** создать `/www/phoenix_kit_locations/test/spaces_test.exs` — докстрока `space_test.exs` уже обещает существование этого файла ("cross-row invariant... tested separately under `test/spaces_test.exs`").
+**Файл:** создать `test/spaces_test.exs` — докстрока `space_test.exs` уже обещает существование этого файла ("cross-row invariant... tested separately under `test/spaces_test.exs`").
 
 `use PhoenixKitLocations.DataCase, async: true`, покрыть:
 - `create_space/2` с новыми kinds (`zone`, `section`, `aisle`, `shelf`), `{:error, :parent_in_other_location}`, `{:error, :cycle}` через `update_space/3` (переродительствование).
@@ -345,7 +345,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 ## Задача 17. Тесты `LocationStructureLive` и `SpaceTree`
 
 **Файлы:**
-- Создать `/www/phoenix_kit_locations/test/phoenix_kit_locations/web/location_structure_live_test.exs` (по образцу `location_form_live_test.exs` / `LiveCase`): mount по `/en/admin/locations/:uuid/structure` рендерит дерево; создание root/child space через форму; переименование; move up/down меняет `position` в БД; delete каскадно убирает детей; выбор узла показывает detail-панель с его файлами.
+- Создать `test/phoenix_kit_locations/web/location_structure_live_test.exs` (по образцу `location_form_live_test.exs` / `LiveCase`): mount по `/en/admin/locations/:uuid/structure` рендерит дерево; создание root/child space через форму; переименование; move up/down меняет `position` в БД; delete каскадно убирает детей; выбор узла показывает detail-панель с его файлами.
 - Опционально: `test/phoenix_kit_locations/web/components/space_tree_test.exs` — `render_component`-тест на голом дереве (2-3 уровня), проверка `show_actions={false}` скрывает CRUD-кнопки.
 
 **Проверка:** `mix test`.
@@ -356,7 +356,7 @@ use Gettext, backend: PhoenixKitLocations.Gettext
 
 ## Задача 18. `Spaces.full_path/2`
 
-**Файл:** `/www/phoenix_kit_locations/lib/phoenix_kit_locations/spaces.ex`
+**Файл:** `lib/phoenix_kit_locations/spaces.ex`
 
 Добавить `alias PhoenixKitLocations.Schemas.Location`. Порт паттерна `PhoenixKitCatalogue.Catalogue.Tree.ancestor_uuids/1` + `walk_up/3`, адаптированный под `phoenix_kit_location_spaces` (self-join по `parent_uuid`, `UNION` не `UNION ALL` — cycle-safe):
 
@@ -397,7 +397,7 @@ end
 
 ## Задача 19. `PlacePicker` LiveComponent
 
-**Файл:** создать `/www/phoenix_kit_locations/lib/phoenix_kit_locations/web/components/place_picker.ex` — модуль `PhoenixKitLocations.Web.Components.PlacePicker`, `use Phoenix.LiveComponent`.
+**Файл:** создать `lib/phoenix_kit_locations/web/components/place_picker.ex` — модуль `PhoenixKitLocations.Web.Components.PlacePicker`, `use Phoenix.LiveComponent`.
 
 Мирроринг `ItemPicker` (search-combobox) для Location-половины + переиспользование `SpaceTree.space_tree_node/1` в read-only режиме (`show_actions={false}`) для Space-половины:
 
@@ -424,7 +424,7 @@ type = Locations.get_location_type_by_name("Warehouse")
 У модуля пока нет реального потребителя (warehouse/manufacturing — on hold, см. память проекта), поэтому для полноценного event-теста (по образцу `item_picker_events_test.exs`, который гоняет `ItemPicker` через реальный host LiveView, а не изолированно) нужен тестовый хост.
 
 **Файлы:**
-- Создать `/www/phoenix_kit_locations/test/support/place_picker_harness_live.ex` — минимальный `Phoenix.LiveView`, монтирующий один `<.live_component module={PlacePicker} id="harness-picker" />` и `handle_info({:place_picker_select, _id, place}, socket)`, сохраняющий `place` в assigns для проверки через `render/1`.
+- Создать `test/support/place_picker_harness_live.ex` — минимальный `Phoenix.LiveView`, монтирующий один `<.live_component module={PlacePicker} id="harness-picker" />` и `handle_info({:place_picker_select, _id, place}, socket)`, сохраняющий `place` в assigns для проверки через `render/1`.
 - Добавить роут в `test/support/test_router.ex` **внутри уже существующего** `scope "/en/admin/locations", PhoenixKitLocations.Web do ... live_session :locations_test, ... do` (не отдельным top-level scope — единственный `live_session`/root-layout в тестовом роутере уже настроен там; служебный путь для теста, не показывается в реальном UI): `live("/__test__/place-picker", PlacePickerHarnessLive, :index)`, итоговый URL — `/en/admin/locations/__test__/place-picker`.
 - Создать `test/phoenix_kit_locations/web/components/place_picker_test.exs`: `live(conn, "/en/admin/locations/__test__/place-picker")` для mount; поиск локации по подстроке → выбор → сообщение `{:place_picker_select, ...}` долетает до host; фильтр по `location_type_uuid` исключает локации другого типа; выбор Space в дереве (включая предварительный `toggle_space_node` для разворачивания) прокидывает `space_uuid`; "Use this location" даёт `space_uuid: nil`.
 
@@ -434,7 +434,7 @@ type = Locations.get_location_type_by_name("Warehouse")
 
 # Финальная проверка всего плана
 
-1. `cd /www/phoenix_kit_locations && mix format && mix quality` (format + credo --strict + dialyzer) — чисто.
+1. `mix format && mix quality` (format + credo --strict + dialyzer) — чисто.
 2. `mix test` — весь набор зелёный (включая новые `spaces_test.exs`, `location_structure_live_test.exs`, `place_picker_test.exs`).
 3. В `<host-app>`: пересобрать зависимость и `sudo /usr/bin/supervisorctl restart elixir`.
 4. UI-прогон в хосте: `/admin/locations` → строка локации → "Structure" → создать 2-3 уровня (Floor → Zone → Shelf), переименовать, переместить, прикрепить файл к Zone, деактивировать Shelf, удалить Zone (убедиться, что Shelf исчез каскадно) → вернуться на "Details", сохранить локацию (без Spaces-секции, форма работает как обычная CRUD-форма) → `/admin/locations/types/new` создать Workshop/Office, если ещё не создан (задача 4).

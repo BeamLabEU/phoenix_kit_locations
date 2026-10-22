@@ -3,7 +3,7 @@ defmodule PhoenixKitLocations.Web.Components.LocationTabs do
   Shared tab navigation between a Location's "Details" and "Structure"
   pages. Each tab is served by a separate LiveView (`LocationFormLive`
   and `LocationStructureLive`), so tab links use `navigate` rather than
-  `patch`, mirroring `PhoenixKitWarehouse.Web.Components.WarehouseHeader`.
+  `patch`.
 
   Only meant to be rendered once the Location already exists (has a
   `uuid`) — there is no Structure tab for a not-yet-created Location.

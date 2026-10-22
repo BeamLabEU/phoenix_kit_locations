@@ -10,6 +10,8 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
 
   use ExUnit.Case, async: true
 
+  alias PhoenixKit.Dashboard.Tab
+
   @lib Path.expand("../lib", __DIR__)
   @gettext Path.expand("../priv/gettext", __DIR__)
 
@@ -44,6 +46,28 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
     assert Gettext.with_locale(PhoenixKitLocations.Gettext, "et", fn ->
              PhoenixKitLocations.Errors.message(:location_not_found)
            end) == "Asukohta ei leitud."
+  end
+
+  # Core's `Tab.localized_label/1` looks the label up at runtime, so a tab
+  # without the backend renders its English msgid in every locale and nothing
+  # warns; the extractor never sees that lookup either.
+  test "every admin tab names the module's backend and its label translates in ru and et" do
+    for tab <- PhoenixKitLocations.admin_tabs() do
+      assert tab.gettext_backend == PhoenixKitLocations.Gettext,
+             "#{tab.id} has no gettext_backend"
+
+      assert tab.gettext_domain == "default", "#{tab.id} has no gettext_domain"
+
+      for locale <- ~w(et ru) do
+        translated =
+          Gettext.with_locale(PhoenixKitLocations.Gettext, locale, fn ->
+            Tab.localized_label(tab)
+          end)
+
+        refute translated == tab.label,
+               "tab #{tab.id} label #{inspect(tab.label)} is not translated in #{locale}"
+      end
+    end
   end
 
   defp msgids(%Expo.Messages{messages: messages}) do
