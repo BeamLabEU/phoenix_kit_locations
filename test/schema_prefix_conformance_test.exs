@@ -13,14 +13,27 @@ defmodule PhoenixKitLocations.SchemaPrefixConformanceTest do
     offenders =
       Path.wildcard("lib/**/*.ex")
       |> Enum.filter(fn path ->
-        content = File.read!(path)
+        ast = path |> File.read!() |> Code.string_to_quoted!()
 
-        String.contains?(content, ~s[schema "phoenix_kit]) and
-          not String.contains?(content, "use PhoenixKit.SchemaPrefix")
+        contains?(ast, fn
+          {:schema, _, [table, _]} when is_binary(table) -> true
+          _ -> false
+        end) and
+          not contains?(ast, fn
+            {:use, _, [{:__aliases__, _, [:PhoenixKit, :SchemaPrefix]}]} -> true
+            _ -> false
+          end)
       end)
 
     assert offenders == [],
            "table-backed schemas missing `use PhoenixKit.SchemaPrefix` " <>
              "(add it right after `use Ecto.Schema`): #{inspect(offenders)}"
+  end
+
+  defp contains?(ast, predicate) do
+    {_ast, found?} =
+      Macro.prewalk(ast, false, fn node, found? -> {node, found? or predicate.(node)} end)
+
+    found?
   end
 end

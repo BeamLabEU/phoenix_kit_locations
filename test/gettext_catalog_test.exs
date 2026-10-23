@@ -70,6 +70,22 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
     end
   end
 
+  test "runtime tab labels survive extraction without source call sites" do
+    labels = PhoenixKitLocations.admin_tabs() |> Enum.map(& &1.label) |> Enum.uniq()
+
+    for path <- Path.wildcard(Path.join(@gettext, "**/*.{pot,po}")) do
+      messages = Expo.PO.parse_file!(path).messages
+
+      for label <- labels do
+        message = Enum.find(messages, &(IO.iodata_to_binary(&1.msgid) == label))
+        assert message, "#{inspect(label)} is missing from #{path}"
+
+        refute "elixir-autogen" in List.flatten(message.flags),
+               "#{inspect(label)} in #{path} must survive without an extractor-visible call site"
+      end
+    end
+  end
+
   defp msgids(%Expo.Messages{messages: messages}) do
     for %Expo.Message.Singular{} = m <- messages, into: MapSet.new() do
       IO.iodata_to_binary(m.msgid)

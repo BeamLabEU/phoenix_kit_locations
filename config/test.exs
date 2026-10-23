@@ -9,9 +9,9 @@ config :phoenix_kit_locations, ecto_repos: [PhoenixKitLocations.Test.Repo]
 # case), this falls back to the previous hardcoded name, so publishing
 # and CI are unaffected.
 pg_test_db =
-  case System.get_env("PGDATABASE") do
-    value when is_binary(value) and value != "" -> String.trim(value)
-    _ -> "phoenix_kit_locations_test#{System.get_env("MIX_TEST_PARTITION")}"
+  case System.get_env("PGDATABASE", "") |> String.trim() do
+    "" -> "phoenix_kit_locations_test#{System.get_env("MIX_TEST_PARTITION")}"
+    value -> value
   end
 
 # `PGPOOL` bounds the connection pool the same way core does — the default
@@ -19,15 +19,15 @@ pg_test_db =
 # box, which is fine against a private local Postgres but not against a
 # shared instance already near its connection ceiling.
 pg_test_pool =
-  case System.get_env("PGPOOL") do
-    value when is_binary(value) and value != "" ->
-      case Integer.parse(String.trim(value)) do
+  case System.get_env("PGPOOL", "") |> String.trim() do
+    "" ->
+      System.schedulers_online() * 2
+
+    value ->
+      case Integer.parse(value) do
         {size, ""} when size > 0 -> size
         _ -> raise "PGPOOL must be a positive integer, got: #{inspect(value)}"
       end
-
-    _ ->
-      System.schedulers_online() * 2
   end
 
 config :phoenix_kit_locations, PhoenixKitLocations.Test.Repo,

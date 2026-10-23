@@ -23,9 +23,8 @@ db_name =
   Application.get_env(:phoenix_kit_locations, PhoenixKitLocations.Test.Repo)[:database] ||
     "phoenix_kit_locations_test"
 
-# The preflight ships in core, and a core at this module's floor may predate
-# it — so it is used when the running core has it, and otherwise the repo
-# start below is the connection check.
+# Prefer core's classified preflight errors. If it cannot be loaded, the
+# repo probe below still checks the connection before running migrations.
 db_check =
   if Code.ensure_loaded?(PhoenixKit.TestSupport.PostgresPreflight) do
     # One classified connection attempt, with the repo's OWN credentials and
@@ -61,28 +60,7 @@ repo_available =
   else
     try do
       {:ok, _} = PhoenixKitLocations.Test.Repo.start_link()
-
-      # Core's `ensure_current/2` first, so the test schema tracks whatever
-      # V-migrations core ships (users, settings, activities, the
-      # `uuid_generate_v7()` function, and — until core's next baseline
-      # squash — the four location tables). See `PhoenixKit.Migration` for
-      # re-runnable semantics. Accumulates rows in `schema_migrations`
-      # between resets — cleared by `mix test.reset`.
-      PhoenixKit.Migration.ensure_current(PhoenixKitLocations.Test.Repo, log: false)
-
-      # Then this module's own chain, through the same statements a host's
-      # generated wrapper runs. `up/1` uses `execute/1`, which only works
-      # inside an `Ecto.Migration` run, so replay `up_statements/1` through
-      # the repo instead. Every statement is idempotent; the version check
-      # just skips the replay on an already-current database.
-      if PhoenixKitLocations.Migrations.migrated_version_runtime(prefix: "public") <
-           PhoenixKitLocations.Migrations.current_version() do
-        for stmt <- PhoenixKitLocations.Migrations.up_statements("public") do
-          PhoenixKitLocations.Test.Repo.query!(stmt, [], log: false)
-        end
-      end
-
-      Ecto.Adapters.SQL.Sandbox.mode(PhoenixKitLocations.Test.Repo, :manual)
+      PhoenixKitLocations.Test.Repo.query!("SELECT 1", [], log: false)
       true
     rescue
       e ->
@@ -104,6 +82,22 @@ repo_available =
         false
     end
   end
+
+# Once connected, a migration or sandbox failure must fail the run. Treating
+# it as an unavailable database would silently exclude the tests it broke.
+if repo_available do
+  # Core first, then the module's idempotent DDL, matching host startup.
+  PhoenixKit.Migration.ensure_current(PhoenixKitLocations.Test.Repo, log: false)
+
+  if PhoenixKitLocations.Migrations.migrated_version_runtime(prefix: "public") <
+       PhoenixKitLocations.Migrations.current_version() do
+    for stmt <- PhoenixKitLocations.Migrations.up_statements("public") do
+      PhoenixKitLocations.Test.Repo.query!(stmt, [], log: false)
+    end
+  end
+
+  Ecto.Adapters.SQL.Sandbox.mode(PhoenixKitLocations.Test.Repo, :manual)
+end
 
 Application.put_env(:phoenix_kit_locations, :test_repo_available, repo_available)
 

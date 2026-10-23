@@ -74,27 +74,10 @@ defmodule PhoenixKitLocations.MixProject do
 
   defp deps do
     [
-      # The floor is 2.41.1: `status_badge`'s `label` attr first shipped there.
-      # The module also runs on core's shared toolkits (2.38.0) —
-      # `PhoenixKitWeb.Actor`, `PhoenixKit.Activity.log/3`,
-      # `Storage.ResourceFolders`, the reorganizer's `ResourceSource`,
-      # `PhoenixKitWeb.Attachments`, `Utils.TreeQuery`, `Utils.Format`,
-      # `mount_multilang(open_on:)` and the `:phoenix_kit_js_sources`
-      # compiler — all first shipped there, none feature-detected, so a lower
-      # core fails to compile. (2.0.0's V135 baseline, which V1 adopts, is
-      # long subsumed.) Patch-precise floor in the compound form, so the
-      # ceiling stays open through every later 2.x minor (see
-      # test/core_pin_conformance_test.exs).
-      # TEMPORARY: core `main` is ahead of Hex (beamlab_countries 2.x for the
-      # country/city dropdowns), so the dep comes from GitHub. The requirement
-      # stays as the floor; `override: true` keeps core's own pins from
-      # blocking resolution. Drop the options (back to the bare Hex pin)
-      # before any release: Hex rejects git deps.
-      pk_dep(:phoenix_kit, ">= 2.41.1 and < 3.0.0",
-        github: "BeamLabEU/phoenix_kit",
-        branch: "main",
-        override: true
-      ),
+      # Core 2.63.0 first requires beamlab_countries 2.x, which supplies the
+      # Cities API used by the address form. Keep the ceiling open across
+      # later 2.x minors (see test/core_pin_conformance_test.exs).
+      pk_dep(:phoenix_kit, ">= 2.63.0 and < 3.0.0", []),
       {:phoenix_live_view, "~> 1.1"},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

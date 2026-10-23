@@ -174,7 +174,7 @@ msgstr "Тип"
 #: lib/phoenix_kit_locations/web/locations_live.ex:35
 #: lib/phoenix_kit_locations/web/locations_live.ex:80
 #: lib/phoenix_kit_locations/web/locations_live.ex:90
-#, elixir-format, elixir-autogen
+#, elixir-format
 msgid "Locations"
 msgstr "Локации"
 
@@ -201,14 +201,14 @@ msgstr "Название"
 #: lib/phoenix_kit_locations/web/locations_live.ex:316
 #: lib/phoenix_kit_locations/web/locations_live.ex:317
 #: lib/phoenix_kit_locations/web/locations_live.ex:320
-#, elixir-format, elixir-autogen
+#, elixir-format
 msgid "New Location"
 msgstr "Новая локация"
 
 #: lib/phoenix_kit_locations/web/locations_live.ex:402
 #: lib/phoenix_kit_locations/web/locations_live.ex:403
 #: lib/phoenix_kit_locations/web/locations_live.ex:406
-#, elixir-format, elixir-autogen
+#, elixir-format
 msgid "New Type"
 msgstr "Новый тип"
 
@@ -274,14 +274,14 @@ msgstr "Статус"
 #: lib/phoenix_kit_locations/web/components/location_tabs.ex:36
 #: lib/phoenix_kit_locations/web/location_structure_live.ex:92
 #: lib/phoenix_kit_locations/web/locations_live.ex:368
-#, elixir-format, elixir-autogen
+#, elixir-format
 msgid "Structure"
 msgstr "Структура"
 
 #: lib/phoenix_kit_locations/web/location_type_form_live.ex:86
 #: lib/phoenix_kit_locations/web/locations_live.ex:89
 #: lib/phoenix_kit_locations/web/locations_live.ex:305
-#, elixir-format, elixir-autogen
+#, elixir-format
 msgid "Types"
 msgstr "Типы"
 

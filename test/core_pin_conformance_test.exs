@@ -12,20 +12,52 @@ defmodule PhoenixKitLocations.CorePinConformanceTest do
   outright, with no degraded mode. Nothing else in this repo's own test run
   would notice, which is why the check is a test rather than a convention.
 
-  The floor is `>= 2.41.1 and < 3.0.0`: the list pages pass `status_badge`
-  a translated `label`, which core first took in 2.41.1. The module also runs
-  on core's shared toolkits (`PhoenixKitWeb.Actor`, `Activity.log/3`, `Storage.ResourceFolders`,
-  `PhoenixKitWeb.Attachments`, `Utils.TreeQuery`), all first shipped in core
-  2.38.0, and does not compile without them. Before that it was `~> 2.0`:
-  core 2.0.0 squashed the migration chain to a V135 floor and the module was
-  verified only against that baseline.
+  The floor is `>= 2.63.0 and < 3.0.0`: core 2.63.0 first requires
+  beamlab_countries 2.x, whose Cities API the address form uses. The
+  committed dependency must resolve from Hex even when this test run uses
+  the documented PHOENIX_KIT_PATH override.
   """
 
-  @must_admit ["2.41.1", "2.41.5", "2.42.0", "2.99.4"]
-  @must_reject ["1.7.236", "2.0.0", "2.9.4", "2.24.0", "2.38.0", "2.41.0", "3.0.0"]
+  @must_admit ["2.63.0", "2.63.5", "2.64.0", "2.99.4"]
+  @must_reject ["1.7.236", "2.0.0", "2.38.0", "2.41.1", "2.62.2", "3.0.0"]
 
-  test "the :phoenix_kit requirement admits every core >= 2.41.1 minor and nothing else" do
-    requirement = core_requirement()
+  setup_all do
+    # Evaluate the real project without the local override in a separate VM,
+    # leaving this run's Mix project and process-wide environment untouched.
+    script = """
+    Mix.start()
+    Code.compile_file("mix.exs")
+    Mix.Project.config()[:deps]
+    |> :erlang.term_to_binary()
+    |> Base.encode64()
+    |> IO.write()
+    """
+
+    {output, status} =
+      System.cmd(System.find_executable("elixir"), ["-e", script],
+        env: [{"PHOENIX_KIT_PATH", nil}],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+    deps = output |> Base.decode64!() |> :erlang.binary_to_term()
+    {:ok, dependency: Enum.find(deps, &(elem(&1, 0) == :phoenix_kit))}
+  end
+
+  test "the committed :phoenix_kit dependency uses Hex", %{dependency: dependency} do
+    assert {_, requirement, opts} = normalize_dependency(dependency)
+    assert is_binary(requirement), "the committed dependency needs a published requirement"
+
+    for key <- [:path, :git, :github, :in_umbrella] do
+      refute Keyword.has_key?(opts, key),
+             "committed :phoenix_kit dependency uses #{key}; Hex packages need Hex dependencies"
+    end
+  end
+
+  test "the :phoenix_kit requirement admits every core >= 2.63.0 minor and nothing else", %{
+    dependency: dependency
+  } do
+    {_, requirement, _opts} = normalize_dependency(dependency)
 
     assert match?({:ok, _parsed}, Version.parse_requirement(requirement)),
            "`:phoenix_kit` requirement #{inspect(requirement)} is not a valid requirement"
@@ -35,7 +67,7 @@ defmodule PhoenixKitLocations.CorePinConformanceTest do
              "`:phoenix_kit` requirement #{inspect(requirement)} rejects core #{version}. " <>
                "A pin that excludes a core minor breaks `mix deps.get` for every host " <>
                "running this module alongside that core. Keep the floor patch-precise " <>
-               "and the ceiling open (`>= 2.41.1 and < 3.0.0`), never a three-segment `~>`."
+               "and the ceiling open (`>= 2.63.0 and < 3.0.0`), never a three-segment `~>`."
     end
 
     for version <- @must_reject do
@@ -45,41 +77,9 @@ defmodule PhoenixKitLocations.CorePinConformanceTest do
     end
   end
 
-  # Resolution order matters. `Mix.Project.config()` is exact, but it reports the
-  # dep as it resolved THIS run — and `pk_dep/3` rewrites it to a `path:` tuple
-  # whenever PHOENIX_KIT_PATH is exported, which is the workspace's sanctioned way
-  # to run this suite against unreleased core. Reading the committed literal from
-  # mix.exs as a fallback keeps the check meaningful under that override instead
-  # of failing the documented workflow — and it still fails when a path dep is
-  # COMMITTED, because then there is no literal left to find.
-  defp core_requirement do
-    resolved_requirement() || committed_requirement() ||
-      flunk("""
-      No version requirement found for `:phoenix_kit`.
+  defp normalize_dependency({app, requirement}) when is_binary(requirement),
+    do: {app, requirement, []}
 
-      Neither the resolved dep nor mix.exs carries one, which means a `path:`
-      dep has been committed. That ships a broken package and breaks every
-      other consumer's build — restore the published requirement.
-      """)
-  end
-
-  defp resolved_requirement do
-    Mix.Project.config()
-    |> Keyword.get(:deps, [])
-    |> Enum.find_value(fn
-      {:phoenix_kit, requirement} when is_binary(requirement) -> requirement
-      {:phoenix_kit, requirement, _opts} when is_binary(requirement) -> requirement
-      _ -> nil
-    end)
-  end
-
-  # First match wins, matching how every other tool in the workspace reads this
-  # pin. Covers both the bare `{:phoenix_kit, "..."}` and the `pk_dep(:phoenix_kit,
-  # "...")` forms, since the captured text is identical in each.
-  defp committed_requirement do
-    case Regex.run(~r/:phoenix_kit,\s*"([^"]+)"/, File.read!("mix.exs")) do
-      [_full, requirement] -> requirement
-      _ -> nil
-    end
-  end
+  defp normalize_dependency({app, opts}) when is_list(opts), do: {app, nil, opts}
+  defp normalize_dependency({app, requirement, opts}), do: {app, requirement, opts}
 end
