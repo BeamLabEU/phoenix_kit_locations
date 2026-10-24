@@ -43,9 +43,10 @@ defmodule PhoenixKitLocations.Geo do
   known code (a legacy free-text country) leads the list, so editing a row
   never silently blanks its country.
 
-  Core labels each country with its flag (`"🇪🇪 Estonia"`). A native select
-  jumps to an option by the first characters typed, so a flag in front stops
-  typing "Est" from finding anything; the labels here start with the name.
+  A native select jumps to an option by the first characters typed, so the
+  labels start with the name. Core 2.64 puts the flag after it
+  (`"Estonia 🇪🇪"`), kept as is; an older core put it in front
+  (`"🇪🇪 Estonia"`), and that leading flag is stripped.
   """
   @spec country_options(String.t() | nil) :: [{String.t(), String.t()}]
   def country_options(current) do

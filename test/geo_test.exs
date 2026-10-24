@@ -42,7 +42,7 @@ defmodule PhoenixKitLocations.GeoTest do
   describe "options" do
     test "a legacy country leads the list, a known code does not" do
       assert [{"Atlantis", "Atlantis"} | _] = Geo.country_options("Atlantis")
-      assert {"Estonia", "EE"} = List.keyfind(Geo.country_options("EE"), "EE", 1)
+      assert {"Estonia" <> _flag, "EE"} = List.keyfind(Geo.country_options("EE"), "EE", 1)
       assert length(Geo.country_options(nil)) == length(Geo.country_options("EE"))
     end
 
@@ -50,7 +50,7 @@ defmodule PhoenixKitLocations.GeoTest do
       labels = Enum.map(Geo.country_options(nil), &elem(&1, 0))
 
       assert Enum.all?(labels, &String.match?(&1, ~r/^[\p{L}\p{N}]/u))
-      assert "Estonia" in labels
+      assert Enum.any?(labels, &String.starts_with?(&1, "Estonia"))
     end
 
     test "subdivision options come with the id as the value" do

@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.7.0 - 2026-10-24
+
+### Upgrade notes
+
+- **Requires `phoenix_kit >= 2.63.0 and < 3.0.0`** (was `>= 2.41.1`). Core
+  2.63.0 is the first to bring `beamlab_countries` 2.x, whose city data the
+  address form reads.
+- **`location.country` is now stored as an ISO 3166-1 alpha-2 code** (`"EE"`)
+  and `location.state` as a `beamlab_countries` subdivision id (`"37"`,
+  `"NY"`) where the country has subdivision data. No migration: every write
+  through `Location.changeset/2` converts a typed or legacy name
+  (`"Estonia"`, `"Harju"`) to its code, and the edit form opens an old row on
+  the converted values. A value that matches nothing is kept as written. Host
+  code that displays `country` directly should use
+  `PhoenixKitLocations.Geo.country_name/1`.
+
+### Added
+
+- **Country, state and city selectors on the location form.** The address
+  block leads with a country dropdown; state and city follow it as dropdowns
+  where `beamlab_countries` has data (US and Canada list cities per state) and
+  as text fields elsewhere, with a "contact the support team" hint for a
+  missing city. Labels follow the country (State, County, Province /
+  Territory; ZIP Code for the US). Country labels start with the name rather
+  than a flag, so typing in the select finds the country.
+- The city dropdown lists every city the library has for a country, not only
+  the ten largest.
+- A Country column on the locations list (and in its card view); the
+  project hub's Sites tab shows the country name instead of the stored code.
+- `PhoenixKitLocations.Geo`: the country, subdivision and city lookups and
+  normalizers behind the form.
+- `find_similar_addresses/5` takes a `:country` option; the duplicate-address
+  warning on the form now takes the country into account (a stored location
+  with no country still counts as a match).
+
+### Changed
+
+- `update_location_type/3` returns `{:error, :location_type_not_found}` for a
+  type deleted since the caller loaded it, including an unchanged save that
+  used to report success.
+- Dependencies refreshed to `phoenix_kit` 2.64.1.
+
+### Fixed
+
+- `PlacePicker` re-checks a location (owner, type and status filters) and a
+  space (still active, still in that location) at the final confirmation, not
+  only when opening the tree, so it can no longer emit a place reassigned,
+  deactivated or deleted while the picker was open.
+- Saving a location type deleted in another session redirects to Types with
+  a not-found message instead of crashing the form.
+- `/admin/locations/types/<malformed-uuid>/edit` redirects instead of raising
+  `Ecto.Query.CastError`; `get_location_type/1` returns `nil` for a malformed
+  uuid.
+
 ## 0.6.1 - 2026-10-01
 
 ### Changed
