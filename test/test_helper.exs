@@ -126,4 +126,12 @@ if repo_available do
   {:ok, _} = PhoenixKitLocations.Test.Endpoint.start_link()
 end
 
-ExUnit.start(exclude: exclude)
+# The builds-alone test needs `PhoenixKit.TestSupport.ModuleChainCheck`, which
+# ships in the first core release after 2.64.1; against an older core it is
+# excluded.
+chain_check_exclude =
+  if Code.ensure_loaded?(PhoenixKit.TestSupport.ModuleChainCheck),
+    do: [],
+    else: [:requires_module_chain_check]
+
+ExUnit.start(exclude: chain_check_exclude ++ exclude)
