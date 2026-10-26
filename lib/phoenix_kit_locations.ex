@@ -55,6 +55,13 @@ defmodule PhoenixKitLocations do
   @impl PhoenixKit.Module
   def migration_module, do: PhoenixKitLocations.Migrations
 
+  @doc """
+  The manifest of this module's tables, for `mix phoenix_kit.repair` and
+  `mix phoenix_kit.doctor`; see `PhoenixKitLocations.ExpectedSchema`.
+  """
+  # No `@impl`, so this compiles against a core that lacks the callback.
+  def expected_schema, do: PhoenixKitLocations.ExpectedSchema
+
   @impl PhoenixKit.Module
   def enabled? do
     Settings.get_boolean_setting("locations_enabled", false)
