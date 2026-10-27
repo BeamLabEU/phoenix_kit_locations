@@ -59,7 +59,7 @@ defmodule PhoenixKitLocations do
   The manifest of this module's tables, for `mix phoenix_kit.repair` and
   `mix phoenix_kit.doctor`; see `PhoenixKitLocations.ExpectedSchema`.
   """
-  # No `@impl`, so this compiles against a core that lacks the callback.
+  @impl PhoenixKit.Module
   def expected_schema, do: PhoenixKitLocations.ExpectedSchema
 
   @impl PhoenixKit.Module
