@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.9.0 - 2026-11-08
+
+### Added
+
+- **German, Spanish, French, Italian and Chinese** (`de`, `es`, `fr`, `it`,
+  Simplified `zh`): every page string, including plural forms, alongside
+  en/et/ru. Core hands the module the base language, so `zh-CN` reads the
+  `zh` catalogue.
+- **The permissions matrix translates the module's labels** ("Locations",
+  "Manage all locations"): `permission_metadata/0` names the module's gettext
+  backend. Core's own catalogue never had "Manage all locations".
+- A legacy country typed in any of the module's languages ("Germania",
+  "德国") maps to its code; the old et/ru list missed them.
+
+### Fixed
+
+- **A form save with multilingual content off wiped a location's or a
+  space's translations.** Core then leaves `data` out of the form params, and
+  the attachment pointers alone replaced the stored map. The forms now keep
+  the stored `data`, and ignore one sent by the client.
+- **Breadcrumbs and `PlacePicker` showed an old name** after a rename in the
+  space tree, a host's `update_location/3`, or a save with multilingual
+  content off: the main-language copy in `data` kept the previous name. Every
+  write now keeps it in step with the columns
+  (`PhoenixKitLocations.TranslatedData`), and the name lookup reads the
+  column for the main language, so rows left stale by an earlier release show
+  correctly without a save.
+- The first translation of a location with files copied its file pointers
+  into the main-language entry, where a featured image removed since lived
+  on. Such copies are dropped on the next write and never brought back.
+- A translation stored under a bare `"name"` key (bulk or AI translation)
+  was shadowed by the main language's name.
+- The projects hub's Sites tab showed country names in English beside
+  translated labels.
+- The subtree-delete warning had no plural forms ("1 descendants").
+
+### Changed
+
+- An update whose attrs carry no `data` builds on the locked row's `data`,
+  since keeping the main-language entry in step writes `data` too.
+- Dependencies updated, `phoenix_kit` 3.4.0 among them (the suite passes
+  against it); `mix hex.audit` is clean again. No migration.
+
 ## 0.8.0 - 2026-10-27
 
 ### Changed
