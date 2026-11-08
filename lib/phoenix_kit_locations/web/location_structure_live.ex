@@ -677,10 +677,13 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
     gettext(~s(Delete "%{name}"? This cannot be undone.), name: name)
   end
 
+  # `ngettext`: the noun's form follows the count (ru has three, et two).
   defp delete_confirm_message(%{name: name, descendant_count: count}) do
-    gettext(~s(Delete "%{name}" and its %{count} descendants? This cannot be undone.),
-      name: name,
-      count: count
+    ngettext(
+      ~s(Delete "%{name}" and its %{count} descendant? This cannot be undone.),
+      ~s(Delete "%{name}" and its %{count} descendants? This cannot be undone.),
+      count,
+      name: name
     )
   end
 

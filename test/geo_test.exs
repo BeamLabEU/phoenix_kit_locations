@@ -109,6 +109,22 @@ defmodule PhoenixKitLocations.GeoTest do
       assert Geo.country_name("") == nil
       assert Geo.country_name(nil) == nil
     end
+
+    # `ProjectSitesLive` runs in its own process and sets the locale on the
+    # module's backend only; country names used to follow core's backend
+    # there and came out English beside translated labels.
+    test "follows the module backend's locale, even with core's unset" do
+      {name, label} =
+        Task.async(fn ->
+          Gettext.put_locale(PhoenixKitLocations.Gettext, "ru")
+          {label, "EE"} = Enum.find(Geo.country_options(nil), &(elem(&1, 1) == "EE"))
+          {Geo.country_name("EE"), label}
+        end)
+        |> Task.await()
+
+      assert name == "Эстония"
+      assert String.starts_with?(label, "Эстония")
+    end
   end
 
   describe "country_aliases/1" do

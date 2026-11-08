@@ -30,15 +30,48 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
       template_ids = msgids(Expo.PO.parse_file!(Path.join(@gettext, "default.pot")))
       po = Expo.PO.parse_file!(Path.join(@gettext, "#{unquote(locale)}/LC_MESSAGES/default.po"))
 
+      nplurals = nplurals(po)
+
       translated =
-        for %Expo.Message.Singular{} = m <- po.messages,
-            IO.iodata_to_binary(m.msgstr) != "",
+        for m <- po.messages,
+            translated?(m, nplurals),
             "fuzzy" not in List.flatten(m.flags),
             into: MapSet.new(),
             do: IO.iodata_to_binary(m.msgid)
 
       missing = template_ids |> MapSet.difference(translated) |> Enum.sort()
       assert missing == [], "untranslated or fuzzy in #{unquote(locale)}: #{inspect(missing)}"
+    end
+  end
+
+  # Core's permissions matrix translates these through the backend
+  # `permission_metadata/0` names; like the tab labels they are data, so the
+  # extractor never sees them.
+  test "permission labels name the module's backend, translate, and survive extraction" do
+    meta = PhoenixKitLocations.permission_metadata()
+    assert meta.gettext_backend == PhoenixKitLocations.Gettext
+    assert meta.gettext_domain == "default"
+
+    labels = [meta.label | Enum.map(meta.sub_permissions, & &1.label)]
+
+    for locale <- ~w(et ru), label <- labels do
+      translated =
+        Gettext.with_locale(meta.gettext_backend, locale, fn ->
+          Gettext.gettext(meta.gettext_backend, label)
+        end)
+
+      refute translated == label,
+             "permission label #{inspect(label)} is not translated in #{locale}"
+    end
+
+    for path <- Path.wildcard(Path.join(@gettext, "**/*.{pot,po}")), label <- labels do
+      message =
+        Enum.find(Expo.PO.parse_file!(path).messages, &(IO.iodata_to_binary(&1.msgid) == label))
+
+      assert message, "#{inspect(label)} is missing from #{path}"
+
+      refute "elixir-autogen" in List.flatten(message.flags),
+             "#{inspect(label)} in #{path} must survive without an extractor-visible call site"
     end
   end
 
@@ -87,8 +120,21 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
   end
 
   defp msgids(%Expo.Messages{messages: messages}) do
-    for %Expo.Message.Singular{} = m <- messages, into: MapSet.new() do
-      IO.iodata_to_binary(m.msgid)
-    end
+    for m <- messages, into: MapSet.new(), do: IO.iodata_to_binary(m.msgid)
+  end
+
+  defp translated?(%Expo.Message.Singular{msgstr: msgstr}, _nplurals),
+    do: IO.iodata_to_binary(msgstr) != ""
+
+  # Every form the locale's Plural-Forms header asks for (ru has three).
+  defp translated?(%Expo.Message.Plural{msgstr: msgstr}, nplurals) do
+    Enum.all?(0..(nplurals - 1), &(IO.iodata_to_binary(Map.get(msgstr, &1, "")) != ""))
+  end
+
+  defp nplurals(%Expo.Messages{} = po) do
+    {:ok, plural_forms} =
+      po |> Expo.Messages.get_header("Plural-Forms") |> Enum.join() |> Expo.PluralForms.parse()
+
+    plural_forms.nplurals
   end
 end

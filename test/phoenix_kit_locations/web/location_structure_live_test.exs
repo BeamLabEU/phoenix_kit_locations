@@ -448,6 +448,23 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
       assert Spaces.get_space(space.uuid) != nil
     end
 
+    test "a single descendant reads in the singular", %{conn: conn} do
+      location = fixture_location()
+      floor = fixture_space(location.uuid, %{"kind" => "floor", "name" => "Floor 1"})
+
+      _room =
+        fixture_space(location.uuid, %{
+          "kind" => "room",
+          "name" => "Room 1",
+          "parent_uuid" => floor.uuid
+        })
+
+      {:ok, view, _html} = live(conn, structure_path(location))
+      rendered = render_click(view, "delete_space", %{"uuid" => floor.uuid})
+
+      assert rendered =~ "and its 1 descendant?"
+    end
+
     test "delete_space with an unknown uuid flashes not-found without opening the modal",
          %{conn: conn} do
       location = fixture_location()

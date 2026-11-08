@@ -162,7 +162,14 @@ defmodule PhoenixKitLocations do
             "Site-wide: every location (not just own), ownership, internal notes, attachments " <>
               "and the location Types pages"
         }
-      ]
+      ],
+      # The permissions matrix translates `label` (and each sub-permission's,
+      # which inherits this backend) with it, the way `Tab` translates the
+      # sidebar. Core's own catalogue has no "Manage all locations". Like the
+      # tab labels, these msgids are hand-written in priv/gettext without
+      # `elixir-autogen`, since no call site exists for the extractor.
+      gettext_backend: PhoenixKitLocations.Gettext,
+      gettext_domain: "default"
     }
   end
 

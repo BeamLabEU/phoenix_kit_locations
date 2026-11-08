@@ -50,7 +50,8 @@ defmodule PhoenixKitLocations.Geo do
   """
   @spec country_options(String.t() | nil) :: [{String.t(), String.t()}]
   def country_options(current) do
-    CountryData.countries_for_select()
+    [locale: locale()]
+    |> CountryData.countries_for_select()
     |> Enum.map(fn {label, code} -> {strip_flag(label), code} end)
     |> with_current(current)
   end
@@ -75,7 +76,7 @@ defmodule PhoenixKitLocations.Geo do
       value ->
         case country(value) do
           nil -> value
-          %{alpha2: code} -> CountryData.get_country_name(code) || value
+          %{alpha2: code} -> CountryData.get_country_name(code, locale: locale()) || value
         end
     end
   end
@@ -133,7 +134,7 @@ defmodule PhoenixKitLocations.Geo do
   @spec subdivision_options(String.t() | nil, String.t() | nil) :: [{String.t(), String.t()}]
   def subdivision_options(country_code, current) when is_binary(country_code) do
     country_code
-    |> CountryData.subdivisions_for_select()
+    |> CountryData.subdivisions_for_select(locale: locale())
     |> with_current(current)
   end
 
@@ -318,9 +319,13 @@ defmodule PhoenixKitLocations.Geo do
 
   defp blank_to_nil(_value), do: nil
 
-  # The viewer's language as a bare code ("et"), for localized names.
+  # The viewer's language as a bare code ("et"), for localized names. Read from
+  # the module's backend, so names follow the module's own labels: core's
+  # `CountryData` defaults to core's backend, which `ProjectSitesLive` (its own
+  # `live_render` process, locale set on this backend only) leaves unset, and
+  # its country names came out English beside translated labels.
   defp locale do
-    Gettext.get_locale() |> String.split(["-", "_"]) |> hd()
+    PhoenixKitLocations.Gettext |> Gettext.get_locale() |> String.split(["-", "_"]) |> hd()
   end
 
   # Literal calls, so `mix gettext.extract` sees every label. An unknown type
