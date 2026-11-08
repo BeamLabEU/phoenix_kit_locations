@@ -5,6 +5,8 @@ defmodule PhoenixKitLocations.Schemas.LocationType do
   use PhoenixKit.SchemaPrefix
   import Ecto.Changeset
 
+  alias PhoenixKitLocations.TranslatedData
+
   @type t :: %__MODULE__{}
 
   @primary_key {:uuid, UUIDv7, autogenerate: true}
@@ -38,5 +40,6 @@ defmodule PhoenixKitLocations.Schemas.LocationType do
     |> validate_length(:name, min: 1, max: 255)
     |> validate_length(:description, max: 1000)
     |> validate_inclusion(:status, @statuses)
+    |> TranslatedData.normalize_changeset([:name, :description])
   end
 end

@@ -31,6 +31,7 @@ defmodule PhoenixKitLocations.Schemas.Space do
   use Gettext, backend: PhoenixKitLocations.Gettext
 
   alias PhoenixKitLocations.Schemas.Location
+  alias PhoenixKitLocations.TranslatedData
 
   @type t :: %__MODULE__{}
 
@@ -96,6 +97,7 @@ defmodule PhoenixKitLocations.Schemas.Space do
     |> validate_length(:description, max: 2000)
     |> validate_length(:notes, max: 5000)
     |> validate_no_self_parent()
+    |> TranslatedData.normalize_changeset([:name, :description])
     |> assoc_constraint(:location)
     |> assoc_constraint(:parent)
     |> check_constraint(:kind,

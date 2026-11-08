@@ -15,6 +15,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
   alias PhoenixKitLocations.Paths
   alias PhoenixKitLocations.Policy
   alias PhoenixKitLocations.Schemas.LocationType
+  alias PhoenixKitLocations.TranslatedData
   alias PhoenixKitWeb.Actor
 
   @translatable_fields ["name", "description"]
@@ -104,7 +105,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
 
   def handle_event("validate", %{"location_type" => params}, socket) do
     params =
-      merge_translatable_params(params, socket, @translatable_fields,
+      TranslatedData.merge_form_params(params, socket, @translatable_fields,
         changeset: socket.assigns.changeset,
         preserve_fields: @preserve_fields
       )
@@ -129,7 +130,7 @@ defmodule PhoenixKitLocations.Web.LocationTypeFormLive do
 
   defp do_save(socket, params) do
     params =
-      merge_translatable_params(params, socket, @translatable_fields,
+      TranslatedData.merge_form_params(params, socket, @translatable_fields,
         changeset: socket.assigns.changeset,
         preserve_fields: @preserve_fields
       )

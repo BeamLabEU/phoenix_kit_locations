@@ -85,7 +85,6 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
   import PhoenixKitWeb.Components.Core.SearchPicker, only: [search_picker: 1]
   import PhoenixKitLocations.Web.Components.SpaceTree, only: [space_tree: 1]
 
-  alias PhoenixKit.Utils.Multilang
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Schemas.Location
   alias PhoenixKitLocations.Spaces
@@ -358,17 +357,6 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
     end
   end
 
-  # ─────────────────────────────────────────────────────────────────
-  # Display helpers
-  # ─────────────────────────────────────────────────────────────────
-
-  defp location_display_name(%Location{name: name}, nil), do: name
-
-  defp location_display_name(%Location{data: data, name: name}, locale) do
-    translation = Multilang.get_language_data(data, locale)
-    Map.get(translation, "_name") || Map.get(translation, "name") || name
-  end
-
   # Per-instance push names: `push_event` reaches every hook listening on a
   # name, so a shared one would fill every picker on the page.
   defp results_event(id), do: "#{id}:results"
@@ -378,7 +366,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
     row = %{
       kind: "location",
       uuid: location.uuid,
-      label: location_display_name(location, locale),
+      label: Spaces.translated_name(location, locale),
       icon: "hero-map-pin"
     }
 
@@ -406,7 +394,7 @@ defmodule PhoenixKitLocations.Web.Components.PlacePicker do
         <div :if={@selected_location} class="flex items-center justify-between gap-2">
           <span class="text-sm font-medium truncate flex items-center gap-1">
             <.icon name="hero-map-pin" class="w-4 h-4 shrink-0 text-base-content/50" />
-            {location_display_name(@selected_location, @locale)}
+            {Spaces.translated_name(@selected_location, @locale)}
           </span>
           <.button
             type="button"

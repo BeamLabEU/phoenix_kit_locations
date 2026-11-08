@@ -619,5 +619,45 @@ defmodule PhoenixKitLocations.SpacesTest do
 
       assert Spaces.full_path(floor.uuid, locale: "ru") == "Warehouse A / Этаж 1"
     end
+
+    # The form writes the main entry as "_name"; a bulk or AI translation may
+    # write a language's override bare. The merged read used to let the main
+    # "_name" win.
+    test "with locale: a bare override beats the main entry's prefixed name" do
+      location = create_location(%{name: "Warehouse A"})
+
+      floor =
+        create_space(location.uuid, %{
+          "kind" => "floor",
+          "name" => "Floor 1",
+          "data" => %{
+            "_primary_language" => "en",
+            "en" => %{"_name" => "Floor 1"},
+            "ru" => %{"name" => "Этаж 1"}
+          }
+        })
+
+      assert Spaces.full_path(floor.uuid, locale: "ru") == "Warehouse A / Этаж 1"
+    end
+
+    # A main entry an older release left stale (a tree rename changed only
+    # the column), written straight to the row.
+    test "with locale: the main language and an untranslated one read the column" do
+      location = create_location(%{name: "Warehouse A"})
+      floor = create_space(location.uuid, %{"kind" => "floor", "name" => "Lobby"})
+
+      stale = %{
+        "_primary_language" => "en",
+        "en" => %{"_name" => "Floor 1"},
+        "ru" => %{"_name" => "Этаж 1"}
+      }
+
+      floor |> Ecto.Changeset.change(data: stale) |> Repo.update!()
+
+      assert Spaces.full_path(floor.uuid, locale: "en") == "Warehouse A / Lobby"
+      assert Spaces.full_path(floor.uuid, locale: "en-GB") == "Warehouse A / Lobby"
+      assert Spaces.full_path(floor.uuid, locale: "et") == "Warehouse A / Lobby"
+      assert Spaces.full_path(floor.uuid, locale: "ru-RU") == "Warehouse A / Этаж 1"
+    end
   end
 end

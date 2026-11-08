@@ -132,8 +132,9 @@ defmodule PhoenixKitLocations.Locations do
         nil ->
           repo().rollback(:location_type_not_found)
 
-        _stored ->
+        stored ->
           location_type
+          |> with_stored_data(stored, attrs)
           |> LocationType.changeset(attrs)
           |> repo().update()
           |> ok_or_rollback()
@@ -322,6 +323,7 @@ defmodule PhoenixKitLocations.Locations do
 
         stored ->
           location
+          |> with_stored_data(stored, attrs)
           |> Location.changeset(keep_folder_pointer(attrs, stored))
           |> repo().update()
           |> ok_or_rollback()
@@ -354,6 +356,22 @@ defmodule PhoenixKitLocations.Locations do
   end
 
   def keep_folder_pointer(attrs, _stored), do: attrs
+
+  @doc false
+  # An update whose attrs carry no `data` starts from the locked row's
+  # `data`, not the caller's copy: the schema changesets rewrite `data` even
+  # then (`PhoenixKitLocations.TranslatedData` keeps the main-language entry
+  # in step with a renamed column), and a copy loaded before another session
+  # claimed a folder or saved a translation would write it back without
+  # them. Attrs that carry `data` (a form save) keep the caller's copy as the
+  # base, so a `data` the form left as it found it is still no change and
+  # does not overwrite what another session wrote since.
+  @spec with_stored_data(struct(), struct(), map()) :: struct()
+  def with_stored_data(record, %{data: data}, attrs) do
+    if Map.has_key?(attrs, "data") or Map.has_key?(attrs, :data),
+      do: record,
+      else: %{record | data: data}
+  end
 
   @doc false
   @spec lock_row(module(), String.t()) :: struct() | nil

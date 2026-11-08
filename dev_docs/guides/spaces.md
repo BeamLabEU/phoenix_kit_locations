@@ -80,18 +80,22 @@ mixed-key map): a space never moves to another location.
   (not a `%{space: …, children: …}` envelope).
 - `full_path/2`: `"Location / Floor / Zone / Shelf"` breadcrumb, `nil` when the
   space or its Location cannot be found. `opts[:locale]` resolves each segment
-  through `PhoenixKit.Utils.Multilang.get_language_data/2`; omitted, it reads the
-  primary-language column with no `data` read at all. Ancestors come from one
+  through `translated_name/2`; omitted, it reads the primary-language column
+  with no `data` read at all. Ancestors come from one
   recursive CTE using `UNION` (not `UNION ALL`) so a corrupted or cyclic chain
   terminates.
 - `count_descendants/1`: every descendant (children, grandchildren, …), `0` for a
   leaf and `0` for an unknown uuid. Backs the delete-confirmation modal, because
   a hard delete CASCADEs the whole subtree.
-- `translated_name/2` (`@doc false`, shared with `LocationStructureLive`) checks
-  `data[locale]["_name"]` before `data[locale]["name"]` before the column.
-  `MultilangForm.merge_translatable_params/4`, the form write path, stores
-  translatable fields under the underscore-prefixed key; a bare `"name"` lookup
-  would always fall back to the primary language regardless of locale.
+- `translated_name/2` (`@doc false`, shared with `LocationStructureLive` and
+  `PlacePicker`): the column for the main language and for a language with no
+  name of its own; otherwise that language's OWN entry (core's
+  `get_raw_language_data/2`, with its dialect fallback), `"_name"` before a bare
+  `"name"`. Not core's merged main ⊕ override `get_language_data/2`: there the
+  main entry's `"_name"` (the form writes it) shadows a bare `"name"` override
+  (a bulk or AI translation writes those), and a main entry an older release
+  left stale would stand in for the column. Writes keep the main entry in step
+  with the columns (`PhoenixKitLocations.TranslatedData`).
 
 ### Raw CTE uuids
 

@@ -7,6 +7,7 @@ defmodule PhoenixKitLocations.Schemas.Location do
   import Ecto.Changeset
 
   alias PhoenixKitLocations.Geo
+  alias PhoenixKitLocations.TranslatedData
 
   @type t :: %__MODULE__{}
 
@@ -98,6 +99,7 @@ defmodule PhoenixKitLocations.Schemas.Location do
     |> maybe_validate_email()
     |> maybe_validate_website()
     |> Geo.normalize_changeset()
+    |> TranslatedData.normalize_changeset([:name, :description, :public_notes])
   end
 
   @doc """

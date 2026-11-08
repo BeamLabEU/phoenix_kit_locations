@@ -44,6 +44,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   alias PhoenixKitLocations.Paths
   alias PhoenixKitLocations.Policy
   alias PhoenixKitLocations.Schemas.Location
+  alias PhoenixKitLocations.TranslatedData
   alias PhoenixKitWeb.Actor
 
   @attachment_events ~w(open_featured_image_picker close_media_selector cancel_upload
@@ -243,7 +244,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
   def handle_event("validate", %{"location" => params}, socket) do
     params =
-      merge_translatable_params(params, socket, @translatable_fields,
+      TranslatedData.merge_form_params(params, socket, @translatable_fields,
         changeset: socket.assigns.changeset,
         preserve_fields: @preserve_fields
       )
@@ -315,7 +316,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
   def handle_event("save", %{"location" => params}, socket) do
     params =
-      merge_translatable_params(params, socket, @translatable_fields,
+      TranslatedData.merge_form_params(params, socket, @translatable_fields,
         changeset: socket.assigns.changeset,
         preserve_fields: @preserve_fields
       )

@@ -203,7 +203,8 @@ defmodule PhoenixKitLocations.Spaces do
   # reads the chain after any other re-parent there has committed — two at
   # once in opposite directions otherwise both passed and committed a loop.
   # The row lock keeps the stored folder pointer a save does not name
-  # (`Locations.keep_folder_pointer/2`).
+  # (`Locations.keep_folder_pointer/2`), and the changeset starts from the
+  # locked row's `data` when the attrs name none (`Locations.with_stored_data/3`).
   defp locked_update(space, attrs) do
     parent = fetch_attr(attrs, :parent_uuid)
     # Any change of parent, a move to the top level included: it closes no
@@ -217,6 +218,7 @@ defmodule PhoenixKitLocations.Spaces do
          :ok <- validate_no_cycle(space.uuid, parent, space.location_uuid),
          {:ok, updated} <-
            space
+           |> Locations.with_stored_data(stored, attrs)
            |> Space.changeset(Locations.keep_folder_pointer(attrs, stored))
            |> repo().update() do
       updated
@@ -473,29 +475,44 @@ defmodule PhoenixKitLocations.Spaces do
   # `:data` field). `locale: nil` skips the JSONB read entirely and
   # returns the primary-language column as-is.
   #
-  # Checks `data[locale]["_name"]` before `data[locale]["name"]`:
-  # `PhoenixKitWeb.Components.MultilangForm.merge_translatable_params/4`
-  # — the form write path used by both `LocationFormLive` and this
-  # module's own `LocationStructureLive` detail panel — stores
-  # translatable fields under an underscore-prefixed key (`"_name"`,
-  # mirroring the `"_title"` example in `PhoenixKit.Utils.Multilang`'s
-  # own moduledoc). A bare `Map.get(translation, "name")` would never
-  # see those overrides and would always silently fall back to the
-  # primary-language column regardless of `locale`. The unprefixed
-  # `"name"` fallback covers data written through a different path
-  # (e.g. bulk/AI translation) that stores field names as-is. Mirrors
-  # `PhoenixKitCatalogue.Web.Components.ItemPicker.translated_name/2`
-  # exactly.
+  # The column is the main language's name; `data` holds the other
+  # languages' overrides (`PhoenixKitLocations.TranslatedData`). So the
+  # main language, and a language with no name of its own, read the
+  # column, and another language reads its OWN entry, never the merged
+  # main ⊕ override map core's `get_language_data/2` builds: there a
+  # main-entry `"_name"` (core's form writes it) shadows a bare `"name"`
+  # override (a bulk or AI translation writes those), and a main entry
+  # left stale by an older release would stand in for the column.
+  # `get_raw_language_data/2` finds the entry with core's dialect fallback
+  # ("fr" for "fr-FR"); when that falls through to the main entry, it is
+  # the main language. `"_name"` is read before the bare `"name"`. Flat
+  # (single-language) data is read as one entry.
   #
   # Public (not part of the documented API — `@doc false`) so that
-  # `LocationStructureLive` can reuse this resolver for the breadcrumb
-  # trail without duplicating the `_name`/`name` fallback chain.
+  # `LocationStructureLive` and `PlacePicker` share this resolver.
   @doc false
   def translated_name(%{name: name}, nil), do: name
 
   def translated_name(%{data: data, name: name}, locale) do
-    translation = Multilang.get_language_data(data, locale)
-    Map.get(translation, "_name") || Map.get(translation, "name") || name
+    if Multilang.multilang_data?(data) do
+      main_entry = Map.get(data, data["_primary_language"])
+
+      case Multilang.get_raw_language_data(data, locale) do
+        ^main_entry -> name
+        own -> entry_name(own) || name
+      end
+    else
+      entry_name(data || %{}) || name
+    end
+  end
+
+  defp entry_name(entry) do
+    Enum.find_value(["_name", "name"], fn key ->
+      case Map.get(entry, key) do
+        value when is_binary(value) and value != "" -> value
+        _ -> nil
+      end
+    end)
   end
 
   # ═══════════════════════════════════════════════════════════════════
