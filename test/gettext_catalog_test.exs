@@ -15,6 +15,19 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
   @lib Path.expand("../lib", __DIR__)
   @gettext Path.expand("../priv/gettext", __DIR__)
 
+  # Every language the module ships besides English, whose msgids are the
+  # English text.
+  @locales ~w(et ru de es fr it zh)
+
+  test "the shipped catalogues are exactly the checked locales" do
+    shipped =
+      Path.wildcard(Path.join(@gettext, "*/LC_MESSAGES/default.po"))
+      |> Enum.map(&(&1 |> Path.relative_to(@gettext) |> Path.split() |> hd()))
+      |> Enum.sort()
+
+    assert shipped == Enum.sort(["en" | @locales])
+  end
+
   test "no module translates through core's backend" do
     offenders =
       Path.wildcard(Path.join(@lib, "**/*.ex"))
@@ -25,7 +38,7 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
            "on core's Gettext backend (its catalogue lacks these strings): #{inspect(offenders)}"
   end
 
-  for locale <- ~w(et ru) do
+  for locale <- @locales do
     test "#{locale} translates every msgid in the template, with no fuzzy guesses" do
       template_ids = msgids(Expo.PO.parse_file!(Path.join(@gettext, "default.pot")))
       po = Expo.PO.parse_file!(Path.join(@gettext, "#{unquote(locale)}/LC_MESSAGES/default.po"))
@@ -54,13 +67,13 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
 
     labels = [meta.label | Enum.map(meta.sub_permissions, & &1.label)]
 
-    for locale <- ~w(et ru), label <- labels do
+    for locale <- @locales, label <- labels do
       translated =
         Gettext.with_locale(meta.gettext_backend, locale, fn ->
           Gettext.gettext(meta.gettext_backend, label)
         end)
 
-      refute translated == label,
+      assert translated == catalogue_msgstr(locale, label),
              "permission label #{inspect(label)} is not translated in #{locale}"
     end
 
@@ -84,20 +97,20 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
   # Core's `Tab.localized_label/1` looks the label up at runtime, so a tab
   # without the backend renders its English msgid in every locale and nothing
   # warns; the extractor never sees that lookup either.
-  test "every admin tab names the module's backend and its label translates in ru and et" do
+  test "every admin tab names the module's backend and its label translates in every locale" do
     for tab <- PhoenixKitLocations.admin_tabs() do
       assert tab.gettext_backend == PhoenixKitLocations.Gettext,
              "#{tab.id} has no gettext_backend"
 
       assert tab.gettext_domain == "default", "#{tab.id} has no gettext_domain"
 
-      for locale <- ~w(et ru) do
+      for locale <- @locales do
         translated =
           Gettext.with_locale(PhoenixKitLocations.Gettext, locale, fn ->
             Tab.localized_label(tab)
           end)
 
-        refute translated == tab.label,
+        assert translated == catalogue_msgstr(locale, tab.label),
                "tab #{tab.id} label #{inspect(tab.label)} is not translated in #{locale}"
       end
     end
@@ -117,6 +130,21 @@ defmodule PhoenixKitLocations.GettextCatalogTest do
                "#{inspect(label)} in #{path} must survive without an extractor-visible call site"
       end
     end
+  end
+
+  # The locale's non-blank translation of `msgid`, so a word spelled as in
+  # English still counts once the catalogue holds it.
+  defp catalogue_msgstr(locale, msgid) do
+    message =
+      Path.join(@gettext, "#{locale}/LC_MESSAGES/default.po")
+      |> Expo.PO.parse_file!()
+      |> Map.fetch!(:messages)
+      |> Enum.find(&(IO.iodata_to_binary(&1.msgid) == msgid))
+
+    assert %Expo.Message.Singular{} = message, "#{inspect(msgid)} is missing from #{locale}"
+    msgstr = IO.iodata_to_binary(message.msgstr)
+    assert msgstr != "", "#{inspect(msgid)} is untranslated in #{locale}"
+    msgstr
   end
 
   defp msgids(%Expo.Messages{messages: messages}) do

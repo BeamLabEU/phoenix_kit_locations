@@ -1,0 +1,1052 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n>1);\n"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:136
+#, elixir-autogen, elixir-format
+msgid "Aisle"
+msgstr "Allée"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:132
+#, elixir-autogen, elixir-format
+msgid "Floor"
+msgstr "Étage"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:133
+#, elixir-autogen, elixir-format
+msgid "Room"
+msgstr "Salle"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:135
+#, elixir-autogen, elixir-format
+msgid "Section"
+msgstr "Section"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:137
+#, elixir-autogen, elixir-format
+msgid "Shelf"
+msgstr "Étagère"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:134
+#, elixir-autogen, elixir-format
+msgid "Zone"
+msgstr "Zone"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:812
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:524
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:245
+#: lib/phoenix_kit_locations/web/locations_live.ex:515
+#, elixir-autogen, elixir-format
+msgid "Active"
+msgstr "Actif"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:471
+#, elixir-autogen, elixir-format
+msgid "Add"
+msgstr "Ajouter"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:290
+#, elixir-autogen, elixir-format
+msgid "Add child"
+msgstr "Ajouter un sous-espace"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:134
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:696
+#, elixir-autogen, elixir-format
+msgid "Add root space"
+msgstr "Ajouter un espace racine"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:700
+#, elixir-autogen, elixir-format
+msgid "Add space"
+msgstr "Ajouter un espace"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:701
+#, elixir-autogen, elixir-format
+msgid "Add space under %{name}"
+msgstr "Ajouter un espace dans %{name}"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:160
+#: lib/phoenix_kit_locations/web/location_form_live.ex:852
+#, elixir-autogen, elixir-format
+msgid "Cancel"
+msgstr "Annuler"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:78
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:418
+#, elixir-autogen, elixir-format
+msgid "Change"
+msgstr "Modifier"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:300
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:616
+#: lib/phoenix_kit_locations/web/locations_live.ex:279
+#: lib/phoenix_kit_locations/web/locations_live.ex:290
+#: lib/phoenix_kit_locations/web/locations_live.ex:374
+#: lib/phoenix_kit_locations/web/locations_live.ex:384
+#: lib/phoenix_kit_locations/web/locations_live.ex:444
+#: lib/phoenix_kit_locations/web/locations_live.ex:454
+#, elixir-autogen, elixir-format
+msgid "Delete"
+msgstr "Supprimer"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:677
+#, elixir-autogen, elixir-format
+msgid "Delete \"%{name}\"? This cannot be undone."
+msgstr "Supprimer « %{name} » ? Cette action est irréversible."
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:613
+#, elixir-autogen, elixir-format
+msgid "Delete Space"
+msgstr "Supprimer l'espace"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:637
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:558
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:232
+#: lib/phoenix_kit_locations/web/locations_live.ex:398
+#: lib/phoenix_kit_locations/web/locations_live.ex:419
+#, elixir-autogen, elixir-format
+msgid "Description"
+msgstr "Description"
+
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:33
+#, elixir-autogen, elixir-format
+msgid "Details"
+msgstr "Détails"
+
+#: lib/phoenix_kit_locations.ex:218
+#, elixir-format
+msgid "Edit Location"
+msgstr "Modifier le lieu"
+
+#: lib/phoenix_kit_locations.ex:203
+#, elixir-format
+msgid "Edit Type"
+msgstr "Modifier le type"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:747
+#, elixir-autogen, elixir-format
+msgid "Failed to delete space"
+msgstr "Impossible de supprimer l'espace"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:722
+#, elixir-autogen, elixir-format
+msgid "Failed to rename space"
+msgstr "Impossible de renommer l'espace"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:244
+#: lib/phoenix_kit_locations/web/location_form_live.ex:812
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:524
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:245
+#: lib/phoenix_kit_locations/web/locations_live.ex:516
+#, elixir-autogen, elixir-format
+msgid "Inactive"
+msgstr "Inactif"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:567
+#, elixir-autogen, elixir-format
+msgid "Internal notes (admin-only)"
+msgstr "Notes internes (administrateurs uniquement)"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:455
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:516
+#, elixir-autogen, elixir-format
+msgid "Kind"
+msgstr "Type"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:93
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:93
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:55
+#: lib/phoenix_kit_locations/web/locations_live.ex:36
+#: lib/phoenix_kit_locations/web/locations_live.ex:81
+#: lib/phoenix_kit_locations/web/locations_live.ex:91
+#, elixir-format
+msgid "Locations"
+msgstr "Lieux"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:270
+#, elixir-autogen, elixir-format
+msgid "Move down"
+msgstr "Déplacer vers le bas"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:258
+#, elixir-autogen, elixir-format
+msgid "Move up"
+msgstr "Déplacer vers le haut"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:622
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:462
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:544
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:217
+#: lib/phoenix_kit_locations/web/locations_live.ex:330
+#: lib/phoenix_kit_locations/web/locations_live.ex:418
+#, elixir-autogen, elixir-format
+msgid "Name"
+msgstr "Nom"
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:318
+#: lib/phoenix_kit_locations/web/locations_live.ex:319
+#: lib/phoenix_kit_locations/web/locations_live.ex:322
+#, elixir-format
+msgid "New Location"
+msgstr "Nouveau lieu"
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:406
+#: lib/phoenix_kit_locations/web/locations_live.ex:407
+#: lib/phoenix_kit_locations/web/locations_live.ex:410
+#, elixir-format
+msgid "New Type"
+msgstr "Nouveau type"
+
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:458
+#, elixir-autogen, elixir-format
+msgid "No locations found"
+msgstr "Aucun lieu trouvé"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:121
+#, elixir-autogen, elixir-format
+msgid "No spaces yet."
+msgstr "Aucun espace pour le moment."
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:583
+#, elixir-autogen, elixir-format
+msgid "Photos, layouts, anything specific to this space."
+msgstr "Photos, plans et tout ce qui concerne cet espace."
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:584
+#, elixir-autogen, elixir-format
+msgid "Remove this file from the space?"
+msgstr "Retirer ce fichier de l'espace ?"
+
+#: lib/phoenix_kit_locations/web/components/space_tree.ex:280
+#, elixir-autogen, elixir-format
+msgid "Rename"
+msgstr "Renommer"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:597
+#, elixir-autogen, elixir-format
+msgid "Save"
+msgstr "Enregistrer"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:857
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:595
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:259
+#, elixir-autogen, elixir-format
+msgid "Saving..."
+msgstr "Enregistrement..."
+
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:453
+#, elixir-autogen, elixir-format
+msgid "Search locations…"
+msgstr "Rechercher des lieux…"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:582
+#, elixir-autogen, elixir-format
+msgid "Shown for this space."
+msgstr "Affichée pour cet espace."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:791
+#: lib/phoenix_kit_locations/web/location_form_live.ex:811
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:523
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:244
+#: lib/phoenix_kit_locations/web/locations_live.ex:308
+#: lib/phoenix_kit_locations/web/locations_live.ex:336
+#: lib/phoenix_kit_locations/web/locations_live.ex:399
+#: lib/phoenix_kit_locations/web/locations_live.ex:420
+#, elixir-autogen, elixir-format
+msgid "Status"
+msgstr "Statut"
+
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:36
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:92
+#: lib/phoenix_kit_locations/web/locations_live.ex:372
+#, elixir-format
+msgid "Structure"
+msgstr "Structure"
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:86
+#: lib/phoenix_kit_locations/web/locations_live.ex:90
+#: lib/phoenix_kit_locations/web/locations_live.ex:307
+#, elixir-format
+msgid "Types"
+msgstr "Types"
+
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:432
+#, elixir-autogen, elixir-format
+msgid "Use this location (no specific space)"
+msgstr "Utiliser ce lieu (sans espace précis)"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:87
+#, elixir-autogen, elixir-format
+msgid "A location with an owner is private to that account; without one it is global. The change applies when you save."
+msgstr "Un lieu avec un propriétaire est réservé à ce compte ; sans propriétaire, il est global. La modification s'applique à l'enregistrement."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:47
+#, elixir-autogen, elixir-format
+msgid "All"
+msgstr "Tous"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:53
+#, elixir-autogen, elixir-format
+msgid "Filter by owner"
+msgstr "Filtrer par propriétaire"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:26
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:48
+#, elixir-autogen, elixir-format
+msgid "Global"
+msgstr "Global"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:99
+#, elixir-autogen, elixir-format
+msgid "No owner (global)"
+msgstr "Aucun propriétaire (global)"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:115
+#, elixir-autogen, elixir-format
+msgid "No users found."
+msgstr "Aucun utilisateur trouvé."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:49
+#, elixir-autogen, elixir-format
+msgid "Owned"
+msgstr "Avec propriétaire"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:22
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:81
+#, elixir-autogen, elixir-format
+msgid "Owner"
+msgstr "Propriétaire"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:96
+#, elixir-autogen, elixir-format
+msgid "Remove owner"
+msgstr "Retirer le propriétaire"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:110
+#, elixir-autogen, elixir-format
+msgid "Search users by email or name…"
+msgstr "Rechercher des utilisateurs par e-mail ou par nom…"
+
+#: lib/phoenix_kit_locations/attachments.ex:345
+#, elixir-autogen, elixir-format
+msgid "Could not remove file."
+msgstr "Impossible de retirer le fichier."
+
+#: lib/phoenix_kit_locations/attachments.ex:622
+#, elixir-autogen, elixir-format
+msgid "Selected image could not be loaded."
+msgstr "Impossible de charger l'image sélectionnée."
+
+#: lib/phoenix_kit_locations/attachments.ex:393
+#, elixir-autogen, elixir-format
+msgid "Upload failed: no target file area selected."
+msgstr "Échec de l'import : aucune zone de fichiers cible sélectionnée."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:179
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:82
+#: lib/phoenix_kit_locations/web/locations_live.ex:371
+#: lib/phoenix_kit_locations/web/locations_live.ex:383
+#: lib/phoenix_kit_locations/web/locations_live.ex:442
+#: lib/phoenix_kit_locations/web/locations_live.ex:453
+#, elixir-autogen, elixir-format
+msgid "Edit"
+msgstr "Modifier"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:178
+#, elixir-autogen, elixir-format
+msgid "New location"
+msgstr "Nouveau lieu"
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "New type"
+msgstr "Nouveau type"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:136
+#, elixir-autogen, elixir-format
+msgid " or drag & drop"
+msgstr " ou glissez-déposez"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:737
+#, elixir-autogen, elixir-format
+msgid "+1 234 567 890"
+msgstr "+33 1 23 45 67 89"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:929
+#, elixir-autogen, elixir-format
+msgid "24/7 Security"
+msgstr "Sécurité 24h/24, 7j/7"
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:337
+#: lib/phoenix_kit_locations/web/locations_live.ex:421
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "Actions"
+
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:98
+#, elixir-autogen, elixir-format
+msgid "Add location UUIDs (comma-separated) in the project's Modules & features panel."
+msgstr "Ajoutez les UUID des lieux (séparés par des virgules) dans le panneau Modules et fonctionnalités du projet."
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:472
+#, elixir-autogen, elixir-format
+msgid "Adding..."
+msgstr "Ajout en cours..."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:659
+#: lib/phoenix_kit_locations/web/locations_live.ex:304
+#: lib/phoenix_kit_locations/web/locations_live.ex:331
+#, elixir-autogen, elixir-format
+msgid "Address"
+msgstr "Adresse"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:678
+#, elixir-autogen, elixir-format
+msgid "Address Line 1"
+msgstr "Adresse (ligne 1)"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:685
+#, elixir-autogen, elixir-format
+msgid "Address Line 2"
+msgstr "Complément d'adresse"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:926
+#, elixir-autogen, elixir-format
+msgid "Air Conditioning"
+msgstr "Climatisation"
+
+#: lib/phoenix_kit_locations/errors.ex:59
+#, elixir-autogen, elixir-format
+msgid "An unexpected error occurred."
+msgstr "Une erreur inattendue s'est produite."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:686
+#, elixir-autogen, elixir-format
+msgid "Apartment, suite, unit, building, floor"
+msgstr "Appartement, bureau, lot, bâtiment, étage"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:110
+#, elixir-autogen, elixir-format
+msgid "Attached Files"
+msgstr "Fichiers joints"
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:234
+#, elixir-autogen, elixir-format
+msgid "Brief description of this location type..."
+msgstr "Brève description de ce type de lieu..."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:639
+#, elixir-autogen, elixir-format
+msgid "Brief description of this location..."
+msgstr "Brève description de ce lieu..."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:930
+#, elixir-autogen, elixir-format
+msgid "CCTV"
+msgstr "Vidéosurveillance"
+
+#: lib/phoenix_kit_locations/errors.ex:54
+#, elixir-autogen, elixir-format
+msgid "Cannot make a space its own ancestor."
+msgstr "Un espace ne peut pas être son propre ancêtre."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:712
+#: lib/phoenix_kit_locations/web/location_form_live.ex:716
+#: lib/phoenix_kit_locations/web/locations_live.ex:332
+#, elixir-autogen, elixir-format
+msgid "City"
+msgstr "Ville"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:820
+#, elixir-autogen, elixir-format
+msgid "Click to toggle. A location can have multiple types."
+msgstr "Cliquez pour activer ou désactiver. Un lieu peut avoir plusieurs types."
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:135
+#, elixir-autogen, elixir-format
+msgid "Click to upload"
+msgstr "Cliquez pour importer"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:730
+#, elixir-autogen, elixir-format
+msgid "Contact"
+msgstr "Contact"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:670
+#: lib/phoenix_kit_locations/web/locations_live.ex:305
+#: lib/phoenix_kit_locations/web/locations_live.ex:333
+#, elixir-autogen, elixir-format
+msgid "Country"
+msgstr "Pays"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:861
+#, elixir-autogen, elixir-format
+msgid "Create Location"
+msgstr "Créer le lieu"
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:258
+#, elixir-autogen, elixir-format
+msgid "Create Type"
+msgstr "Créer le type"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:857
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:259
+#, elixir-autogen, elixir-format
+msgid "Creating..."
+msgstr "Création en cours..."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:276
+#, elixir-autogen, elixir-format
+msgid "Delete Location"
+msgstr "Supprimer le lieu"
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:287
+#, elixir-autogen, elixir-format
+msgid "Delete Location Type"
+msgstr "Supprimer le type de lieu"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:202
+#, elixir-autogen, elixir-format
+msgid "Download"
+msgstr "Télécharger"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:922
+#, elixir-autogen, elixir-format
+msgid "Elevator"
+msgstr "Ascenseur"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:742
+#, elixir-autogen, elixir-format
+msgid "Email"
+msgstr "E-mail"
+
+#: lib/phoenix_kit_locations/errors.ex:35
+#, elixir-autogen, elixir-format
+msgid "Failed to delete location type."
+msgstr "Impossible de supprimer le type de lieu."
+
+#: lib/phoenix_kit_locations/errors.ex:34
+#, elixir-autogen, elixir-format
+msgid "Failed to delete location."
+msgstr "Impossible de supprimer le lieu."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:129
+#, elixir-autogen, elixir-format
+msgid "Failed to load location types."
+msgstr "Impossible de charger les types de lieux."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:116
+#, elixir-autogen, elixir-format
+msgid "Failed to load locations."
+msgstr "Impossible de charger les lieux."
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:47
+#, elixir-autogen, elixir-format
+msgid "Featured Image"
+msgstr "Image à la une"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:753
+#, elixir-autogen, elixir-format
+msgid "Features & Amenities"
+msgstr "Équipements et services"
+
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:104
+#, elixir-autogen, elixir-format
+msgid "Find them in Locations"
+msgstr "Retrouvez-les dans Lieux"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:37
+#: lib/phoenix_kit_locations/web/location_form_live.ex:781
+#, elixir-autogen, elixir-format
+msgid "Floor plans, brochures, certificates. Any file type is accepted."
+msgstr "Plans, brochures, certificats. Tous les types de fichiers sont acceptés."
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:249
+#, elixir-autogen, elixir-format
+msgid "Inactive types won't appear in the location type selection."
+msgstr "Les types inactifs n'apparaîtront pas dans la sélection du type de lieu."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:791
+#, elixir-autogen, elixir-format
+msgid "Internal"
+msgstr "Interne"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:803
+#, elixir-autogen, elixir-format
+msgid "Internal Notes"
+msgstr "Notes internes"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:113
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:456
+#, elixir-autogen, elixir-format
+msgid "Load more"
+msgstr "Charger plus"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:925
+#, elixir-autogen, elixir-format
+msgid "Loading Dock"
+msgstr "Quai de chargement"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:114
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:457
+#, elixir-autogen, elixir-format
+msgid "Loading…"
+msgstr "Chargement…"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:818
+#, elixir-autogen, elixir-format
+msgid "Location Types"
+msgstr "Types de lieux"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:447
+#, elixir-autogen, elixir-format
+msgid "Location created."
+msgstr "Lieu créé."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:241
+#, elixir-autogen, elixir-format
+msgid "Location deleted."
+msgstr "Lieu supprimé."
+
+#: lib/phoenix_kit_locations/errors.ex:32
+#, elixir-autogen, elixir-format
+msgid "Location not found."
+msgstr "Lieu introuvable."
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:154
+#, elixir-autogen, elixir-format
+msgid "Location type created."
+msgstr "Type de lieu créé."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:242
+#, elixir-autogen, elixir-format
+msgid "Location type deleted."
+msgstr "Type de lieu supprimé."
+
+#: lib/phoenix_kit_locations/errors.ex:33
+#, elixir-autogen, elixir-format
+msgid "Location type not found."
+msgstr "Type de lieu introuvable."
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:167
+#, elixir-autogen, elixir-format
+msgid "Location type updated."
+msgstr "Type de lieu mis à jour."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:467
+#, elixir-autogen, elixir-format
+msgid "Location updated."
+msgstr "Lieu mis à jour."
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:96
+#, elixir-autogen, elixir-format
+msgid "No featured image set."
+msgstr "Aucune image à la une définie."
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:174
+#, elixir-autogen, elixir-format
+msgid "No files attached yet."
+msgstr "Aucun fichier joint pour le moment."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:492
+#, elixir-autogen, elixir-format
+msgid "No location types yet."
+msgstr "Aucun type de lieu pour le moment."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:480
+#, elixir-autogen, elixir-format
+msgid "No locations match this filter."
+msgstr "Aucun lieu ne correspond à ce filtre."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:468
+#, elixir-autogen, elixir-format
+msgid "No locations yet."
+msgstr "Aucun lieu pour le moment."
+
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:95
+#, elixir-autogen, elixir-format
+msgid "No sites linked to this project yet."
+msgstr "Aucun lieu n'est encore lié à ce projet."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:805
+#, elixir-autogen, elixir-format
+msgid "Notes only visible to admins..."
+msgstr "Notes visibles uniquement par les administrateurs..."
+
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:119
+#, elixir-autogen, elixir-format
+msgid "Open location"
+msgstr "Ouvrir le lieu"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:58
+#, elixir-autogen, elixir-format
+msgid "Open original"
+msgstr "Ouvrir l'original"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:923
+#, elixir-autogen, elixir-format
+msgid "Parking"
+msgstr "Parking"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:736
+#, elixir-autogen, elixir-format
+msgid "Phone"
+msgstr "Téléphone"
+
+#: lib/phoenix_kit_locations/geo.ex:174
+#, elixir-autogen, elixir-format
+msgid "Postal Code"
+msgstr "Code postal"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:652
+#, elixir-autogen, elixir-format
+msgid "Public Notes"
+msgstr "Notes publiques"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:924
+#, elixir-autogen, elixir-format
+msgid "Public Transport Nearby"
+msgstr "Transports en commun à proximité"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:88
+#: lib/phoenix_kit_locations/web/components/files_card.ex:225
+#, elixir-autogen, elixir-format
+msgid "Remove"
+msgstr "Retirer"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:782
+#, elixir-autogen, elixir-format
+msgid "Remove this file from the location? If it's not attached to any other resource, it will be moved to trash (admins can restore)."
+msgstr "Retirer ce fichier du lieu ? S'il n'est rattaché à aucune autre ressource, il sera placé dans la corbeille (les administrateurs peuvent le restaurer)."
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:40
+#, elixir-autogen, elixir-format
+msgid "Remove this file? If it's not attached to any other resource, it will be moved to trash (admins can restore)."
+msgstr "Retirer ce fichier ? S'il n'est rattaché à aucune autre ressource, il sera placé dans la corbeille (les administrateurs peuvent le restaurer)."
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:86
+#: lib/phoenix_kit_locations/web/components/files_card.ex:223
+#, elixir-autogen, elixir-format
+msgid "Removing..."
+msgstr "Retrait en cours..."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:928
+#, elixir-autogen, elixir-format
+msgid "Restrooms"
+msgstr "Toilettes"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:862
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:258
+#, elixir-autogen, elixir-format
+msgid "Save Changes"
+msgstr "Enregistrer les modifications"
+
+#: lib/phoenix_kit_locations/errors.ex:38
+#, elixir-autogen, elixir-format
+msgid "Saved but failed to update type assignments."
+msgstr "Enregistré, mais impossible de mettre à jour les types attribués."
+
+#: lib/phoenix_kit_locations/errors.ex:43
+#, elixir-autogen, elixir-format
+msgid "Saved, but failed to change the owner."
+msgstr "Enregistré, mais impossible de changer le propriétaire."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:112
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:455
+#, elixir-autogen, elixir-format
+msgid "Searching…"
+msgstr "Recherche en cours…"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:104
+#, elixir-autogen, elixir-format
+msgid "Set featured image"
+msgstr "Définir l'image à la une"
+
+#: lib/phoenix_kit_locations/web/components/files_card.ex:34
+#, elixir-autogen, elixir-format
+msgid "Shown alongside this item in listings."
+msgstr "Affichée à côté de cet élément dans les listes."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:780
+#, elixir-autogen, elixir-format
+msgid "Shown alongside this location in listings."
+msgstr "Affichée à côté de ce lieu dans les listes."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:310
+#, elixir-autogen, elixir-format
+msgid "Similar address found at: %{names}"
+msgstr "Adresse similaire trouvée pour : %{names}"
+
+#: lib/phoenix_kit_locations/errors.ex:45
+#, elixir-autogen, elixir-format
+msgid "Space not found."
+msgstr "Espace introuvable."
+
+#: lib/phoenix_kit_locations/geo.ex:352
+#: lib/phoenix_kit_locations/web/location_form_live.ex:210
+#, elixir-autogen, elixir-format
+msgid "State / Region"
+msgstr "État / région"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:679
+#, elixir-autogen, elixir-format
+msgid "Street address, P.O. box"
+msgstr "Numéro et rue, boîte postale"
+
+#: lib/phoenix_kit_locations/errors.ex:48
+#, elixir-autogen, elixir-format
+msgid "The chosen parent space belongs to a different location."
+msgstr "L'espace parent choisi appartient à un autre lieu."
+
+#: lib/phoenix_kit_locations/errors.ex:51
+#, elixir-autogen, elixir-format
+msgid "The chosen parent space no longer exists."
+msgstr "L'espace parent choisi n'existe plus."
+
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:94
+#, elixir-autogen, elixir-format
+msgid "The configured locations no longer exist."
+msgstr "Les lieux configurés n'existent plus."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:797
+#, elixir-autogen, elixir-format
+msgid "This information is only visible to administrators."
+msgstr "Ces informations ne sont visibles que par les administrateurs."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:289
+#, elixir-autogen, elixir-format
+msgid "This will permanently delete this location type. Locations using it will lose the type association."
+msgstr "Ce type de lieu sera définitivement supprimé. Les lieux qui l'utilisent perdront ce type."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:278
+#, elixir-autogen, elixir-format
+msgid "This will permanently delete this location. This cannot be undone."
+msgstr "Ce lieu sera définitivement supprimé. Cette action est irréversible."
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:335
+#, elixir-autogen, elixir-format
+msgid "Type"
+msgstr "Type"
+
+#: lib/phoenix_kit_locations/errors.ex:64
+#, elixir-autogen, elixir-format
+msgid "Unexpected error: %{reason}"
+msgstr "Erreur inattendue : %{reason}"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:860
+#, elixir-autogen, elixir-format
+msgid "Waiting for uploads..."
+msgstr "En attente de la fin des imports..."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:748
+#, elixir-autogen, elixir-format
+msgid "Website"
+msgstr "Site web"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:921
+#, elixir-autogen, elixir-format
+msgid "Wheelchair Accessible"
+msgstr "Accessible en fauteuil roulant"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:927
+#, elixir-autogen, elixir-format
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+#: lib/phoenix_kit_locations/errors.ex:40
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to do that."
+msgstr "Vous n'avez pas l'autorisation de faire cela."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:654
+#, elixir-autogen, elixir-format
+msgid "e.g., Bell is broken — knock loudly, entrance from side street..."
+msgstr "ex. : sonnette en panne — frappez fort, entrée par la rue latérale..."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:623
+#, elixir-autogen, elixir-format
+msgid "e.g., Main Office, Downtown Showroom"
+msgstr "ex. : Siège, Showroom du centre-ville"
+
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:218
+#, elixir-autogen, elixir-format
+msgid "e.g., Showroom, Storage, Office"
+msgstr "ex. : Showroom, Entrepôt, Bureau"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:749
+#, elixir-autogen, elixir-format
+msgid "https://..."
+msgstr "https://..."
+
+#: lib/phoenix_kit_locations/errors.ex:57
+#, elixir-autogen, elixir-format
+msgid "its parent floor was not saved (it might need a name)"
+msgstr "son étage parent n'a pas été enregistré (il lui faut peut-être un nom)"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:743
+#, elixir-autogen, elixir-format
+msgid "location@example.com"
+msgstr "location@example.com"
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:483
+#, elixir-autogen, elixir-format
+msgid "Clear filter"
+msgstr "Effacer le filtre"
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:471
+#, elixir-autogen, elixir-format
+msgid "Create your first location"
+msgstr "Créez votre premier lieu"
+
+#: lib/phoenix_kit_locations/web/locations_live.ex:495
+#, elixir-autogen, elixir-format
+msgid "Create your first type"
+msgstr "Créez votre premier type"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:584
+#, elixir-autogen, elixir-format
+msgid "Public information"
+msgstr "Informations publiques"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:118
+#, elixir-autogen, elixir-format
+msgid "cannot be its own parent"
+msgstr "ne peut pas être son propre parent"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:127
+#, elixir-autogen, elixir-format
+msgid "must be a valid email address"
+msgstr "doit être une adresse e-mail valide"
+
+#: lib/phoenix_kit_locations/schemas/space.ex:103
+#: lib/phoenix_kit_locations/schemas/space.ex:107
+#, elixir-autogen, elixir-format
+msgid "must be one of: %{values}"
+msgstr "doit être l'une des valeurs suivantes : %{values}"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:142
+#, elixir-autogen, elixir-format
+msgid "must start with http:// or https://"
+msgstr "doit commencer par http:// ou https://"
+
+#: lib/phoenix_kit_locations/geo.ex:345
+#, elixir-autogen, elixir-format
+msgid "Canton"
+msgstr "Canton"
+
+#: lib/phoenix_kit_locations/geo.ex:340
+#, elixir-autogen, elixir-format
+msgid "County"
+msgstr "Comté"
+
+#: lib/phoenix_kit_locations/geo.ex:342
+#, elixir-autogen, elixir-format
+msgid "Department"
+msgstr "Département"
+
+#: lib/phoenix_kit_locations/geo.ex:341
+#, elixir-autogen, elixir-format
+msgid "District"
+msgstr "District"
+
+#: lib/phoenix_kit_locations/geo.ex:347
+#, elixir-autogen, elixir-format
+msgid "Division"
+msgstr "Division"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:718
+#, elixir-autogen, elixir-format
+msgid "Don't see your city? Please contact the support team and we will add it."
+msgstr "Votre ville n'apparaît pas ? Contactez l'équipe d'assistance et nous l'ajouterons."
+
+#: lib/phoenix_kit_locations/geo.ex:348
+#, elixir-autogen, elixir-format
+msgid "Emirate"
+msgstr "Émirat"
+
+#: lib/phoenix_kit_locations/geo.ex:343
+#, elixir-autogen, elixir-format
+msgid "Governorate"
+msgstr "Gouvernorat"
+
+#: lib/phoenix_kit_locations/geo.ex:344
+#, elixir-autogen, elixir-format
+msgid "Municipality"
+msgstr "Municipalité"
+
+#: lib/phoenix_kit_locations/geo.ex:346
+#, elixir-autogen, elixir-format
+msgid "Oblast"
+msgstr "Oblast"
+
+#: lib/phoenix_kit_locations/geo.ex:349
+#, elixir-autogen, elixir-format
+msgid "Parish"
+msgstr "Paroisse"
+
+#: lib/phoenix_kit_locations/geo.ex:350
+#, elixir-autogen, elixir-format
+msgid "Prefecture"
+msgstr "Préfecture"
+
+#: lib/phoenix_kit_locations/geo.ex:334
+#, elixir-autogen, elixir-format
+msgid "Province"
+msgstr "Province"
+
+#: lib/phoenix_kit_locations/geo.ex:337
+#, elixir-autogen, elixir-format
+msgid "Province / Territory"
+msgstr "Province / territoire"
+
+#: lib/phoenix_kit_locations/geo.ex:339
+#, elixir-autogen, elixir-format
+msgid "Region"
+msgstr "Région"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:671
+#, elixir-autogen, elixir-format
+msgid "Select a country"
+msgstr "Sélectionnez un pays"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:698
+#: lib/phoenix_kit_locations/web/location_form_live.ex:713
+#, elixir-autogen, elixir-format
+msgid "Select…"
+msgstr "Sélectionner…"
+
+#: lib/phoenix_kit_locations/geo.ex:333
+#, elixir-autogen, elixir-format
+msgid "State"
+msgstr "État"
+
+#: lib/phoenix_kit_locations/geo.ex:351
+#, elixir-autogen, elixir-format
+msgid "Voivodeship"
+msgstr "Voïvodie"
+
+#: lib/phoenix_kit_locations/geo.ex:173
+#, elixir-autogen, elixir-format
+msgid "ZIP Code"
+msgstr "Code postal (ZIP)"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:682
+#, elixir-autogen, elixir-format
+msgid "Delete \"%{name}\" and its %{count} descendant? This cannot be undone."
+msgid_plural "Delete \"%{name}\" and its %{count} descendants? This cannot be undone."
+msgstr[0] "Supprimer « %{name} » et %{count} sous-espace ? Cette action est irréversible."
+msgstr[1] "Supprimer « %{name} » et ses %{count} sous-espaces ? Cette action est irréversible."
+
+#, elixir-format
+msgid "Manage all locations"
+msgstr "Gérer tous les lieux"

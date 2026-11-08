@@ -18,6 +18,12 @@ defmodule PhoenixKitLocations.GeoTest do
       assert Geo.normalize_country("日本") == "JP"
     end
 
+    test "maps a name in any language the module ships a catalogue for" do
+      for name <- ~w(Deutschland Alemania Allemagne Germania 德国) do
+        assert Geo.normalize_country(name) == "DE", "#{name} did not map to DE"
+      end
+    end
+
     test "is nil for blank or unknown text" do
       assert Geo.normalize_country(nil) == nil
       assert Geo.normalize_country("  ") == nil
