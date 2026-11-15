@@ -74,12 +74,10 @@ defmodule PhoenixKitLocations.MixProject do
 
   defp deps do
     [
-      # Core 2.63.0 first requires beamlab_countries 2.x, which supplies the
-      # Cities API used by the address form. Keep the ceiling open across
-      # later 2.x minors (see test/core_pin_conformance_test.exs).
-      # Floor 2.65.0: the first core with the `file_references/0` and `expected_schema/0`
-      # callbacks this module implements (`@impl`). The ceiling is open through core 3.x.
-      pk_dep(:phoenix_kit, ">= 2.65.0 and < 4.0.0", []),
+      # Floor 3.5.0, ceiling open through every core 3.x (see
+      # test/core_pin_conformance_test.exs). Core brings beamlab_countries 2.x,
+      # which supplies the Cities API used by the address form.
+      pk_dep(:phoenix_kit, ">= 3.5.0 and < 4.0.0", []),
       {:phoenix_live_view, "~> 1.1"},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

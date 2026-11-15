@@ -23,30 +23,24 @@ db_name =
   Application.get_env(:phoenix_kit_locations, PhoenixKitLocations.Test.Repo)[:database] ||
     "phoenix_kit_locations_test"
 
-# Prefer core's classified preflight errors. If it cannot be loaded, the
-# repo probe below still checks the connection before running migrations.
+# One classified connection attempt, with the repo's OWN credentials and
+# transport, before anything starts the pool.
+#
+# This replaces a `psql -lqt` listing. That check asked the wrong question:
+# it ran as the shell's user over a unix socket, so it reported "the
+# database is there" and said nothing about whether the CONFIGURED role
+# could reach it over TCP. When it could not, the answer arrived minutes
+# later as a pool checkout timeout that reads like a flaky test.
 db_check =
-  if Code.ensure_loaded?(PhoenixKit.TestSupport.PostgresPreflight) do
-    # One classified connection attempt, with the repo's OWN credentials and
-    # transport, before anything starts the pool.
-    #
-    # This replaces a `psql -lqt` listing. That check asked the wrong question:
-    # it ran as the shell's user over a unix socket, so it reported "the
-    # database is there" and said nothing about whether the CONFIGURED role
-    # could reach it over TCP. When it could not, the answer arrived minutes
-    # later as a pool checkout timeout that reads like a flaky test.
-    case PhoenixKit.TestSupport.PostgresPreflight.check(
-           Application.get_env(:phoenix_kit_locations, PhoenixKitLocations.Test.Repo, [])
-         ) do
-      :ok ->
-        :exists
+  case PhoenixKit.TestSupport.PostgresPreflight.check(
+         Application.get_env(:phoenix_kit_locations, PhoenixKitLocations.Test.Repo, [])
+       ) do
+    :ok ->
+      :exists
 
-      {:error, _reason, message} ->
-        IO.puts(:stderr, "\n" <> message)
-        :not_found
-    end
-  else
-    :try_connect
+    {:error, _reason, message} ->
+      IO.puts(:stderr, "\n" <> message)
+      :not_found
   end
 
 repo_available =
@@ -126,20 +120,4 @@ if repo_available do
   {:ok, _} = PhoenixKitLocations.Test.Endpoint.start_link()
 end
 
-# The builds-alone test needs `PhoenixKit.TestSupport.ModuleChainCheck`, which
-# ships in the first core release after 2.64.1; against an older core it is
-# excluded.
-chain_check_exclude =
-  if Code.ensure_loaded?(PhoenixKit.TestSupport.ModuleChainCheck),
-    do: [],
-    else: [:requires_module_chain_check]
-
-ExUnit.start(exclude: chain_check_exclude ++ exclude)
-
-# The manifest test builds the module's tables with `ModuleChainCheck.build_alone/4`
-# and hands the manifest to repair (`PhoenixKit.Module.expected_schema/0`); both
-# arrive in the first core release after 2.64.1.
-unless Code.ensure_loaded?(PhoenixKit.TestSupport.ModuleChainCheck) and
-         function_exported?(PhoenixKit.TestSupport.ModuleChainCheck, :build_alone, 4) do
-  ExUnit.configure(exclude: [:requires_core_expected_schema | ExUnit.configuration()[:exclude]])
-end
+ExUnit.start(exclude: exclude)
