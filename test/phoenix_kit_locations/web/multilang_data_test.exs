@@ -141,7 +141,7 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
   end
 
   defp refute_pointers_in_languages(data) do
-    for {lang, %{} = entry} <- data, key <- @pointer_keys do
+    for {lang, %{} = entry} <- data, key <- @pointer_keys ++ ["additional_photo_uuids"] do
       refute Map.has_key?(entry, key),
              "#{key} was copied into the #{lang} entry: #{inspect(data)}"
     end
@@ -155,7 +155,13 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
 
     test "the first translation of a location with files keeps the pointers top-level only",
          ctx do
-      location = put_data(fixture_location(%{name: "Head Office"}), ctx.pointers)
+      gallery = [Ecto.UUID.generate()]
+
+      location =
+        put_data(
+          fixture_location(%{name: "Head Office"}),
+          Map.put(ctx.pointers, "additional_photo_uuids", gallery)
+        )
 
       {:ok, view, _html} = live(ctx.conn, "/admin/locations/#{location.uuid}/edit")
       switch_lang(view, "fr-FR")
@@ -169,6 +175,7 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
       assert get_in(saved.data, ["fr-FR", "_name"]) == "Siège"
       assert get_in(saved.data, ["en-US", "_name"]) == "Head Office"
       assert Map.take(saved.data, @pointer_keys) == ctx.pointers
+      assert saved.data["additional_photo_uuids"] == gallery
       refute_pointers_in_languages(saved.data)
     end
 
@@ -197,10 +204,13 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
 
   describe "multilingual content off" do
     test "a location save keeps the translations and follows the new name", ctx do
+      gallery = [Ecto.UUID.generate()]
+
       location =
         put_data(
           fixture_location(%{name: "Head Office"}),
           Map.merge(translated("Head Office", "Siège"), ctx.pointers)
+          |> Map.put("additional_photo_uuids", gallery)
         )
 
       {:ok, view, _html} = live(ctx.conn, "/admin/locations/#{location.uuid}/edit")
@@ -214,6 +224,8 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
       assert get_in(saved.data, ["en-US", "_name"]) == "Main Office"
       assert get_in(saved.data, ["fr-FR", "_name"]) == "Siège"
       assert Map.take(saved.data, @pointer_keys) == ctx.pointers
+      assert saved.data["additional_photo_uuids"] == gallery
+      refute_pointers_in_languages(saved.data)
     end
 
     test "a space save keeps the translations and follows the new name", ctx do
@@ -222,7 +234,10 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
       space =
         location
         |> new_space("Ground")
-        |> put_data(Map.merge(translated("Ground", "Rez-de-chaussée"), ctx.pointers))
+        |> put_data(
+          Map.merge(translated("Ground", "Rez-de-chaussée"), ctx.pointers)
+          |> Map.put("additional_photo_uuids", [Ecto.UUID.generate()])
+        )
 
       {:ok, view, _html} = live(ctx.conn, "/admin/locations/#{location.uuid}/structure")
       render_click(view, "select_space", %{"uuid" => space.uuid})
@@ -236,6 +251,7 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
       assert get_in(saved.data, ["en-US", "_name"]) == "Ground floor"
       assert get_in(saved.data, ["fr-FR", "_name"]) == "Rez-de-chaussée"
       assert Map.take(saved.data, @pointer_keys) == ctx.pointers
+      refute Map.has_key?(saved.data, "additional_photo_uuids")
     end
 
     test "a location type save keeps the translations and follows the new name", ctx do

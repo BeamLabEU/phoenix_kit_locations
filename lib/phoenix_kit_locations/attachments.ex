@@ -428,6 +428,11 @@ defmodule PhoenixKitLocations.Attachments do
   in `params["data"]` is replaced, or removed when the scope has none. A
   forged folder uuid would otherwise be stored, and the next mount would aim
   every file action at another account's folder.
+
+  `additional_photo_uuids` is not scope state (only a location gallery has
+  it). It is dropped here; `LocationFormLive` writes the staged gallery
+  afterwards. A space save therefore cannot keep a client-sent or leftover
+  gallery list.
   """
   def inject_attachment_data(params, socket, scope) do
     st = state(socket, scope)
@@ -435,6 +440,7 @@ defmodule PhoenixKitLocations.Attachments do
     params
     |> inject_files_folder(st.folder_uuid)
     |> inject_featured_image(st.featured_image_uuid)
+    |> drop_gallery_pointer()
   end
 
   @doc """
@@ -759,6 +765,12 @@ defmodule PhoenixKitLocations.Attachments do
     data = ensure_data_map(params)
     Map.put(params, "data", Map.put(data, "featured_image_uuid", uuid))
   end
+
+  defp drop_gallery_pointer(%{"data" => %{} = data} = params) do
+    Map.put(params, "data", Map.delete(data, "additional_photo_uuids"))
+  end
+
+  defp drop_gallery_pointer(params), do: params
 
   defp ensure_data_map(params) do
     case Map.get(params, "data") do

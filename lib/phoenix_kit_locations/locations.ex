@@ -345,9 +345,20 @@ defmodule PhoenixKitLocations.Locations do
 
   # A form that didn't edit photos (including every owner-scoped form) keeps
   # the current selection even if another editor changed it after mount.
-  defp preserve_photos(%{"data" => data} = attrs, stored, true) when is_map(data) do
+  # `data` arrives as `"data"` from a form and as `:data` from Elixir.
+  defp preserve_photos(attrs, stored, true) do
     keys = ~w(featured_image_uuid additional_photo_uuids)
-    Map.put(attrs, "data", Map.merge(Map.drop(data, keys), Map.take(stored.data || %{}, keys)))
+    stored_photos = Map.take(stored.data || %{}, keys)
+
+    Enum.reduce(["data", :data], attrs, fn key, acc ->
+      case acc do
+        %{^key => %{} = data} ->
+          Map.put(acc, key, Map.merge(Map.drop(data, keys), stored_photos))
+
+        _ ->
+          acc
+      end
+    end)
   end
 
   defp preserve_photos(attrs, _stored, _preserve?), do: attrs

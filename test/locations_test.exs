@@ -1,8 +1,11 @@
 defmodule PhoenixKitLocations.LocationsTest do
   use PhoenixKitLocations.DataCase, async: true
 
+  alias PhoenixKit.Modules.Storage
+  alias PhoenixKit.Modules.Storage.File, as: StorageFile
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Schemas.Location, as: LocationSchema
+  alias PhoenixKitLocations.Spaces
 
   # ── Helpers ──────────────────────────────────────────────────────
 
@@ -14,6 +17,31 @@ defmodule PhoenixKitLocations.LocationsTest do
   defp create_location(attrs \\ %{}) do
     {:ok, l} = Locations.create_location(Map.merge(%{name: "Test Location"}, attrs))
     l
+  end
+
+  # `condition` is true when the table does not reference the file.
+  defp unreferenced?(condition, uuids) do
+    Repo.exists?(
+      from(f in StorageFile,
+        where: f.uuid in ^uuids,
+        where: ^condition
+      )
+    )
+  end
+
+  defp storage_file(user, name) do
+    Storage.create_file(%{
+      original_file_name: name,
+      file_name: name,
+      mime_type: "image/jpeg",
+      file_type: "image",
+      ext: "jpg",
+      file_checksum: "c-#{name}-#{System.unique_integer([:positive])}",
+      user_file_checksum: "u-#{name}-#{System.unique_integer([:positive])}",
+      size: 10,
+      status: "active",
+      user_uuid: user.uuid
+    })
   end
 
   # ═══════════════════════════════════════════════════════════════════
@@ -220,6 +248,73 @@ defmodule PhoenixKitLocations.LocationsTest do
       l = create_location()
       assert {:ok, updated} = Locations.update_location(l, %{name: "Updated"})
       assert updated.name == "Updated"
+    end
+
+    test "preserve_photos keeps the locked gallery for atom-keyed data" do
+      location = create_location()
+      cover = Ecto.UUID.generate()
+      extra = Ecto.UUID.generate()
+
+      photos = %{
+        "featured_image_uuid" => cover,
+        "additional_photo_uuids" => [extra]
+      }
+
+      assert {:ok, _} = Locations.update_location(location, %{data: photos})
+
+      assert {:ok, saved} =
+               Locations.update_location(location, %{name: "Renamed", data: %{}},
+                 preserve_photos: true
+               )
+
+      assert saved.name == "Renamed"
+      assert saved.data["featured_image_uuid"] == cover
+      assert saved.data["additional_photo_uuids"] == [extra]
+    end
+
+    test "file_references counts gallery photos and space covers, and ignores a bad gallery value" do
+      user = fixture_user()
+      location = create_location(%{name: "Referenced"})
+      {:ok, cover} = storage_file(user, "cover.jpg")
+      {:ok, extra} = storage_file(user, "extra.jpg")
+      {:ok, loose} = storage_file(user, "loose.jpg")
+      {:ok, space_cover} = storage_file(user, "space.jpg")
+
+      assert {:ok, _} =
+               Locations.update_location(location, %{
+                 data: %{
+                   "featured_image_uuid" => cover.uuid,
+                   "additional_photo_uuids" => [extra.uuid]
+                 }
+               })
+
+      {:ok, space} =
+        Spaces.create_space(%{
+          "location_uuid" => location.uuid,
+          "kind" => "floor",
+          "name" => "Floor"
+        })
+
+      assert {:ok, _} =
+               Spaces.update_space(space, %{
+                 "data" => %{"featured_image_uuid" => space_cover.uuid}
+               })
+
+      [{_, location_cond}, {_, space_cond}] = PhoenixKitLocations.file_references()
+
+      refute unreferenced?(location_cond, [cover.uuid, extra.uuid])
+      assert unreferenced?(location_cond, [loose.uuid])
+      assert unreferenced?(location_cond, [space_cover.uuid])
+
+      refute unreferenced?(space_cond, [space_cover.uuid])
+      assert unreferenced?(space_cond, [loose.uuid, cover.uuid])
+
+      assert {:ok, _} =
+               Locations.update_location(location, %{
+                 data: %{"additional_photo_uuids" => "not-an-array"}
+               })
+
+      assert unreferenced?(location_cond, [loose.uuid])
     end
 
     test "update_location/3 on a location deleted since it was loaded returns :location_not_found" do

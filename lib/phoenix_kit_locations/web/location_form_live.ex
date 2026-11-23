@@ -397,7 +397,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     do: Attachments.cancel_attachment_upload(socket, ref)
 
   defp attachment_event("remove_file", %{"scope" => "location", "uuid" => uuid}, socket) do
-    if uuid in socket.assigns.photos,
+    # Staged removals are not saved yet. A photo still in the stored gallery
+    # must not be trashed from the files card, or Cancel leaves a cover that
+    # points at a trashed file.
+    if uuid in gallery_uuids(socket.assigns),
       do: {:noreply, socket},
       else: Attachments.trash_file(socket, location_scope(), uuid)
   end
@@ -525,7 +528,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   @impl true
   def handle_info({MediaGallery, "location-photos", {:changed, uuids}}, socket) do
     if manage_all?(socket),
-      do: {:noreply, assign(socket, :photos, Enum.uniq(uuids))},
+      do: {:noreply, assign(socket, :photos, valid_uuids(uuids))},
       else: {:noreply, socket}
   end
 
@@ -560,11 +563,12 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   @impl true
   def render(assigns) do
     assigns =
-      assign(
-        assigns,
+      assigns
+      |> assign(
         :lang_data,
         get_lang_data(assigns.changeset, assigns.current_lang, assigns.multilang_enabled)
       )
+      |> assign(:gallery_uuids, gallery_uuids(assigns))
 
     ~H"""
     <div class="flex flex-col w-full px-4 py-8 gap-6">
@@ -681,6 +685,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
             </.multilang_fields_wrapper>
 
             <div hidden={@form_tab != "basics"}>
+              <%!-- Country decides the state and city lists. Changing it
+                   clears them (`validate`). --%>
               <.select
                 field={@form[:country]}
                 label={gettext("Country")}
@@ -696,8 +702,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 <span>{@address_warning}</span>
               </div>
 
-              <%!-- Country leads: it decides the state and city lists and the
-                 labels below. Picking another one clears them (`validate`). --%>
               <.input
                 field={@form[:address_line_1]}
                 type="text"
@@ -844,7 +848,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                   state={Attachments.state(%{assigns: assigns}, location_scope())}
                   uploads={@uploads}
                   show_featured={false}
-                  excluded_files={@photos}
+                  excluded_files={@gallery_uuids}
                   files_subtitle={
                     gettext("Floor plans, brochures, certificates. Any file type is accepted.")
                   }
@@ -957,8 +961,23 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     end
   end
 
-  defp photo_selection(data) do
-    (List.wrap(data["featured_image_uuid"]) ++ List.wrap(data["additional_photo_uuids"]))
+  defp photo_selection(data) when is_map(data) do
+    valid_uuids(
+      List.wrap(data["featured_image_uuid"]) ++ List.wrap(data["additional_photo_uuids"])
+    )
+  end
+
+  defp photo_selection(_data), do: []
+
+  # The files card hides and refuses both the staged gallery and the gallery
+  # last saved. A staged removal stays out of the files list until save.
+  defp gallery_uuids(%{photos: photos, location: location}) do
+    valid_uuids(List.wrap(photos) ++ photo_selection(location && location.data))
+  end
+
+  defp valid_uuids(uuids) do
+    uuids
+    |> List.wrap()
     |> Enum.filter(&match?({:ok, _}, Ecto.UUID.cast(&1)))
     |> Enum.uniq()
   end
@@ -966,8 +985,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   defp put_photo_selection(params, socket) do
     photos =
       if manage_all?(socket),
-        do: socket.assigns.photos,
-        else: photo_selection(socket.assigns.location.data || %{})
+        do: valid_uuids(socket.assigns.photos),
+        else: photo_selection(socket.assigns.location.data)
 
     data = Map.drop(params["data"], ["featured_image_uuid", "additional_photo_uuids"])
 

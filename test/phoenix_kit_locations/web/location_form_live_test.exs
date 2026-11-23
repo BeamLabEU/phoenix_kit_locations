@@ -547,6 +547,63 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       render_click(view, "remove_file", %{"scope" => "location", "uuid" => plan.uuid})
       assert %{status: "trashed"} = Storage.get_file(plan.uuid)
     end
+
+    test "removing a photo from the gallery does not let the files card trash it", %{conn: conn} do
+      user = fixture_user()
+      n = System.unique_integer([:positive])
+      {:ok, folder} = Storage.create_folder(%{name: "form-gallery-keep-#{n}"})
+      {:ok, photo} = create_file(folder, user, "keep-#{n}.jpg")
+
+      location =
+        fixture_location(%{
+          name: "Keep Cover",
+          data: %{
+            "files_folder_uuid" => folder.uuid,
+            "featured_image_uuid" => photo.uuid,
+            "additional_photo_uuids" => []
+          }
+        })
+
+      {:ok, view, _html} = live(conn, Paths.location_edit(location.uuid))
+
+      send(
+        view.pid,
+        {PhoenixKitWeb.Components.MediaGallery, "location-photos", {:changed, []}}
+      )
+
+      render(view)
+      render_click(view, "remove_file", %{"scope" => "location", "uuid" => photo.uuid})
+
+      assert %{status: "active", folder_uuid: folder_uuid} = Storage.get_file(photo.uuid)
+      assert folder_uuid == folder.uuid
+    end
+
+    test "a gallery change keeps only real file uuids", %{conn: conn} do
+      user = fixture_user()
+      n = System.unique_integer([:positive])
+      {:ok, folder} = Storage.create_folder(%{name: "form-gallery-uuid-#{n}"})
+      {:ok, photo} = create_file(folder, user, "real-#{n}.jpg")
+
+      location =
+        fixture_location(%{
+          name: "Uuid Gallery",
+          data: %{"files_folder_uuid" => folder.uuid}
+        })
+
+      {:ok, view, _html} = live(conn, Paths.location_edit(location.uuid))
+
+      send(view.pid, {
+        PhoenixKitWeb.Components.MediaGallery,
+        "location-photos",
+        {:changed, ["not-a-uuid", photo.uuid, photo.uuid]}
+      })
+
+      assert {:error, {:live_redirect, _}} = view |> form("#location-form") |> render_submit()
+
+      saved = Locations.get_location(location.uuid)
+      assert saved.data["featured_image_uuid"] == photo.uuid
+      refute Map.has_key?(saved.data, "additional_photo_uuids")
+    end
   end
 
   defp create_file(folder, user, name, mime \\ "image/jpeg", ext \\ "jpg") do
