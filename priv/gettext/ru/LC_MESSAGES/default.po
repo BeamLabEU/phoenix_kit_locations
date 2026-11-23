@@ -1051,3 +1051,15 @@ msgstr[2] "Удалить «%{name}» и %{count} вложенных элеме�
 #, elixir-format
 msgid "Manage all locations"
 msgstr "Управление всеми локациями"
+
+#, elixir-autogen
+msgid "Basics"
+msgstr "Основное"
+
+#, elixir-autogen
+msgid "Settings"
+msgstr "Настройки"
+
+#, elixir-autogen
+msgid "Photos"
+msgstr "Фотографии"

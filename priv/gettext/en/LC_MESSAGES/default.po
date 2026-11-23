@@ -1050,3 +1050,15 @@ msgstr[1] ""
 #, elixir-format
 msgid "Manage all locations"
 msgstr ""
+
+#, elixir-autogen
+msgid "Basics"
+msgstr "Basics"
+
+#, elixir-autogen
+msgid "Settings"
+msgstr "Settings"
+
+#, elixir-autogen
+msgid "Photos"
+msgstr "Photos"

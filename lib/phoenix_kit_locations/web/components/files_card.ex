@@ -23,6 +23,8 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
   attr(:scope, :string, required: true)
   attr(:state, :map, required: true, doc: "Map from `Attachments.state/2`")
   attr(:uploads, :map, required: true)
+  attr(:excluded_files, :list, default: [])
+  attr(:show_featured, :boolean, default: true)
   attr(:featured_subtitle, :string, default: nil)
   attr(:files_subtitle, :string, default: nil)
   attr(:remove_file_confirm, :string, default: nil)
@@ -42,74 +44,86 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
         )
       end)
 
-    ~H"""
-    <div class="flex flex-col gap-0.5">
-      <.section_header icon="hero-photo" title={gettext("Featured Image")} />
-      <p class="text-xs text-base-content/50">{@featured_subtitle}</p>
-    </div>
+    assigns =
+      assign(
+        assigns,
+        :files,
+        Enum.reject(assigns.state.files, &(&1.uuid in assigns.excluded_files))
+      )
 
-    <%= if @state.featured_image_file do %>
-      <div class="flex items-center gap-4">
-        <a
-          href={URLSigner.signed_url(@state.featured_image_uuid, "original")}
-          target="_blank"
-          rel="noopener"
-          class="shrink-0"
-          title={gettext("Open original")}
-        >
-          <img
-            src={URLSigner.signed_url(@state.featured_image_uuid, "thumbnail")}
-            alt={@state.featured_image_file.original_file_name}
-            class="w-24 h-24 rounded-md object-cover bg-base-200 border border-base-300"
-          />
-        </a>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium truncate">{@state.featured_image_file.original_file_name}</p>
-          <p class="text-xs text-base-content/50">{Attachments.format_file_size(@state.featured_image_file.size)}</p>
+    ~H"""
+    <%= if @show_featured do %>
+      <div class="flex flex-col gap-0.5">
+        <.section_header icon="hero-photo" title={gettext("Featured Image")} />
+        <p class="text-xs text-base-content/50">{@featured_subtitle}</p>
+      </div>
+
+      <%= if @state.featured_image_file do %>
+        <div class="flex items-center gap-4">
+          <a
+            href={URLSigner.signed_url(@state.featured_image_uuid, "original")}
+            target="_blank"
+            rel="noopener"
+            class="shrink-0"
+            title={gettext("Open original")}
+          >
+            <img
+              src={URLSigner.signed_url(@state.featured_image_uuid, "thumbnail")}
+              alt={@state.featured_image_file.original_file_name}
+              class="w-24 h-24 rounded-md object-cover bg-base-200 border border-base-300"
+            />
+          </a>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium truncate">
+              {@state.featured_image_file.original_file_name}
+            </p>
+            <p class="text-xs text-base-content/50">
+              {Attachments.format_file_size(@state.featured_image_file.size)}
+            </p>
+          </div>
+          <div class="flex flex-col gap-2">
+            <.button
+              type="button"
+              variant="outline"
+              size="sm"
+              phx-click="open_featured_image_picker"
+              phx-value-scope={@scope}
+            >
+              {gettext("Change")}
+            </.button>
+            <.button
+              type="button"
+              variant="ghost"
+              size="sm"
+              phx-click="clear_featured_image"
+              phx-value-scope={@scope}
+              phx-disable-with={gettext("Removing...")}
+            >
+              {gettext("Remove")}
+            </.button>
+          </div>
         </div>
-        <div class="flex flex-col gap-2">
+      <% else %>
+        <div class="flex items-center justify-between py-4 border border-dashed border-base-300 rounded-md px-4">
+          <div class="flex items-center gap-3 text-base-content/60">
+            <.icon name="hero-photo" class="w-6 h-6" />
+            <span class="text-sm">{gettext("No featured image set.")}</span>
+          </div>
           <.button
             type="button"
-            variant="outline"
             size="sm"
             phx-click="open_featured_image_picker"
             phx-value-scope={@scope}
           >
-            {gettext("Change")}
-          </.button>
-          <.button
-            type="button"
-            variant="ghost"
-            size="sm"
-            phx-click="clear_featured_image"
-            phx-value-scope={@scope}
-            phx-disable-with={gettext("Removing...")}
-          >
-            {gettext("Remove")}
+            <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Set featured image")}
           </.button>
         </div>
-      </div>
-    <% else %>
-      <div class="flex items-center justify-between py-4 border border-dashed border-base-300 rounded-md px-4">
-        <div class="flex items-center gap-3 text-base-content/60">
-          <.icon name="hero-photo" class="w-6 h-6" />
-          <span class="text-sm">{gettext("No featured image set.")}</span>
-        </div>
-        <.button
-          type="button"
-          size="sm"
-          phx-click="open_featured_image_picker"
-          phx-value-scope={@scope}
-        >
-          <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Set featured image")}
-        </.button>
-      </div>
+      <% end %>
     <% end %>
-
     <div class="flex flex-col gap-0.5">
       <.section_header icon="hero-paper-clip" title={gettext("Attached Files")}>
-        <:actions :if={@state.files != []}>
-          <span class="badge badge-sm badge-ghost">{length(@state.files)}</span>
+        <:actions :if={@files != []}>
+          <span class="badge badge-sm badge-ghost">{length(@files)}</span>
         </:actions>
       </.section_header>
       <p class="text-xs text-base-content/50">{@files_subtitle}</p>
@@ -168,7 +182,7 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
       {Attachments.upload_error_message(err)}
     </p>
 
-    <%= if @state.files == [] do %>
+    <%= if @files == [] do %>
       <.empty_state
         icon="hero-paper-clip"
         title={gettext("No files attached yet.")}
@@ -177,7 +191,7 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
     <% else %>
       <ul class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <li
-          :for={file <- @state.files}
+          :for={file <- @files}
           class="flex items-center gap-3 rounded-md border border-base-300 bg-base-200/30 p-3"
         >
           <%= if file.file_type == "image" do %>
@@ -229,7 +243,6 @@ defmodule PhoenixKitLocations.Web.Components.FilesCard do
         </li>
       </ul>
     <% end %>
-
     """
   end
 end

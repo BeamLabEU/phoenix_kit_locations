@@ -7,7 +7,8 @@ defmodule PhoenixKitLocations.TranslatedData do
   fields (`%{"_primary_language" => "en-US", "en-US" => %{"_name" => …},
   "fr-FR" => %{"_name" => …}}`). This module also keeps the attachment
   pointers there, top-level (`files_folder_uuid`, `featured_image_uuid`,
-  see `PhoenixKitLocations.Attachments`). Three rules follow:
+  and the location gallery's `additional_photo_uuids`; see
+  `PhoenixKitLocations.Attachments`). Three rules follow:
 
     * **The main-language entry mirrors the columns.** `name`,
       `description` (and a location's `public_notes`) are the main-language
@@ -40,7 +41,7 @@ defmodule PhoenixKitLocations.TranslatedData do
   alias PhoenixKitWeb.Components.MultilangForm
 
   @primary_language_key "_primary_language"
-  @pointer_keys ~w(files_folder_uuid featured_image_uuid)
+  @pointer_keys ~w(files_folder_uuid featured_image_uuid additional_photo_uuids)
 
   @doc """
   Applies the first two rules to a schema changeset whose `data` has the

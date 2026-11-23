@@ -1,6 +1,7 @@
 defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
   use PhoenixKitLocations.LiveCase
 
+  alias PhoenixKit.Modules.Storage
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
 
@@ -15,7 +16,15 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       assert html =~ "Contact"
       assert html =~ "Features &amp; Amenities"
       # No persisted uuid yet, so the Details/Structure strip stays off.
-      refute has_element?(view, "[role=tablist]")
+      refute has_element?(view, "[role=tab]", "Structure")
+      assert has_element?(view, "#location-form-tabs [phx-value-tab=basics]")
+      assert has_element?(view, "[hidden] #location_email")
+      refute has_element?(view, "[hidden] #location_country")
+      view |> element("#location-form-tabs [phx-value-tab=details]") |> render_click()
+      refute has_element?(view, "[hidden] #location_email")
+      assert has_element?(view, "[hidden] #location_country")
+      view |> element("#location-form-tabs [phx-value-tab=settings]") |> render_click()
+      refute has_element?(view, "[hidden] #location_status")
     end
 
     test "submitting the form creates a location, redirects, and logs with actor_uuid",
@@ -505,5 +514,54 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
 
       assert is_binary(render(view))
     end
+  end
+
+  describe "photo gallery" do
+    test "a gallery photo is refused by the Files card's remove; a plain folder file is trashed",
+         %{conn: conn} do
+      user = fixture_user()
+      n = System.unique_integer([:positive])
+      {:ok, folder} = Storage.create_folder(%{name: "form-gallery-#{n}"})
+      {:ok, photo} = create_file(folder, user, "photo-#{n}.jpg")
+      {:ok, plan} = create_file(folder, user, "plan-#{n}.pdf", "application/pdf", "pdf")
+
+      location =
+        fixture_location(%{
+          name: "Gallery HQ",
+          data: %{
+            "files_folder_uuid" => folder.uuid,
+            "featured_image_uuid" => photo.uuid,
+            "additional_photo_uuids" => []
+          }
+        })
+
+      {:ok, view, _html} = live(conn, Paths.location_edit(location.uuid))
+
+      # The photo is staged in @photos, so remove_file is ignored outright:
+      # it stays attached and active (the gallery owns its removal).
+      render_click(view, "remove_file", %{"scope" => "location", "uuid" => photo.uuid})
+      assert %{status: "active", folder_uuid: folder_uuid} = Storage.get_file(photo.uuid)
+      assert folder_uuid == folder.uuid
+
+      # A non-gallery file in the same folder is removed as before.
+      render_click(view, "remove_file", %{"scope" => "location", "uuid" => plan.uuid})
+      assert %{status: "trashed"} = Storage.get_file(plan.uuid)
+    end
+  end
+
+  defp create_file(folder, user, name, mime \\ "image/jpeg", ext \\ "jpg") do
+    Storage.create_file(%{
+      original_file_name: name,
+      file_name: name,
+      mime_type: mime,
+      file_type: if(ext == "jpg", do: "image", else: "document"),
+      ext: ext,
+      file_checksum: "c-#{name}",
+      user_file_checksum: "u-#{name}",
+      size: 10,
+      status: "active",
+      user_uuid: user.uuid,
+      folder_uuid: folder.uuid
+    })
   end
 end

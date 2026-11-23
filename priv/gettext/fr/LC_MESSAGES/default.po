@@ -1050,3 +1050,15 @@ msgstr[1] "Supprimer « %{name} » et ses %{count} sous-espaces ? Cette action e
 #, elixir-format
 msgid "Manage all locations"
 msgstr "Gérer tous les lieux"
+
+#, elixir-autogen
+msgid "Basics"
+msgstr "Informations de base"
+
+#, elixir-autogen
+msgid "Settings"
+msgstr "Paramètres"
+
+#, elixir-autogen
+msgid "Photos"
+msgstr "Photos"

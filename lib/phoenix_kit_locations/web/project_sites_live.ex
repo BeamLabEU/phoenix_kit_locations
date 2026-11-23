@@ -25,7 +25,9 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
 
   require Logger
 
-  alias PhoenixKitLocations.{Geo, Locations, Paths}
+  import PhoenixKitLocations.Web.Components.LocationSummary
+
+  alias PhoenixKitLocations.{Locations, Paths}
 
   @impl true
   def mount(_params, session, socket) do
@@ -41,7 +43,13 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
       |> Enum.map(&safe_get/1)
       |> Enum.reject(&is_nil/1)
 
-    {:ok, assign(socket, locations: locations, configured?: uuids != [])}
+    {:ok,
+     assign(socket,
+       locations: locations,
+       cover_urls: cover_urls(locations, socket.assigns[:phoenix_kit_current_scope]),
+       locale: session["locale"],
+       configured?: uuids != []
+     )}
   end
 
   # A `live_render`ed LiveView runs in its own process, which does not inherit
@@ -108,12 +116,7 @@ defmodule PhoenixKitLocations.Web.ProjectSitesLive do
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div :for={location <- @locations} class="card border border-base-200 bg-base-100">
             <div class="card-body py-4 gap-1">
-              <h3 class="font-semibold text-sm">{location.name}</h3>
-              <p class="text-xs opacity-70">
-                {[location.address_line_1, location.city, Geo.country_name(location.country)]
-                |> Enum.reject(&(&1 in [nil, ""]))
-                |> Enum.join(", ")}
-              </p>
+              <.location_summary location={location} cover_urls={@cover_urls} locale={@locale} />
               <div class="card-actions justify-end mt-1">
                 <.button variant="ghost" size="xs" navigate={Paths.location_edit(location.uuid)}>
                   {gettext("Open location")}

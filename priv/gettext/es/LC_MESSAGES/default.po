@@ -1050,3 +1050,15 @@ msgstr[1] "¿Eliminar «%{name}» y sus %{count} subespacios? Esta acción no se
 #, elixir-format
 msgid "Manage all locations"
 msgstr "Gestionar todas las ubicaciones"
+
+#, elixir-autogen
+msgid "Basics"
+msgstr "Datos básicos"
+
+#, elixir-autogen
+msgid "Settings"
+msgstr "Ajustes"
+
+#, elixir-autogen
+msgid "Photos"
+msgstr "Fotos"

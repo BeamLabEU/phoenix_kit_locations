@@ -311,6 +311,12 @@ defmodule PhoenixKitLocations.Locations do
   Updates a location with the given attributes. Never changes the owner — see
   `set_location_owner/3`. A location deleted since the caller loaded it comes
   back as `{:error, :location_not_found}`.
+
+  Pass `preserve_photos: true` in `opts` when the saver didn't edit the photo
+  gallery (e.g. every owner-scoped form): the stored `featured_image_uuid` /
+  `additional_photo_uuids`, read under the row lock, then win over the attrs'
+  copy, so a form opened before another editor changed the gallery can't
+  clobber the newer selection.
   """
   @spec update_location(Location.t(), map(), opts) ::
           {:ok, Location.t()} | {:error, Ecto.Changeset.t() | :location_not_found}
@@ -322,15 +328,29 @@ defmodule PhoenixKitLocations.Locations do
           repo().rollback(:location_not_found)
 
         stored ->
+          attrs =
+            attrs
+            |> keep_folder_pointer(stored)
+            |> preserve_photos(stored, Keyword.get(opts, :preserve_photos, false))
+
           location
           |> with_stored_data(stored, attrs)
-          |> Location.changeset(keep_folder_pointer(attrs, stored))
+          |> Location.changeset(attrs)
           |> repo().update()
           |> ok_or_rollback()
       end
     end)
     |> log_activity("location.updated", "location", opts, &location_metadata/1)
   end
+
+  # A form that didn't edit photos (including every owner-scoped form) keeps
+  # the current selection even if another editor changed it after mount.
+  defp preserve_photos(%{"data" => data} = attrs, stored, true) when is_map(data) do
+    keys = ~w(featured_image_uuid additional_photo_uuids)
+    Map.put(attrs, "data", Map.merge(Map.drop(data, keys), Map.take(stored.data || %{}, keys)))
+  end
+
+  defp preserve_photos(attrs, _stored, _preserve?), do: attrs
 
   @doc false
   # A record's files folder is claimed outside its form, and written the

@@ -48,6 +48,10 @@ Routes are registered automatically:
 | `/admin/locations/types/new` | Create type |
 | `/admin/locations/types/:uuid/edit` | Edit type |
 
+The location form opens on **Basics** with the name and country. Name is required. **Details** holds the full address, contact information, amenities and types. **Settings** holds status and, for managers, ownership and internal notes. With multilingual content enabled, language tabs let editors translate the name, description and public notes.
+
+Managers can select multiple photos on Basics and drag a photo to the first position to feature it. Saving updates the cover on the locations list and project Sites cards. Existing featured images appear first when editing.
+
 With `locations.manage_all`, the list shows each location's **Owner** and filters by All / Global / Owned, and the location form has an owner picker. Users with only `locations` see neither (see Permissions below).
 
 ### Permissions: own locations vs. all locations

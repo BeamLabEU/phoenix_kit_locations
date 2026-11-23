@@ -33,8 +33,11 @@ defmodule PhoenixKitLocations do
 
   use PhoenixKit.Module
 
+  import Ecto.Query
+
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Settings
+  alias PhoenixKitLocations.Schemas.{Location, Space}
 
   @version Mix.Project.config()[:version]
 
@@ -112,6 +115,44 @@ defmodule PhoenixKitLocations do
 
   @impl PhoenixKit.Module
   def media_reorganizer, do: PhoenixKitLocations.MediaReorganizer
+
+  @impl PhoenixKit.Module
+  def file_references do
+    # Use schema-backed subqueries so the host schema prefix applies here too.
+    gallery =
+      from(l in Location,
+        inner_lateral_join:
+          photo in fragment(
+            "SELECT jsonb_array_elements_text(CASE WHEN jsonb_typeof(?->'additional_photo_uuids') = 'array' THEN ?->'additional_photo_uuids' ELSE '[]'::jsonb END) AS uuid",
+            l.data,
+            l.data
+          ),
+        on: true,
+        where: not is_nil(photo.uuid),
+        select: photo.uuid
+      )
+
+    location_covers = cover_references(Location)
+    space_covers = cover_references(Space)
+
+    [
+      {Location.__schema__(:source),
+       dynamic(
+         [f],
+         fragment("?::text", f.uuid) not in subquery(location_covers) and
+           fragment("?::text", f.uuid) not in subquery(gallery)
+       )},
+      {Space.__schema__(:source),
+       dynamic([f], fragment("?::text", f.uuid) not in subquery(space_covers))}
+    ]
+  end
+
+  defp cover_references(schema) do
+    from(r in schema,
+      where: not is_nil(fragment("?->>'featured_image_uuid'", r.data)),
+      select: %{uuid: fragment("?->>'featured_image_uuid'", r.data)}
+    )
+  end
 
   # Project-extension contribution to the `phoenix_kit_projects` hub — the
   # duck-typed one-way contract (same shape as the dashboards widget

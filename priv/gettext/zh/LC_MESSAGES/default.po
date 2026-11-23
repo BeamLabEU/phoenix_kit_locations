@@ -1049,3 +1049,15 @@ msgstr[0] "删除“%{name}”及其 %{count} 个下级空间？此操作无法�
 #, elixir-format
 msgid "Manage all locations"
 msgstr "管理所有地点"
+
+#, elixir-autogen
+msgid "Basics"
+msgstr "基本信息"
+
+#, elixir-autogen
+msgid "Settings"
+msgstr "设置"
+
+#, elixir-autogen
+msgid "Photos"
+msgstr "照片"

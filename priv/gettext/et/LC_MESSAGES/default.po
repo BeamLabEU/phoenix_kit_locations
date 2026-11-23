@@ -1050,3 +1050,15 @@ msgstr[1] "Kustutada «%{name}» ja selle %{count} alamelementi? Seda ei saa tag
 #, elixir-format
 msgid "Manage all locations"
 msgstr "Kõigi asukohtade haldamine"
+
+#, elixir-autogen
+msgid "Basics"
+msgstr "Põhiandmed"
+
+#, elixir-autogen
+msgid "Settings"
+msgstr "Seaded"
+
+#, elixir-autogen
+msgid "Photos"
+msgstr "Fotod"

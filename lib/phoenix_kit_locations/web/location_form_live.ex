@@ -46,9 +46,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   alias PhoenixKitLocations.Schemas.Location
   alias PhoenixKitLocations.TranslatedData
   alias PhoenixKitWeb.Actor
+  alias PhoenixKitWeb.Components.MediaGallery
 
-  @attachment_events ~w(open_featured_image_picker close_media_selector cancel_upload
-                        remove_file clear_featured_image set_active_upload_scope)
+  @attachment_events ~w(cancel_upload remove_file set_active_upload_scope
+                        open_featured_image_picker clear_featured_image close_media_selector)
 
   @translatable_fields ["name", "description", "public_notes"]
   @preserve_fields %{"status" => :status}
@@ -96,6 +97,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
            page_crumbs: page_crumbs(action, location),
            mode: mode,
            action: action,
+           form_tab: "basics",
+           photos: photo_selection(location.data || %{}),
            location: location,
            owner: load_owner(mode, location),
            owner_matches: [],
@@ -238,6 +241,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   @impl true
+  def handle_event("form_tab", %{"tab" => tab}, socket) when tab in ~w(basics details settings),
+    do: {:noreply, assign(socket, :form_tab, tab)}
+
   def handle_event("switch_language", %{"lang" => lang_code}, socket) do
     {:noreply, handle_switch_language(socket, lang_code)}
   end
@@ -325,6 +331,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
       params
       |> Map.put("features", put_features(socket.assigns.features, params))
       |> Attachments.inject_attachment_data(socket, location_scope())
+      |> put_photo_selection(socket)
       |> drop_admin_only_params(socket)
 
     save_location(socket, socket.assigns.action, params)
@@ -386,20 +393,14 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
   # All take a `scope` via phx-value-scope so multiple Files cards on the
   # same page route to their own state.
-  defp attachment_event("open_featured_image_picker", %{"scope" => scope}, socket),
-    do: Attachments.open_featured_image_picker(socket, scope)
-
-  defp attachment_event("close_media_selector", _params, socket),
-    do: {:noreply, Attachments.close_media_selector(socket)}
-
   defp attachment_event("cancel_upload", %{"ref" => ref}, socket),
     do: Attachments.cancel_attachment_upload(socket, ref)
 
-  defp attachment_event("remove_file", %{"scope" => scope, "uuid" => uuid}, socket),
-    do: Attachments.trash_file(socket, scope, uuid)
-
-  defp attachment_event("clear_featured_image", %{"scope" => scope}, socket),
-    do: Attachments.clear_featured_image(socket, scope)
+  defp attachment_event("remove_file", %{"scope" => "location", "uuid" => uuid}, socket) do
+    if uuid in socket.assigns.photos,
+      do: {:noreply, socket},
+      else: Attachments.trash_file(socket, location_scope(), uuid)
+  end
 
   # Marks which Files card the next upload is for. Wired to phx-click on each
   # dropzone label.
@@ -433,6 +434,21 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
   defp save_location(socket, :edit, params), do: update_location(socket, params)
 
+  defp show_save_errors(socket, changeset) do
+    fields = Keyword.keys(changeset.errors)
+
+    tab =
+      cond do
+        :name in fields or :country in fields -> "basics"
+        Enum.any?(fields, &(&1 in [:status, :notes, :owner_uuid])) -> "settings"
+        true -> "details"
+      end
+
+    socket
+    |> assign(:form_tab, tab)
+    |> assign_form(Map.put(changeset, :action, :validate))
+  end
+
   defp create_location(socket, params) do
     case Locations.create_location(params, Actor.opts(socket) ++ owner_opts(socket)) do
       {:ok, location} ->
@@ -448,7 +464,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
         sync_types_and_redirect(socket, location.uuid, gettext("Location created."))
 
       {:error, changeset} ->
-        {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+        {:noreply, show_save_errors(socket, changeset)}
     end
   end
 
@@ -461,14 +477,20 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
          |> push_navigate(to: Paths.index())}
 
       current ->
-        case Locations.update_location(current, params, Actor.opts(socket)) do
+        changed_photos? =
+          manage_all?(socket) and
+            socket.assigns.photos != photo_selection(socket.assigns.location.data || %{})
+
+        opts = Keyword.put(Actor.opts(socket), :preserve_photos, not changed_photos?)
+
+        case Locations.update_location(current, params, opts) do
           {:ok, location} ->
             socket
             |> maybe_apply_owner(location)
             |> sync_types_and_redirect(location.uuid, gettext("Location updated."))
 
           {:error, %Ecto.Changeset{} = changeset} ->
-            {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+            {:noreply, show_save_errors(socket, changeset)}
 
           # Deleted in the moment between the re-read above and the save.
           {:error, reason} ->
@@ -501,11 +523,11 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   @impl true
-  def handle_info({:media_selected, file_uuids}, socket),
-    do: Attachments.handle_media_selected(socket, file_uuids)
-
-  def handle_info({:media_selector_closed}, socket),
-    do: {:noreply, Attachments.close_media_selector(socket)}
+  def handle_info({MediaGallery, "location-photos", {:changed, uuids}}, socket) do
+    if manage_all?(socket),
+      do: {:noreply, assign(socket, :photos, Enum.uniq(uuids))},
+      else: {:noreply, socket}
+  end
 
   # Defensive catch-all for unmatched messages — e.g. future PubSub
   # broadcasts, multilang hook fall-throughs. Logs at :debug per the
@@ -546,306 +568,337 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
 
     ~H"""
     <div class="flex flex-col w-full px-4 py-8 gap-6">
-      <%!-- Folder-scoped media selector (featured-image picker). The
-           dropzone in each Files card uses the LV upload channel
-           directly — modal is featured-image-only. `scope_folder_id`
-           pulls the folder of whichever scope opened the modal (set
-           on click in `open_featured_image_picker/2`). --%>
-      <.live_component
-        :if={@mode == :all}
-        module={PhoenixKitWeb.Live.Components.MediaSelectorModal}
-        id="location-form-media-selector"
-        show={@show_media_selector}
-        mode={@media_selection_mode}
-        file_type_filter={@media_filter}
-        selected_uuids={@media_selected_uuids}
-        scope_folder_id={Attachments.state(%{assigns: assigns}, @media_selector_scope).folder_uuid}
-        phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
-      />
-
       <%!-- Form content capped at 5xl (matches AI module pattern). --%>
       <div class="max-w-5xl mx-auto w-full">
         <%!-- Structure tab needs a persisted uuid; :new has none. --%>
         <.location_tabs :if={@action == :edit} location={@location} active={:details} />
-        <%!-- Outside #location-form, so owner searches never fire its phx-change. --%>
-        <.owner_picker_card
-          :if={@mode == :all}
-          owner={@owner}
+        <PhoenixKitWeb.Components.Core.NavTabs.nav_tabs
+          id="location-form-tabs"
+          active_tab={@form_tab}
+          on_change="form_tab"
+          tabs={[
+            %{id: "basics", label: gettext("Basics")},
+            %{id: "details", label: gettext("Details")},
+            %{id: "settings", label: gettext("Settings")}
+          ]}
         />
+        <div :if={@mode == :all} hidden={@form_tab != "settings"}>
+          <.owner_picker_card owner={@owner} />
+        </div>
         <.form
           for={@form}
           id="location-form"
+          novalidate
           action="#"
           phx-change="validate"
           phx-submit="save"
         >
-        <%!-- ═══════════════════════════════════════════════════════ --%>
-        <%!-- PUBLIC INFORMATION                                     --%>
-        <%!-- ═══════════════════════════════════════════════════════ --%>
-        <.form_section title={gettext("Public information")} icon="hero-globe-alt" body_class="gap-5">
-          <%!-- Translatable fields (name, description, public notes) --%>
-          <.multilang_tabs
-            multilang_enabled={@multilang_enabled}
-            language_tabs={@language_tabs}
-            current_lang={@current_lang}
-            class=""
-          />
+          <%!-- Keep every field mounted so all tabs submit together. --%>
+          <div hidden={@form_tab == "settings"} class="mt-4 space-y-4">
+            <%!-- Translatable fields (name, description, public notes) --%>
+            <.multilang_tabs
+              multilang_enabled={@multilang_enabled}
+              language_tabs={@language_tabs}
+              current_lang={@current_lang}
+              class=""
+            />
 
-          <.multilang_fields_wrapper
-            multilang_enabled={@multilang_enabled}
-            current_lang={@current_lang}
-            skeleton_class="flex flex-col gap-5"
-            fields_class="flex flex-col gap-5"
-          >
-            <:skeleton>
-              <div class="fieldset">
-                <div class="label"><div class="bg-base-content/15 rounded h-4 w-14 animate-pulse"></div></div>
-                <div class="bg-base-content/15 rounded-lg h-12 w-full animate-pulse"></div>
+            <.multilang_fields_wrapper
+              multilang_enabled={@multilang_enabled}
+              current_lang={@current_lang}
+              skeleton_class="flex flex-col gap-5"
+              fields_class="flex flex-col gap-5"
+            >
+              <:skeleton>
+                <div class="fieldset">
+                  <div class="label">
+                    <div class="bg-base-content/15 rounded h-4 w-14 animate-pulse"></div>
+                  </div>
+                  <div class="bg-base-content/15 rounded-lg h-12 w-full animate-pulse"></div>
+                </div>
+                <div class="fieldset">
+                  <div class="label">
+                    <div class="bg-base-content/15 rounded h-4 w-24 animate-pulse"></div>
+                  </div>
+                  <div class="bg-base-content/15 rounded-lg h-20 w-full animate-pulse"></div>
+                </div>
+                <div class="fieldset">
+                  <div class="label">
+                    <div class="bg-base-content/15 rounded h-4 w-20 animate-pulse"></div>
+                  </div>
+                  <div class="bg-base-content/15 rounded-lg h-20 w-full animate-pulse"></div>
+                </div>
+              </:skeleton>
+              <div hidden={@form_tab != "basics"}>
+                <.translatable_field
+                  field_name="name"
+                  form_prefix="location"
+                  changeset={@changeset}
+                  schema_field={:name}
+                  multilang_enabled={@multilang_enabled}
+                  current_lang={@current_lang}
+                  primary_language={@primary_language}
+                  lang_data={@lang_data}
+                  label={gettext("Name")}
+                  placeholder={gettext("e.g., Main Office, Downtown Showroom")}
+                  required
+                  class="w-full"
+                />
               </div>
-              <div class="fieldset">
-                <div class="label"><div class="bg-base-content/15 rounded h-4 w-24 animate-pulse"></div></div>
-                <div class="bg-base-content/15 rounded-lg h-20 w-full animate-pulse"></div>
+              <div hidden={@form_tab != "details"} class="space-y-4">
+                <.translatable_field
+                  field_name="description"
+                  form_prefix="location"
+                  changeset={@changeset}
+                  schema_field={:description}
+                  multilang_enabled={@multilang_enabled}
+                  current_lang={@current_lang}
+                  primary_language={@primary_language}
+                  lang_data={@lang_data}
+                  label={gettext("Description")}
+                  type="textarea"
+                  placeholder={gettext("Brief description of this location...")}
+                  class="w-full"
+                />
+
+                <.translatable_field
+                  field_name="public_notes"
+                  form_prefix="location"
+                  changeset={@changeset}
+                  schema_field={:public_notes}
+                  multilang_enabled={@multilang_enabled}
+                  current_lang={@current_lang}
+                  primary_language={@primary_language}
+                  lang_data={@lang_data}
+                  label={gettext("Public Notes")}
+                  type="textarea"
+                  placeholder={
+                    gettext("e.g., Bell is broken — knock loudly, entrance from side street...")
+                  }
+                  class="w-full"
+                />
               </div>
-              <div class="fieldset">
-                <div class="label"><div class="bg-base-content/15 rounded h-4 w-20 animate-pulse"></div></div>
-                <div class="bg-base-content/15 rounded-lg h-20 w-full animate-pulse"></div>
-              </div>
-            </:skeleton>
-              <.translatable_field
-                field_name="name"
-                form_prefix="location"
-                changeset={@changeset}
-                schema_field={:name}
-                multilang_enabled={@multilang_enabled}
-                current_lang={@current_lang}
-                primary_language={@primary_language}
-                lang_data={@lang_data}
-                label={gettext("Name")}
-                placeholder={gettext("e.g., Main Office, Downtown Showroom")}
-                required
-                class="w-full"
+            </.multilang_fields_wrapper>
+
+            <div hidden={@form_tab != "basics"}>
+              <.select
+                field={@form[:country]}
+                label={gettext("Country")}
+                prompt={gettext("Select a country")}
+                options={@address.country_options}
               />
-
-              <.translatable_field
-                field_name="description"
-                form_prefix="location"
-                changeset={@changeset}
-                schema_field={:description}
-                multilang_enabled={@multilang_enabled}
-                current_lang={@current_lang}
-                primary_language={@primary_language}
-                lang_data={@lang_data}
-                label={gettext("Description")}
-                type="textarea"
-                placeholder={gettext("Brief description of this location...")}
-                class="w-full"
-              />
-
-              <.translatable_field
-                field_name="public_notes"
-                form_prefix="location"
-                changeset={@changeset}
-                schema_field={:public_notes}
-                multilang_enabled={@multilang_enabled}
-                current_lang={@current_lang}
-                primary_language={@primary_language}
-                lang_data={@lang_data}
-                label={gettext("Public Notes")}
-                type="textarea"
-                placeholder={gettext("e.g., Bell is broken — knock loudly, entrance from side street...")}
-                class="w-full"
-              />
-          </.multilang_fields_wrapper>
-
-            <.section_header icon="hero-map-pin" title={gettext("Address")} />
-
-            <div :if={@address_warning} class="alert alert-warning text-sm py-2">
-              <.icon name="hero-exclamation-triangle" class="h-4 w-4 shrink-0" />
-              <span>{@address_warning}</span>
             </div>
+            <div hidden={@form_tab != "details"} class="space-y-4">
+              <.section_header icon="hero-map-pin" title={gettext("Address")} />
 
-            <%!-- Country leads: it decides the state and city lists and the
+              <div :if={@address_warning} class="alert alert-warning text-sm py-2">
+                <.icon name="hero-exclamation-triangle" class="h-4 w-4 shrink-0" />
+                <span>{@address_warning}</span>
+              </div>
+
+              <%!-- Country leads: it decides the state and city lists and the
                  labels below. Picking another one clears them (`validate`). --%>
-            <.select
-              field={@form[:country]}
-              label={gettext("Country")}
-              prompt={gettext("Select a country")}
-              options={@address.country_options}
-            />
+              <.input
+                field={@form[:address_line_1]}
+                type="text"
+                label={gettext("Address Line 1")}
+                placeholder={gettext("Street address, P.O. box")}
+              />
 
-            <.input
-              field={@form[:address_line_1]}
-              type="text"
-              label={gettext("Address Line 1")}
-              placeholder={gettext("Street address, P.O. box")}
-            />
+              <.input
+                field={@form[:address_line_2]}
+                type="text"
+                label={gettext("Address Line 2")}
+                placeholder={gettext("Apartment, suite, unit, building, floor")}
+              />
 
-            <.input
-              field={@form[:address_line_2]}
-              type="text"
-              label={gettext("Address Line 2")}
-              placeholder={gettext("Apartment, suite, unit, building, floor")}
-            />
-
-            <%!-- `check_address` reads all 3 address fields off the
+              <%!-- `check_address` reads all 3 address fields off the
                  changeset; one blur on postal_code (the natural
                  "I'm done with the address" point) does the same job
                  as binding to all three. --%>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <.select
-                :if={@address.subdivisions?}
-                field={@form[:state]}
-                label={@address.state_label}
-                prompt={gettext("Select…")}
-                options={@address.state_options}
-              />
-              <.input
-                :if={not @address.subdivisions?}
-                field={@form[:state]}
-                type="text"
-                label={@address.state_label}
-              />
-
-              <div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <.select
-                  :if={@address.cities?}
-                  field={@form[:city]}
-                  label={gettext("City")}
+                  :if={@address.subdivisions?}
+                  field={@form[:state]}
+                  label={@address.state_label}
                   prompt={gettext("Select…")}
-                  options={@address.city_options}
+                  options={@address.state_options}
                 />
-                <.input :if={not @address.cities?} field={@form[:city]} type="text" label={gettext("City")} />
-                <p :if={@address.cities?} id="city-missing-hint" class="mt-1 text-xs text-base-content/60">
-                  {gettext("Don't see your city? Please contact the support team and we will add it.")}
-                </p>
+                <.input
+                  :if={not @address.subdivisions?}
+                  field={@form[:state]}
+                  type="text"
+                  label={@address.state_label}
+                />
+
+                <div>
+                  <.select
+                    :if={@address.cities?}
+                    field={@form[:city]}
+                    label={gettext("City")}
+                    prompt={gettext("Select…")}
+                    options={@address.city_options}
+                  />
+                  <.input
+                    :if={not @address.cities?}
+                    field={@form[:city]}
+                    type="text"
+                    label={gettext("City")}
+                  />
+                  <p
+                    :if={@address.cities?}
+                    id="city-missing-hint"
+                    class="mt-1 text-xs text-base-content/60"
+                  >
+                    {gettext(
+                      "Don't see your city? Please contact the support team and we will add it."
+                    )}
+                  </p>
+                </div>
+
+                <.input
+                  field={@form[:postal_code]}
+                  type="text"
+                  label={@address.postal_code_label}
+                  phx-blur="check_address"
+                />
               </div>
 
-              <.input
-                field={@form[:postal_code]}
-                type="text"
-                label={@address.postal_code_label}
-                phx-blur="check_address"
-              />
-            </div>
+              <.section_header icon="hero-envelope" title={gettext("Contact")} />
 
-            <.section_header icon="hero-envelope" title={gettext("Contact")} />
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <.input
+                  field={@form[:phone]}
+                  type="tel"
+                  label={gettext("Phone")}
+                  placeholder={gettext("+1 234 567 890")}
+                />
+                <.input
+                  field={@form[:email]}
+                  type="email"
+                  label={gettext("Email")}
+                  placeholder={gettext("location@example.com")}
+                />
+                <.input
+                  field={@form[:website]}
+                  type="url"
+                  label={gettext("Website")}
+                  placeholder={gettext("https://...")}
+                />
+              </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <.input
-                field={@form[:phone]}
-                type="tel"
-                label={gettext("Phone")}
-                placeholder={gettext("+1 234 567 890")}
-              />
-              <.input
-                field={@form[:email]}
-                type="email"
-                label={gettext("Email")}
-                placeholder={gettext("location@example.com")}
-              />
-              <.input
-                field={@form[:website]}
-                type="url"
-                label={gettext("Website")}
-                placeholder={gettext("https://...")}
-              />
-            </div>
+              <.section_header icon="hero-check-circle" title={gettext("Features & Amenities")} />
 
-            <.section_header icon="hero-check-circle" title={gettext("Features & Amenities")} />
-
-            <%!-- Real form fields: `validate` / `save` read them from the
+              <%!-- Real form fields: `validate` / `save` read them from the
                  params (`put_features/2`), so they are keyboard-reachable
                  and submit like any other input. --%>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <.checkbox
-                :for={key <- @feature_keys}
-                id={"location-feature-#{key}"}
-                name={"location[features][#{key}]"}
-                checked={feature_on?(Map.get(@features, key))}
-                label={feature_label(key)}
-                class="checkbox-sm"
-                wrapper_class="gap-2"
-              />
-            </div>
-        </.form_section>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <.checkbox
+                  :for={key <- @feature_keys}
+                  id={"location-feature-#{key}"}
+                  name={"location[features][#{key}]"}
+                  checked={feature_on?(Map.get(@features, key))}
+                  label={feature_label(key)}
+                  class="checkbox-sm"
+                  wrapper_class="gap-2"
+                />
+              </div>
+              <%!-- Location types --%>
+              <div :if={@all_types != []} class="flex flex-col gap-4">
+                <.section_header icon="hero-tag" title={gettext("Location Types")} />
+                <p class="text-sm text-base-content/50 -mt-2">
+                  {gettext("Click to toggle. A location can have multiple types.")}
+                </p>
 
-        <%!-- ═══════════════════════════════════════════════════════ --%>
-        <%!-- FILES & FEATURED IMAGE — Location scope                --%>
-        <%!-- ═══════════════════════════════════════════════════════ --%>
-        <div :if={@mode == :all} class="card bg-base-100 shadow-lg mt-6">
-          <div class="card-body flex flex-col gap-4">
-            <.files_card_body
-              scope={location_scope()}
-              state={Attachments.state(%{assigns: assigns}, location_scope())}
-              uploads={@uploads}
-              featured_subtitle={gettext("Shown alongside this location in listings.")}
-              files_subtitle={gettext("Floor plans, brochures, certificates. Any file type is accepted.")}
-              remove_file_confirm={gettext("Remove this file from the location? If it's not attached to any other resource, it will be moved to trash (admins can restore).")}
-            />
-          </div>
-        </div>
-
-        <%!-- ═══════════════════════════════════════════════════════ --%>
-        <%!-- INTERNAL                                               --%>
-        <%!-- ═══════════════════════════════════════════════════════ --%>
-        <.form_section
-          title={if @mode == :all, do: gettext("Internal"), else: gettext("Status")}
-          icon={if @mode == :all, do: "hero-lock-closed", else: "hero-adjustments-horizontal"}
-          class="mt-6"
-          body_class="gap-5"
-        >
-          <:subtitle :if={@mode == :all}>
-            {gettext("This information is only visible to administrators.")}
-          </:subtitle>
-
-            <.textarea
-              :if={@mode == :all}
-              field={@form[:notes]}
-              label={gettext("Internal Notes")}
-              rows="3"
-              placeholder={gettext("Notes only visible to admins...")}
-              class="min-h-[5rem]"
-            />
-
-            <.select
-              field={@form[:status]}
-              label={gettext("Status")}
-              options={[{gettext("Active"), "active"}, {gettext("Inactive"), "inactive"}]}
-              class="transition-colors focus-within:select-primary"
-            />
-
-            <%!-- Location types --%>
-            <div :if={@all_types != []} class="flex flex-col gap-4">
-              <.section_header icon="hero-tag" title={gettext("Location Types")} />
-              <p class="text-sm text-base-content/50 -mt-2">
-                {gettext("Click to toggle. A location can have multiple types.")}
-              </p>
-
-              <div class="flex flex-wrap gap-2">
-                <label
-                  :for={t <- @all_types}
-                  class={[
-                    "badge badge-lg cursor-pointer gap-1.5 select-none transition-colors",
-                    if(MapSet.member?(@linked_type_uuids, t.uuid),
-                      do: "badge-primary",
-                      else: "badge-ghost hover:badge-outline"
-                    )
-                  ]}
-                  phx-click="toggle_type"
-                  phx-value-uuid={t.uuid}
-                >
-                  <.icon
-                    :if={MapSet.member?(@linked_type_uuids, t.uuid)}
-                    name="hero-check"
-                    class="h-3.5 w-3.5"
-                  />
-                  {t.name}
-                </label>
+                <div class="flex flex-wrap gap-2">
+                  <label
+                    :for={t <- @all_types}
+                    class={[
+                      "badge badge-lg cursor-pointer gap-1.5 select-none transition-colors",
+                      if(MapSet.member?(@linked_type_uuids, t.uuid),
+                        do: "badge-primary",
+                        else: "badge-ghost hover:badge-outline"
+                      )
+                    ]}
+                    phx-click="toggle_type"
+                    phx-value-uuid={t.uuid}
+                  >
+                    <.icon
+                      :if={MapSet.member?(@linked_type_uuids, t.uuid)}
+                      name="hero-check"
+                      class="h-3.5 w-3.5"
+                    />
+                    {t.name}
+                  </label>
+                </div>
               </div>
             </div>
+          </div>
 
-        </.form_section>
+          <%!-- Folder attachments are separate from the ordered photo gallery. --%>
+          <div :if={@mode == :all} hidden={@form_tab != "details"}>
+            <div class="card bg-base-100 shadow-lg mt-6">
+              <div class="card-body flex flex-col gap-4">
+                <.files_card_body
+                  scope={location_scope()}
+                  state={Attachments.state(%{assigns: assigns}, location_scope())}
+                  uploads={@uploads}
+                  show_featured={false}
+                  excluded_files={@photos}
+                  files_subtitle={
+                    gettext("Floor plans, brochures, certificates. Any file type is accepted.")
+                  }
+                  remove_file_confirm={
+                    gettext(
+                      "Remove this file from the location? If it's not attached to any other resource, it will be moved to trash (admins can restore)."
+                    )
+                  }
+                />
+              </div>
+            </div>
+          </div>
 
+          <div hidden={@form_tab != "settings"}>
+            <.form_section
+              title={if @mode == :all, do: gettext("Internal"), else: gettext("Status")}
+              icon={if @mode == :all, do: "hero-lock-closed", else: "hero-adjustments-horizontal"}
+              class="mt-6"
+              body_class="gap-5"
+            >
+              <:subtitle :if={@mode == :all}>
+                {gettext("This information is only visible to administrators.")}
+              </:subtitle>
+
+              <.textarea
+                :if={@mode == :all}
+                field={@form[:notes]}
+                label={gettext("Internal Notes")}
+                rows="3"
+                placeholder={gettext("Notes only visible to admins...")}
+                class="min-h-[5rem]"
+              />
+
+              <.select
+                field={@form[:status]}
+                label={gettext("Status")}
+                options={[{gettext("Active"), "active"}, {gettext("Inactive"), "inactive"}]}
+                class="transition-colors focus-within:select-primary"
+              />
+            </.form_section>
+          </div>
+        </.form>
+        <div :if={@mode == :all} hidden={@form_tab != "basics"} class="mt-4">
+          <.live_component
+            module={MediaGallery}
+            id="location-photos"
+            title={gettext("Photos")}
+            selected={@photos}
+            featured_first={true}
+            scope_folder_id={Attachments.state(%{assigns: assigns}, location_scope()).folder_uuid}
+            phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
+            phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
+          />
+        </div>
         <%!-- Actions. Hand-rolled rather than core's `form_actions`:
              Save is disabled while uploads are in flight, and
              `form_actions` has no way to disable its submit button. --%>
@@ -853,9 +906,12 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
           <.link navigate={Paths.index()} class="btn btn-ghost">{gettext("Cancel")}</.link>
           <button
             type="submit"
+            form="location-form"
             class="btn btn-primary phx-submit-loading:opacity-75"
             disabled={uploads_in_flight?(assigns)}
-            phx-disable-with={if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")}
+            phx-disable-with={
+              if @action == :new, do: gettext("Creating..."), else: gettext("Saving...")
+            }
           >
             {cond do
               uploads_in_flight?(assigns) -> gettext("Waiting for uploads...")
@@ -864,7 +920,6 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
             end}
           </button>
         </div>
-      </.form>
       </div>
     </div>
     """
@@ -902,8 +957,35 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     end
   end
 
-  # Internal notes need `locations.manage_all`; anyone else's submit must not
-  # write them.
+  defp photo_selection(data) do
+    (List.wrap(data["featured_image_uuid"]) ++ List.wrap(data["additional_photo_uuids"]))
+    |> Enum.filter(&match?({:ok, _}, Ecto.UUID.cast(&1)))
+    |> Enum.uniq()
+  end
+
+  defp put_photo_selection(params, socket) do
+    photos =
+      if manage_all?(socket),
+        do: socket.assigns.photos,
+        else: photo_selection(socket.assigns.location.data || %{})
+
+    data = Map.drop(params["data"], ["featured_image_uuid", "additional_photo_uuids"])
+
+    data =
+      case photos do
+        [] ->
+          data
+
+        [cover] ->
+          Map.put(data, "featured_image_uuid", cover)
+
+        [cover | others] ->
+          Map.merge(data, %{"featured_image_uuid" => cover, "additional_photo_uuids" => others})
+      end
+
+    Map.put(params, "data", data)
+  end
+
   defp drop_admin_only_params(params, socket) do
     if manage_all?(socket), do: params, else: Map.delete(params, "notes")
   end

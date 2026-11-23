@@ -128,6 +128,7 @@ defmodule PhoenixKitLocations.Web.ScopedLocationsLiveTest do
       {:ok, view, html} = live(conn, Paths.location_new())
 
       assert has_element?(view, "#header-title", "New location")
+      refute has_element?(view, "#location-photos")
       refute has_element?(view, "#location-owner-card")
       refute has_element?(view, "textarea[name='location[notes]']")
       refute html =~ "Floor plans, brochures"
@@ -368,7 +369,8 @@ defmodule PhoenixKitLocations.Web.ScopedLocationsLiveTest do
                    "name" => "No Files",
                    "data" => %{
                      "files_folder_uuid" => UUIDv7.generate(),
-                     "featured_image_uuid" => UUIDv7.generate()
+                     "featured_image_uuid" => UUIDv7.generate(),
+                     "additional_photo_uuids" => [UUIDv7.generate()]
                    }
                  }
                })
@@ -376,6 +378,26 @@ defmodule PhoenixKitLocations.Web.ScopedLocationsLiveTest do
       data = TestRepo.get!(Location, mine.uuid).data
       refute Map.has_key?(data, "files_folder_uuid")
       refute Map.has_key?(data, "featured_image_uuid")
+      refute Map.has_key?(data, "additional_photo_uuids")
+    end
+
+    test "an owner editing details preserves a manager's newer gallery", %{conn: conn, user: user} do
+      location = owned_location(user, %{name: "Office"})
+      {:ok, view, _} = live(conn, Paths.location_edit(location.uuid))
+
+      photos = %{
+        "featured_image_uuid" => UUIDv7.generate(),
+        "additional_photo_uuids" => [UUIDv7.generate()]
+      }
+
+      {:ok, _} = Locations.update_location(location, %{data: photos})
+
+      assert {:error, {:live_redirect, _}} =
+               render_submit(view, "save", %{"location" => %{"name" => "Renamed"}})
+
+      saved = Locations.get_location(location.uuid)
+      assert saved.name == "Renamed"
+      assert Map.take(saved.data, Map.keys(photos)) == photos
     end
 
     test "a forged toggle_type can't link a type the form didn't offer", %{conn: conn} do

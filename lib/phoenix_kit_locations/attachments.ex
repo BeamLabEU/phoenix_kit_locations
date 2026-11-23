@@ -438,12 +438,18 @@ defmodule PhoenixKitLocations.Attachments do
   end
 
   @doc """
-  Removes any client-sent `files_folder_uuid` / `featured_image_uuid` from
-  `params["data"]`, for create paths that never go through
-  `inject_attachment_data/3` (e.g. a new Space).
+  Removes any client-sent attachment pointers (`files_folder_uuid`,
+  `featured_image_uuid`, `additional_photo_uuids`) from `params["data"]`,
+  for create paths that never go through `inject_attachment_data/3`
+  (e.g. a new Space — spaces have no gallery, so all three are forged
+  there).
   """
   def drop_attachment_pointers(%{"data" => %{} = data} = params) do
-    Map.put(params, "data", Map.drop(data, ["files_folder_uuid", "featured_image_uuid"]))
+    Map.put(
+      params,
+      "data",
+      Map.drop(data, ["files_folder_uuid", "featured_image_uuid", "additional_photo_uuids"])
+    )
   end
 
   def drop_attachment_pointers(params), do: params

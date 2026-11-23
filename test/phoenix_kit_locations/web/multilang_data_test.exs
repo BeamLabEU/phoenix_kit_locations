@@ -10,6 +10,8 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
   """
   use PhoenixKitLocations.LiveCase, async: false
 
+  import Ecto.Query
+
   alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Storage
   alias PhoenixKitLocations.Locations
@@ -41,6 +43,68 @@ defmodule PhoenixKitLocations.Web.MultilangDataTest do
 
     pointers = %{"files_folder_uuid" => folder.uuid, "featured_image_uuid" => image.uuid}
     %{conn: put_test_scope(conn, fake_scope(user_uuid: user.uuid)), pointers: pointers}
+  end
+
+  test "a gallery reorder persists the new cover and its translated listing", ctx do
+    enable_french()
+    cover = ctx.pointers["featured_image_uuid"]
+    original = Storage.get_file(cover)
+
+    {:ok, second} =
+      Storage.create_file(%{
+        original_file_name: "inside.jpg",
+        file_name: "inside.jpg",
+        mime_type: "image/jpeg",
+        file_type: "image",
+        ext: "jpg",
+        file_checksum: "second-#{cover}",
+        user_file_checksum: "second-#{cover}",
+        size: 12,
+        status: "active",
+        user_uuid: original.user_uuid
+      })
+
+    location =
+      put_data(
+        fixture_location(%{name: "Main Office"}),
+        Map.merge(translated("Main Office", "Bureau"), ctx.pointers)
+      )
+
+    path = PhoenixKitLocations.Paths.location_edit(location.uuid)
+    {:ok, view, _} = live(ctx.conn, path)
+
+    Phoenix.LiveView.send_update(view.pid, PhoenixKitWeb.Components.MediaGallery,
+      id: "location-photos",
+      media_selected: [cover, second.uuid]
+    )
+
+    assert has_element?(view, "#location-photos [phx-value-uuid='#{second.uuid}']")
+
+    view
+    |> with_target("#location-photos")
+    |> render_hook("reorder_images", %{"ordered_ids" => [second.uuid, cover]})
+
+    assert {:error, {:live_redirect, _}} = view |> form("#location-form") |> render_submit()
+
+    saved = Locations.get_location(location.uuid)
+    assert saved.data["featured_image_uuid"] == second.uuid
+    assert saved.data["additional_photo_uuids"] == [cover]
+    assert get_in(saved.data, ["fr-FR", "_name"]) == "Bureau"
+    # Both positions count as references for Storage's orphan check.
+    [{_, condition} | _] = PhoenixKitLocations.file_references()
+
+    refute Repo.exists?(
+             from(f in PhoenixKit.Modules.Storage.File,
+               where: f.uuid in ^[cover, second.uuid],
+               where: ^condition
+             )
+           )
+
+    {:ok, listing, _} =
+      live(with_request_locale(ctx.conn, "fr-FR"), PhoenixKitLocations.Paths.index())
+
+    assert has_element?(listing, "#locations-list a", "Bureau")
+    assert has_element?(listing, "#locations-list img[src*='#{second.uuid}/thumbnail']")
   end
 
   defp enable_french do

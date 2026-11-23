@@ -19,11 +19,11 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   import PhoenixKitWeb.Components.Core.Modal, only: [confirm_modal: 1]
   import PhoenixKitWeb.Components.Core.TableDefault
   import PhoenixKitWeb.Components.Core.TableRowMenu
+  import PhoenixKitLocations.Web.Components.LocationSummary
   import PhoenixKitLocations.Web.Components.OwnerComponents
 
   alias PhoenixKit.Users.Auth
   alias PhoenixKitLocations.Errors
-  alias PhoenixKitLocations.Geo
   alias PhoenixKitLocations.Locations
   alias PhoenixKitLocations.Paths
   alias PhoenixKitLocations.Policy
@@ -39,6 +39,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
        manage_all: false,
        owner_filter: :all,
        owner_emails: %{},
+       cover_urls: %{},
        confirm_delete: nil
      )}
   end
@@ -105,7 +106,11 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
 
     emails = if socket.assigns.manage_all, do: owner_emails(locations), else: %{}
 
-    assign(socket, locations: locations, owner_emails: emails)
+    assign(socket,
+      locations: locations,
+      owner_emails: emails,
+      cover_urls: cover_urls(locations, socket.assigns[:phoenix_kit_current_scope])
+    )
   rescue
     error ->
       Logger.error("Failed to load locations: #{inspect(error)}")
@@ -262,6 +267,8 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
       <.locations_table
         :if={@active_tab == :index}
         locations={@locations}
+        cover_urls={@cover_urls}
+        locale={PhoenixKit.Utils.Multilang.current_locale()}
         owner_emails={@owner_emails}
         manage_all={@manage_all}
         owner_filter={@owner_filter}
@@ -300,13 +307,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
       <.table_default
         variant="zebra" size="sm" toggleable={true}
         id="locations-list" items={@locations}
-        card_fields={fn l -> [
-          %{label: gettext("Address"), value: l.address_line_1 || "—"},
-          %{label: gettext("Country"), value: Geo.country_name(l.country) || "—"}
-        ] ++ owner_card_field(l, @manage_all, @owner_emails) ++ [
-          %{label: gettext("Types"), value: type_names(l)},
-          %{label: gettext("Status"), value: status_label(l.status)}
-        ] end}
+        card_fields={&location_card_fields(&1, @manage_all, @owner_emails)}
       >
         <:toolbar_title>
           <.owner_filter :if={@manage_all} active={@owner_filter} />
@@ -328,40 +329,30 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         <.table_default_header>
           <.table_default_row>
             <.table_default_header_cell>{gettext("Name")}</.table_default_header_cell>
-            <.table_default_header_cell>{gettext("Address")}</.table_default_header_cell>
-            <.table_default_header_cell>{gettext("City")}</.table_default_header_cell>
-            <.table_default_header_cell>{gettext("Country")}</.table_default_header_cell>
             <.table_default_header_cell :if={@manage_all}>{owner_column_title()}</.table_default_header_cell>
-            <.table_default_header_cell>{gettext("Type")}</.table_default_header_cell>
             <.table_default_header_cell>{gettext("Status")}</.table_default_header_cell>
             <.table_default_header_cell class="text-right whitespace-nowrap">{gettext("Actions")}</.table_default_header_cell>
           </.table_default_row>
         </.table_default_header>
         <.table_default_body>
           <.table_default_row :if={@locations == []}>
-            <.table_default_cell colspan={if @manage_all, do: 8, else: 7}>
+            <.table_default_cell colspan={if @manage_all, do: 4, else: 3}>
               <.locations_empty owner_filter={@owner_filter} />
             </.table_default_cell>
           </.table_default_row>
           <.table_default_row :for={location <- @locations}>
             <.table_default_cell>
               <.link navigate={Paths.location_edit(location.uuid)} class="link link-hover font-medium">
-                {location.name}
+                <.location_summary location={location} cover_urls={@cover_urls} locale={@locale} />
               </.link>
+              <div :if={location.location_types != []} class="flex flex-wrap gap-1">
+                <span :for={t <- location.location_types} class="badge badge-sm badge-outline">{t.name}</span>
+              </div>
             </.table_default_cell>
-            <.table_default_cell class="text-sm text-base-content/60">{location.address_line_1 || "—"}</.table_default_cell>
-            <.table_default_cell class="text-sm text-base-content/60">{location.city || "—"}</.table_default_cell>
-            <.table_default_cell class="text-sm text-base-content/60">{Geo.country_name(location.country) || "—"}</.table_default_cell>
             <.table_default_cell :if={@manage_all} class="text-sm">
               <span class={if location.owner_uuid, do: "", else: "text-base-content/40"}>
                 {owner_text(location.owner_uuid, @owner_emails)}
               </span>
-            </.table_default_cell>
-            <.table_default_cell>
-              <div :if={location.location_types != []} class="flex flex-wrap gap-1">
-                <span :for={t <- location.location_types} class="badge badge-sm badge-outline">{t.name}</span>
-              </div>
-              <span :if={location.location_types == []} class="text-base-content/40">—</span>
             </.table_default_cell>
             <.table_default_cell>
               <.status_badge status={location.status} label={status_label(location.status)} />
@@ -377,7 +368,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
           </.table_default_row>
         </.table_default_body>
         <:card_header :let={location}>
-          <.link navigate={Paths.location_edit(location.uuid)} class="font-medium text-sm link link-hover">{location.name}</.link>
+          <.link navigate={Paths.location_edit(location.uuid)} class="font-medium text-sm link link-hover"><.location_summary location={location} cover_urls={@cover_urls} locale={@locale} /></.link>
         </:card_header>
         <:card_actions :let={location}>
           <.button variant="ghost" size="xs" navigate={Paths.location_edit(location.uuid)}>{gettext("Edit")}</.button>
@@ -499,11 +490,17 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
     """
   end
 
-  defp type_names(%{location_types: types}) when is_list(types) and types != [] do
-    Enum.map_join(types, ", ", & &1.name)
-  end
+  defp location_card_fields(location, manage_all?, emails) do
+    types =
+      case location.location_types do
+        [] -> []
+        types -> [%{label: gettext("Types"), value: Enum.map_join(types, ", ", & &1.name)}]
+      end
 
-  defp type_names(_), do: "—"
+    owner_card_field(location, manage_all?, emails) ++
+      types ++
+      [%{label: gettext("Status"), value: status_label(location.status)}]
+  end
 
   # The owner card field only for a site-wide manager; a user scoped to their
   # own locations owns every row they see.

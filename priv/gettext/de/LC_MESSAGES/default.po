@@ -1050,3 +1050,15 @@ msgstr[1] "„%{name}“ und die %{count} untergeordneten Bereiche löschen? Die
 #, elixir-format
 msgid "Manage all locations"
 msgstr "Alle Standorte verwalten"
+
+#, elixir-autogen
+msgid "Basics"
+msgstr "Grunddaten"
+
+#, elixir-autogen
+msgid "Settings"
+msgstr "Einstellungen"
+
+#, elixir-autogen
+msgid "Photos"
+msgstr "Fotos"
