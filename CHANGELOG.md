@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.10.0 - 2026-11-24
+
+### Upgrade notes
+
+- **Requires `phoenix_kit >= 3.5.0 and < 4.0.0`** (was `>= 2.65.0 and < 4.0.0`).
+  3.5.0 is the ecosystem-wide minimum core. Calls that used to feature-detect
+  an older core now call it directly. No migration.
+
+### Added
+
+- **Photo gallery on a location.** A manager stages an ordered selection until
+  save. The first photo is the cover (`featured_image_uuid`); the rest are
+  `additional_photo_uuids`, stored top-level in `data` and kept out of
+  language entries. The locations list and the project Sites tab show that
+  cover, the translated name and a compact address. A save that did not edit
+  the gallery keeps the selection read under the row lock, for form params
+  and for atom-keyed `data`. An owner-scoped save cannot replace it. A photo
+  still in the saved gallery cannot be trashed from the files card until that
+  change is saved. `file_references/0` counts the cover and every gallery
+  photo, plus each space cover, so core's orphan cleanup leaves them. A cover
+  lookup that fails leaves the Sites tab up with no thumbnail.
+
+### Changed
+
+- The location form is tabbed: Basics (name, country, photos), Details
+  (description, address, contact, features, types, files) and Settings
+  (status, ownership, internal notes).
+- The locations list drops the separate address, city and country columns.
+  The name cell carries the cover, translated name, compact address and type
+  badges.
+- Dependencies updated, `phoenix_kit` 3.7.0 among them. No migration.
+
 ## 0.9.0 - 2026-11-08
 
 ### Added
