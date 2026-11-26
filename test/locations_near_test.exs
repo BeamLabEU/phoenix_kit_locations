@@ -56,26 +56,46 @@ defmodule PhoenixKitLocations.LocationsNearTest do
     assert found.uuid == edge.uuid
   end
 
+  # Points just inside the circle in every direction (the destination
+  # formula), each checked against the box the way the SQL checks it.
   test "near: the box contains the circle for random centres and radii" do
     :rand.seed(:exsss, {1, 2, 3})
+    r_earth = Distance.earth_radius_km()
 
-    for _ <- 1..2000 do
-      lat = :rand.uniform() * 180 - 90
-      radius = :rand.uniform() * 5000
+    for _ <- 1..3000 do
+      lat = :rand.uniform() * 178 - 89
+      lng = :rand.uniform() * 360 - 180
+      radius = :rand.uniform() * 4000 + 1
       {dlat, dlng} = Locations.bounding_box(lat, radius)
-      # The point of the circle farthest east (a great circle from the
-      # centre at the bearing that maximises Δλ) and farthest north/south.
-      d = radius / Distance.earth_radius_km()
-      phi = lat * :math.pi() / 180
-      ratio = :math.sin(d) / :math.cos(phi)
 
-      if dlng < 180.0 do
-        assert ratio < 1.0
-        max_dlng = :math.asin(ratio) * 180 / :math.pi()
-        assert dlng >= max_dlng, "lat #{lat} r #{radius}: #{dlng} < #{max_dlng}"
+      d = radius * 0.999 / r_earth
+      bearing = :rand.uniform() * 2 * :math.pi()
+      p1 = lat * :math.pi() / 180
+
+      p2 =
+        :math.asin(
+          :math.sin(p1) * :math.cos(d) + :math.cos(p1) * :math.sin(d) * :math.cos(bearing)
+        )
+
+      l2 =
+        lng * :math.pi() / 180 +
+          :math.atan2(
+            :math.sin(bearing) * :math.sin(d) * :math.cos(p1),
+            :math.cos(d) - :math.sin(p1) * :math.sin(p2)
+          )
+
+      plat = Float.round(p2 * 180 / :math.pi(), 6)
+      plng = Float.round(l2 * 180 / :math.pi(), 6)
+
+      if Distance.haversine({lat, lng}, {plat, plng}) <= radius do
+        assert plat >= lat - dlat and plat <= lat + dlat,
+               "lat: #{inspect({lat, lng, radius, plat, plng})}"
+
+        if dlng < 180.0 do
+          wrapped = abs(:math.fmod(plng - lng + 540, 360) - 180)
+          assert wrapped <= dlng, "lng: #{inspect({lat, lng, radius, plat, plng})}"
+        end
       end
-
-      assert dlat >= d * 180 / :math.pi()
     end
   end
 
