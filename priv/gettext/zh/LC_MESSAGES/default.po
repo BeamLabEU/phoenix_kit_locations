@@ -1062,16 +1062,6 @@ msgstr "用户"
 msgid "Space saved."
 msgstr "空间已保存。"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:115
-#, elixir-autogen, elixir-format
-msgid "No users found."
-msgstr "未找到用户。"
-
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:110
-#, elixir-autogen, elixir-format
-msgid "Search users by email or name…"
-msgstr "按邮箱或姓名搜索用户…"
-
 #: lib/phoenix_kit_locations/web/location_form_live.ex:1068
 #, elixir-autogen, elixir-format
 msgid "Decimal degrees (WGS 84), for maps and distance search. Optional."

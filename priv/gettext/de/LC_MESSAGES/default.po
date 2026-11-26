@@ -1063,16 +1063,6 @@ msgstr "Benutzer"
 msgid "Space saved."
 msgstr "Bereich gespeichert."
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:115
-#, elixir-autogen, elixir-format
-msgid "No users found."
-msgstr "Keine Benutzer gefunden."
-
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:110
-#, elixir-autogen, elixir-format
-msgid "Search users by email or name…"
-msgstr "Benutzer nach E-Mail oder Name suchen…"
-
 #: lib/phoenix_kit_locations/web/location_form_live.ex:1068
 #, elixir-autogen, elixir-format
 msgid "Decimal degrees (WGS 84), for maps and distance search. Optional."
