@@ -9,7 +9,8 @@ defmodule PhoenixKitLocations.Geocoding do
     * `enqueue/2` — inserts a `PhoenixKitLocations.Workers.GeocodeWorker`
       job (Oban, `:default` queue). `Locations.create_location/2` and
       `update_location/3` call it when `:geocode_on_save` is on and the save
-      changed the address without also setting coordinates by hand.
+      changed the address or left the row without coordinates, and did not
+      type coordinates by hand (clearing them is not typing).
     * `geocode_now/2` — calls the geocoder in the current process and writes
       the result (what the job runs; also usable from IEx or a host task).
 

@@ -239,7 +239,7 @@ defmodule PhoenixKitLocations.GeocodingTest do
     end
 
     test "on: an address change enqueues, a name-only change does not" do
-      loc = location()
+      loc = location(%{latitude: "59.1", longitude: "24.1"})
       Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
 
       {:ok, renamed} = Locations.update_location(loc, %{name: "Renamed"})
@@ -256,6 +256,33 @@ defmodule PhoenixKitLocations.GeocodingTest do
       )
     end
 
+    # The form's hint: "Leave blank to look them up from the address after saving."
+    test "on: a save that leaves the coordinates blank enqueues, even without an address change" do
+      loc = location()
+      Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
+
+      {:ok, _} = Locations.update_location(loc, %{name: "Renamed"})
+      assert_enqueued(worker: GeocodeWorker, args: %{"location_uuid" => loc.uuid})
+    end
+
+    test "on: clearing the coordinates is not typing them, so the save enqueues" do
+      loc = location(%{latitude: "59.1", longitude: "24.1"})
+      Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
+
+      {:ok, cleared} =
+        Locations.update_location(loc, %{latitude: "", longitude: "", city: "Tartu"})
+
+      assert cleared.latitude == nil
+
+      assert_enqueued(
+        worker: GeocodeWorker,
+        args: %{
+          "location_uuid" => loc.uuid,
+          "fingerprint" => Geocoding.address_fingerprint(cleared)
+        }
+      )
+    end
+
     test "on: coordinates typed in the same save win, so nothing is enqueued" do
       Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
       loc = location(%{latitude: "59.1", longitude: "24.1"})
@@ -268,7 +295,12 @@ defmodule PhoenixKitLocations.GeocodingTest do
 
       # The row was geocoded after `loc` was loaded (by a job, or another
       # editor typing coordinates).
-      {:ok, _} = Locations.write_geocoded_coordinates(loc.uuid, %{latitude: 1, longitude: 2}, Geocoding.expectation(loc))
+      {:ok, _} =
+        Locations.write_geocoded_coordinates(
+          loc.uuid,
+          %{latitude: 1, longitude: 2},
+          Geocoding.expectation(loc)
+        )
 
       # The old struct still says "no coordinates"; this save moves the city.
       {:ok, _} = Locations.update_location(loc, %{city: "Tartu"})
@@ -287,7 +319,10 @@ defmodule PhoenixKitLocations.GeocodingTest do
 
     test "on: a field another session saved since the struct was loaded is the row's, not the struct's" do
       loc = location()
-      {:ok, _} = Locations.update_location(Locations.get_location(loc.uuid), %{postal_code: "10111"})
+
+      {:ok, _} =
+        Locations.update_location(Locations.get_location(loc.uuid), %{postal_code: "10111"})
+
       Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
 
       {:ok, _} = Locations.update_location(loc, %{city: "Tartu"})
@@ -301,7 +336,9 @@ defmodule PhoenixKitLocations.GeocodingTest do
       loc = location()
       assert {:ok, _} = Geocoding.enqueue(loc)
       # Same address, the row now holds coordinates: a different job.
-      assert {:ok, _} = Geocoding.enqueue(%{loc | latitude: Decimal.new(1), longitude: Decimal.new(2)})
+      assert {:ok, _} =
+               Geocoding.enqueue(%{loc | latitude: Decimal.new(1), longitude: Decimal.new(2)})
+
       # The exact same job is still deduplicated.
       assert {:ok, %{conflict?: true}} = Geocoding.enqueue(loc)
       assert length(all_enqueued(worker: GeocodeWorker)) == 2

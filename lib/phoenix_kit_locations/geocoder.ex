@@ -15,7 +15,8 @@ defmodule PhoenixKitLocations.Geocoder do
   With no `:geocoder` configured (the default) nothing is ever geocoded and
   coordinates are entered by hand. `:geocode_on_save` (default `false`)
   enqueues a background job (`PhoenixKitLocations.Workers.GeocodeWorker`)
-  whenever a location is created or its address changes; without it the host
+  whenever a save changes the address or leaves the location without
+  coordinates (and did not type them by hand); without it the host
   calls `PhoenixKitLocations.Geocoding.enqueue/2` or `geocode_now/2` itself.
 
   ## The callback

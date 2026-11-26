@@ -400,13 +400,20 @@ defmodule PhoenixKitLocations.Locations do
 
   # ── Geocoding on save (opt-in, see `PhoenixKitLocations.Geocoder`) ──
 
-  # A save geocodes when the host opted in, the address changed (`before` →
-  # `saved`, the row before and after the save), and the same save did not
-  # set coordinates by hand (typed coordinates win).
+  # A save geocodes when the host opted in, the same save did not type
+  # coordinates (typed coordinates win; clearing them is not typing), and
+  # either the address changed (`before` → `saved`, the row before and after
+  # the save) or the row is left without coordinates — the form's "leave
+  # blank to look them up" promise, which also covers a location saved
+  # before a geocoder was configured. `Geocoding.enqueue/2` still skips a
+  # row with no usable address, and the job's uniqueness keeps repeated
+  # saves from queueing it twice.
   defp geocode_on_save?(%Ecto.Changeset{valid?: true, changes: changes}, before, saved) do
-    not Map.has_key?(changes, :latitude) and not Map.has_key?(changes, :longitude) and
-      Geocoder.on_save?() and
-      Geocoding.address_fingerprint(before) != Geocoding.address_fingerprint(saved)
+    typed? = Map.get(changes, :latitude) != nil or Map.get(changes, :longitude) != nil
+
+    not typed? and Geocoder.on_save?() and
+      (is_nil(saved.latitude) or is_nil(saved.longitude) or
+         Geocoding.address_fingerprint(before) != Geocoding.address_fingerprint(saved))
   end
 
   defp geocode_on_save?(_changeset, _before, _saved), do: false
@@ -937,7 +944,9 @@ defmodule PhoenixKitLocations.Locations do
     dlat = d * 180 / :math.pi() + @box_margin_deg
     lat_rad = lat * :math.pi() / 180
     reaches_pole? = abs(lat) + dlat >= 90.0
-    ratio = if reaches_pole?, do: 2.0, else: :math.sin(min(d, :math.pi() / 2)) / :math.cos(lat_rad)
+
+    ratio =
+      if reaches_pole?, do: 2.0, else: :math.sin(min(d, :math.pi() / 2)) / :math.cos(lat_rad)
 
     dlng =
       if reaches_pole? or ratio >= 1.0 or d >= :math.pi() / 2,
