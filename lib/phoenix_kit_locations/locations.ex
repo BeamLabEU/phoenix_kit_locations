@@ -370,6 +370,7 @@ defmodule PhoenixKitLocations.Locations do
           changeset
           |> repo().update()
           |> ok_or_rollback()
+          |> with_row_coordinates(saved)
           |> then(&{&1, geocode_target})
       end
     end)
@@ -383,6 +384,11 @@ defmodule PhoenixKitLocations.Locations do
         log_activity(error, "location.updated", "location", opts, &location_metadata/1)
     end
   end
+
+  # The coordinates the row holds after the save, not the caller's copy's:
+  # a job may have written them since the caller loaded its struct.
+  defp with_row_coordinates(record, saved),
+    do: %{record | latitude: saved.latitude, longitude: saved.longitude}
 
   defp lock_geocode_target(uuid, expect) do
     case lock_row(Location, uuid) do

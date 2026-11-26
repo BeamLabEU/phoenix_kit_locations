@@ -326,8 +326,10 @@ defmodule PhoenixKitLocations.GeocodingTest do
         )
 
       # The old struct still says "no coordinates"; this save moves the city.
-      {:ok, _} = Locations.update_location(loc, %{city: "Tartu"})
+      {:ok, returned} = Locations.update_location(loc, %{city: "Tartu"})
       row = Locations.get_location(loc.uuid)
+      # What the caller gets back holds the row's coordinates too.
+      assert Decimal.equal?(returned.latitude, row.latitude)
 
       assert [job] = all_enqueued(worker: GeocodeWorker)
       assert job.args["fingerprint"] == Geocoding.address_fingerprint(row)
