@@ -165,8 +165,16 @@ defmodule PhoenixKitLocations.Schemas.Location do
   # holds what the database stores.
   defp round_coordinate(changeset, field) do
     case get_change(changeset, field) do
-      %Decimal{} = value -> put_change(changeset, field, Decimal.round(value, 6))
-      _ -> changeset
+      # Only an in-range finite value: rounding a huge one (1e28) raises,
+      # and the range check below rejects it anyway.
+      %Decimal{} = value ->
+        if Decimal.inf?(value) or Decimal.nan?(value) or
+             Decimal.gt?(Decimal.abs(value), 180),
+           do: changeset,
+           else: put_change(changeset, field, Decimal.round(value, 6))
+
+      _ ->
+        changeset
     end
   end
 

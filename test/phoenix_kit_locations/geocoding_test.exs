@@ -128,6 +128,17 @@ defmodule PhoenixKitLocations.GeocodingTest do
       assert Decimal.equal?(Locations.get_location(loc.uuid).latitude, Decimal.new(1))
     end
 
+    test "a NaN or infinite result is an invalid result, not a raise" do
+      loc = location()
+
+      for bad <- ["NaN", "Infinity", "-inf", Decimal.new("NaN")] do
+        reply({:ok, %{latitude: bad, longitude: "0"}})
+        assert {:error, :invalid_result} = Geocoding.geocode_now(loc)
+      end
+
+      assert Locations.get_location(loc.uuid).latitude == nil
+    end
+
     test "passes geocoder errors through and rejects junk results" do
       loc = location()
       reply({:error, :not_found})

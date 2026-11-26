@@ -23,6 +23,14 @@ defmodule PhoenixKitLocations.Schemas.LocationCoordinatesTest do
     assert {"must be between -180 and 180", _} = cs.errors[:longitude]
   end
 
+  test "a huge or non-finite value is an error, not a raise" do
+    for value <- ["1e28", String.duplicate("9", 40), "1e400"] do
+      cs = changeset(%{"latitude" => value, "longitude" => "0"})
+      refute cs.valid?
+      assert cs.errors[:latitude]
+    end
+  end
+
   test "requires both or neither" do
     cs = changeset(%{"latitude" => "59.4"})
     refute cs.valid?

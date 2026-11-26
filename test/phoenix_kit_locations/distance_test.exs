@@ -45,6 +45,14 @@ defmodule PhoenixKitLocations.DistanceTest do
     assert Distance.haversine(nil, @tallinn) == nil
   end
 
+  test "a huge or non-finite coordinate has no distance instead of raising" do
+    assert Distance.coordinates({Decimal.new("NaN"), 0}) == nil
+    assert Distance.coordinates({Decimal.new("Infinity"), 0}) == nil
+    assert Distance.coordinates({Decimal.new("1e400"), 0}) == nil
+    assert Distance.coordinates({Integer.pow(10, 400), 0}) == nil
+    assert Distance.haversine({0, Integer.pow(10, 400)}, {0, 0}) == nil
+  end
+
   test "within?/4" do
     assert Distance.within?(@tallinn, @helsinki, 100)
     refute Distance.within?(@tallinn, @tartu, 100)

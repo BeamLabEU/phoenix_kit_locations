@@ -97,8 +97,16 @@ defmodule PhoenixKitLocations.Distance do
   end
 
   defp to_float(n) when is_float(n), do: n
-  defp to_float(n) when is_integer(n), do: n * 1.0
-  defp to_float(%Decimal{} = d), do: Decimal.to_float(d)
+  # Out-of-range integers and Decimals never reach a float conversion (a
+  # huge one overflows it, a NaN or infinite Decimal has none).
+  defp to_float(n) when is_integer(n) and n >= -180 and n <= 180, do: n * 1.0
+  defp to_float(n) when is_integer(n), do: nil
+
+  defp to_float(%Decimal{} = d) do
+    if Decimal.inf?(d) or Decimal.nan?(d) or Decimal.gt?(Decimal.abs(d), 180),
+      do: nil,
+      else: Decimal.to_float(d)
+  end
 
   defp to_float(s) when is_binary(s) do
     case Float.parse(String.trim(s)) do
