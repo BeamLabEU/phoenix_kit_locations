@@ -140,11 +140,39 @@ defmodule PhoenixKitLocations do
        dynamic(
          [f],
          fragment("?::text", f.uuid) not in subquery(location_covers) and
-           fragment("?::text", f.uuid) not in subquery(gallery)
+           fragment("?::text", f.uuid) not in subquery(gallery) and
+           ^not_in_files_folder(Location)
        )},
       {Space.__schema__(:source),
-       dynamic([f], fragment("?::text", f.uuid) not in subquery(space_covers))}
+       dynamic(
+         [f],
+         fragment("?::text", f.uuid) not in subquery(space_covers) and ^not_in_files_folder(Space)
+       )}
     ]
+  end
+
+  # A file in a resource's files folder (the Files card: floor plans,
+  # brochures) is referenced by that folder's pointer, whether the folder is
+  # the file's home or the file is linked into it. Without this every plain
+  # attachment reads as an orphan and core's cleanup trashes it.
+  defp not_in_files_folder(schema) do
+    folders =
+      from(r in schema,
+        where: not is_nil(fragment("?->>'files_folder_uuid'", r.data)),
+        select: %{uuid: fragment("?->>'files_folder_uuid'", r.data)}
+      )
+
+    linked =
+      from(link in PhoenixKit.Modules.Storage.FolderLink,
+        where: fragment("?::text", link.folder_uuid) in subquery(folders),
+        select: link.file_uuid
+      )
+
+    dynamic(
+      [f],
+      (is_nil(f.folder_uuid) or fragment("?::text", f.folder_uuid) not in subquery(folders)) and
+        f.uuid not in subquery(linked)
+    )
   end
 
   defp cover_references(schema) do

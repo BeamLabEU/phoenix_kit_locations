@@ -271,11 +271,20 @@ defmodule PhoenixKitLocations.Geo do
   # module's other languages or the library's alternative names.
   defp country(value) do
     needle = value |> String.trim() |> String.downcase()
+    countries = BeamLabCountries.all()
+
+    # Codes first: a stored value is nearly always the alpha-2 code, and the
+    # name pass builds every country's names in every shipped language.
+    Enum.find(countries, fn country ->
+      String.downcase(country.alpha2) == needle or String.downcase(country.alpha3) == needle
+    end) || country_by_name(countries, needle)
+  end
+
+  defp country_by_name(countries, needle) do
     locales = name_locales()
 
-    Enum.find(BeamLabCountries.all(), fn country ->
-      String.downcase(country.alpha2) == needle or String.downcase(country.alpha3) == needle or
-        Enum.any?(country_names(country, locales), &(String.downcase(&1) == needle))
+    Enum.find(countries, fn country ->
+      Enum.any?(country_names(country, locales), &(String.downcase(&1) == needle))
     end)
   end
 

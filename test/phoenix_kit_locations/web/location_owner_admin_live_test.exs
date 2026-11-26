@@ -12,6 +12,19 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
     location
   end
 
+  defp fixture_organization(name) do
+    uuid = UUIDv7.generate()
+
+    fixture_user(%{
+      uuid: uuid,
+      email: "org-#{uuid}@organization.invalid",
+      username: nil,
+      account_type: "organization",
+      organization_name: name,
+      managed_by_members: true
+    })
+  end
+
   describe "list" do
     setup do
       owner = fixture_user()
@@ -20,13 +33,23 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
       %{owner: owner}
     end
 
-    test "shows the owner's email, and Global for unowned rows", %{conn: conn, owner: owner} do
+    test "shows the owner's name, and Global for unowned rows", %{conn: conn, owner: owner} do
       {:ok, _view, html} = live(conn, "/admin/locations/")
 
       assert html =~ "Seller Warehouse"
       assert html =~ "Shared Showroom"
-      assert html =~ owner.email
+      assert html =~ owner.username
       assert html =~ "Global"
+    end
+
+    test "a managed organization shows its name, never its placeholder address", %{conn: conn} do
+      org = fixture_organization("Trinity")
+      owned_location(org, %{name: "Org Depot"})
+
+      {:ok, _view, html} = live(conn, "/admin/locations/")
+
+      assert html =~ "Trinity"
+      refute html =~ "organization.invalid"
     end
 
     test "?owner=global and ?owner=owned filter the list", %{conn: conn} do
@@ -62,13 +85,14 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
 
       render_hook(view, "search_owner", %{"q" => user.email, "limit" => 10})
       uuid = to_string(user.uuid)
-      email = user.email
+      name = user.username
+      sublabel = "User · " <> user.email
 
       assert_push_event(view, "owner_results", %{
-        results: [%{kind: "user", uuid: ^uuid, label: ^email} | _]
+        results: [%{kind: "person", uuid: ^uuid, label: ^name, sublabel: ^sublabel} | _]
       })
 
-      html = render_hook(view, "pick_owner", %{"kind" => "user", "uuid" => uuid})
+      html = render_hook(view, "pick_owner", %{"kind" => "person", "uuid" => uuid})
       assert_push_event(view, "owner_staged", %{})
       html
     end
@@ -84,6 +108,45 @@ defmodule PhoenixKitLocations.Web.LocationOwnerAdminLiveTest do
         view |> form("#location-form", location: %{"name" => "Picked"}) |> render_submit()
 
       assert Locations.get_location_by(:name, "Picked").owner_uuid == owner.uuid
+    end
+
+    test "a one-letter search finds an organization by name and says what it is",
+         %{conn: conn} do
+      org = fixture_organization("Trinity")
+      uuid = to_string(org.uuid)
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
+
+      render_hook(view, "search_owner", %{"q" => "t", "limit" => 10})
+
+      assert_push_event(view, "owner_results", %{results: results})
+
+      assert %{label: "Trinity", sublabel: "Organization", kind: "organization"} =
+               Enum.find(results, &(&1.uuid == uuid))
+
+      html = render_hook(view, "pick_owner", %{"kind" => "organization", "uuid" => uuid})
+
+      assert has_element?(view, "#location-owner-current", "Trinity")
+      assert has_element?(view, "#location-owner-current", "Organization")
+      refute html =~ "organization.invalid"
+    end
+
+    test "an empty search browses accounts; has_more follows the limit", %{conn: conn} do
+      fixture_user()
+      {:ok, view, _html} = live(conn, "/admin/locations/new")
+
+      render_hook(view, "search_owner", %{"q" => "", "limit" => 1})
+
+      assert_push_event(view, "owner_results", %{results: [_one], has_more: true})
+    end
+
+    test "edit: a managed organization owner shows by name", %{conn: conn} do
+      org = fixture_organization("Trinity")
+      location = owned_location(org, %{name: "Org HQ"})
+
+      {:ok, view, html} = live(conn, "/admin/locations/#{location.uuid}/edit?tab=settings")
+
+      assert has_element?(view, "#location-owner-current", "Trinity")
+      refute html =~ "organization.invalid"
     end
 
     test "new: without a pick the location is global", %{conn: conn} do

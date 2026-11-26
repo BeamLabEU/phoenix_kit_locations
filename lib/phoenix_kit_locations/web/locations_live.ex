@@ -38,7 +38,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
        location_types: [],
        manage_all: false,
        owner_filter: :all,
-       owner_emails: %{},
+       owners: %{},
        cover_urls: %{},
        confirm_delete: nil
      )}
@@ -104,11 +104,11 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         owner_filter_opts(socket.assigns.owner_filter)
       )
 
-    emails = if socket.assigns.manage_all, do: owner_emails(locations), else: %{}
+    owners = if socket.assigns.manage_all, do: owners(locations), else: %{}
 
     assign(socket,
       locations: locations,
-      owner_emails: emails,
+      owners: owners,
       cover_urls: cover_urls(locations, socket.assigns[:phoenix_kit_current_scope])
     )
   rescue
@@ -136,13 +136,13 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
   end
 
   # One batched user lookup for every owner on the page.
-  defp owner_emails(locations) do
+  defp owners(locations) do
     locations
     |> Enum.map(& &1.owner_uuid)
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
     |> Auth.get_users_by_uuids()
-    |> Map.new(&{to_string(&1.uuid), &1.email})
+    |> Map.new(&{to_string(&1.uuid), owner_info(&1)})
   end
 
   # ── Event handlers ──────────────────────────────────────────────
@@ -269,7 +269,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         locations={@locations}
         cover_urls={@cover_urls}
         locale={PhoenixKit.Utils.Multilang.current_locale()}
-        owner_emails={@owner_emails}
+        owners={@owners}
         manage_all={@manage_all}
         owner_filter={@owner_filter}
       />
@@ -307,7 +307,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
       <.table_default
         variant="zebra" size="sm" toggleable={true}
         id="locations-list" items={@locations}
-        card_fields={&location_card_fields(&1, @manage_all, @owner_emails)}
+        card_fields={&location_card_fields(&1, @manage_all, @owners)}
       >
         <:toolbar_title>
           <.owner_filter :if={@manage_all} active={@owner_filter} />
@@ -350,9 +350,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
               </div>
             </.table_default_cell>
             <.table_default_cell :if={@manage_all} class="text-sm">
-              <span class={if location.owner_uuid, do: "", else: "text-base-content/40"}>
-                {owner_text(location.owner_uuid, @owner_emails)}
-              </span>
+              <.owner_label owner_uuid={location.owner_uuid} owners={@owners} />
             </.table_default_cell>
             <.table_default_cell>
               <.status_badge status={location.status} label={status_label(location.status)} />
@@ -372,6 +370,7 @@ defmodule PhoenixKitLocations.Web.LocationsLive do
         </:card_header>
         <:card_actions :let={location}>
           <.button variant="ghost" size="xs" navigate={Paths.location_edit(location.uuid)}>{gettext("Edit")}</.button>
+          <.button variant="ghost" size="xs" navigate={Paths.location_structure(location.uuid)}>{gettext("Structure")}</.button>
           <.button type="button" variant="ghost" size="xs" class="text-error" phx-click="show_delete_confirm" phx-value-uuid={location.uuid} phx-value-type="location">{gettext("Delete")}</.button>
         </:card_actions>
       </.table_default>

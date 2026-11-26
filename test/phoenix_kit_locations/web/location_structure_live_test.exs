@@ -42,7 +42,14 @@ defmodule PhoenixKitLocations.Web.LocationStructureLiveTest do
       assert html =~ "Details"
       assert html =~ "Structure"
       assert has_element?(view, "a.tab-active", "Structure")
-      assert has_element?(view, ~s(a[href="#{Paths.location_edit(location.uuid)}"]), "Details")
+
+      for {tab, label} <- [{"basics", "Basics"}, {"details", "Details"}, {"settings", "Settings"}] do
+        assert has_element?(
+                 view,
+                 ~s(#location-tabs a[href="#{Paths.location_edit(location.uuid, tab)}"]),
+                 label
+               )
+      end
 
       assert html =~ "Floor 1"
       # Zone A is a child of Floor 1 — collapsed by default, so it must

@@ -11,45 +11,45 @@ msgstr ""
 "Language: et\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:136
+#: lib/phoenix_kit_locations/schemas/space.ex:138
 #, elixir-autogen, elixir-format
 msgid "Aisle"
 msgstr "Vahekäik"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:132
+#: lib/phoenix_kit_locations/schemas/space.ex:134
 #, elixir-autogen, elixir-format
 msgid "Floor"
 msgstr "Korrus"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:133
+#: lib/phoenix_kit_locations/schemas/space.ex:135
 #, elixir-autogen, elixir-format
 msgid "Room"
 msgstr "Ruum"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:135
+#: lib/phoenix_kit_locations/schemas/space.ex:137
 #, elixir-autogen, elixir-format
 msgid "Section"
 msgstr "Sektsioon"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:137
+#: lib/phoenix_kit_locations/schemas/space.ex:139
 #, elixir-autogen, elixir-format
 msgid "Shelf"
 msgstr "Riiul"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:134
+#: lib/phoenix_kit_locations/schemas/space.ex:136
 #, elixir-autogen, elixir-format
 msgid "Zone"
 msgstr "Tsoon"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:812
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:524
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:245
-#: lib/phoenix_kit_locations/web/locations_live.ex:515
+#: lib/phoenix_kit_locations/web/location_form_live.ex:887
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:530
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:246
+#: lib/phoenix_kit_locations/web/locations_live.ex:511
 #, elixir-autogen, elixir-format
 msgid "Active"
 msgstr "Aktiivne"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:471
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:477
 #, elixir-autogen, elixir-format
 msgid "Add"
 msgstr "Lisa"
@@ -60,65 +60,65 @@ msgid "Add child"
 msgstr "Lisa alamelement"
 
 #: lib/phoenix_kit_locations/web/components/space_tree.ex:134
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:696
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Add root space"
 msgstr "Lisa juurkoht"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:700
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:706
 #, elixir-autogen, elixir-format
 msgid "Add space"
 msgstr "Lisa koht"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:701
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:707
 #, elixir-autogen, elixir-format
 msgid "Add space under %{name}"
 msgstr "Lisa alamkoht: %{name}"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:160
-#: lib/phoenix_kit_locations/web/location_form_live.ex:852
+#: lib/phoenix_kit_locations/web/components/files_card.ex:174
+#: lib/phoenix_kit_locations/web/location_form_live.ex:909
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Tühista"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:78
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:418
+#: lib/phoenix_kit_locations/web/components/files_card.ex:92
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:406
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "Muuda"
 
 #: lib/phoenix_kit_locations/web/components/space_tree.ex:300
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:616
-#: lib/phoenix_kit_locations/web/locations_live.ex:279
-#: lib/phoenix_kit_locations/web/locations_live.ex:290
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:622
+#: lib/phoenix_kit_locations/web/locations_live.ex:286
+#: lib/phoenix_kit_locations/web/locations_live.ex:297
+#: lib/phoenix_kit_locations/web/locations_live.ex:363
 #: lib/phoenix_kit_locations/web/locations_live.ex:374
-#: lib/phoenix_kit_locations/web/locations_live.ex:384
+#: lib/phoenix_kit_locations/web/locations_live.ex:434
 #: lib/phoenix_kit_locations/web/locations_live.ex:444
-#: lib/phoenix_kit_locations/web/locations_live.ex:454
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Kustuta"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:677
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:683
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{name}\"? This cannot be undone."
 msgstr "Kustutada «%{name}»? Seda ei saa tagasi võtta."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:613
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:619
 #, elixir-autogen, elixir-format
 msgid "Delete Space"
 msgstr "Kustuta koht"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:637
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:558
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:232
-#: lib/phoenix_kit_locations/web/locations_live.ex:398
-#: lib/phoenix_kit_locations/web/locations_live.ex:419
+#: lib/phoenix_kit_locations/web/location_form_live.ex:661
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:564
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:233
+#: lib/phoenix_kit_locations/web/locations_live.ex:388
+#: lib/phoenix_kit_locations/web/locations_live.ex:409
 #, elixir-autogen, elixir-format
 msgid "Description"
 msgstr "Kirjeldus"
 
-#: lib/phoenix_kit_locations/web/components/location_tabs.ex:33
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:57
 #, elixir-autogen, elixir-format
 msgid "Details"
 msgstr "Üksikasjad"
@@ -133,42 +133,42 @@ msgstr "Muuda asukohta"
 msgid "Edit Type"
 msgstr "Muuda tüüpi"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:747
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:753
 #, elixir-autogen, elixir-format
 msgid "Failed to delete space"
 msgstr "Koha kustutamine ebaõnnestus"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:722
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:728
 #, elixir-autogen, elixir-format
 msgid "Failed to rename space"
 msgstr "Koha ümbernimetamine ebaõnnestus"
 
 #: lib/phoenix_kit_locations/web/components/space_tree.ex:244
-#: lib/phoenix_kit_locations/web/location_form_live.ex:812
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:524
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:245
-#: lib/phoenix_kit_locations/web/locations_live.ex:516
+#: lib/phoenix_kit_locations/web/location_form_live.ex:887
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:530
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:246
+#: lib/phoenix_kit_locations/web/locations_live.ex:512
 #, elixir-autogen, elixir-format
 msgid "Inactive"
 msgstr "Mitteaktiivne"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:567
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:573
 #, elixir-autogen, elixir-format
 msgid "Internal notes (admin-only)"
 msgstr "Sisemärkmed (ainult administraatoritele)"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:455
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:516
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:461
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:522
 #, elixir-autogen, elixir-format
 msgid "Kind"
 msgstr "Tüüp"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:93
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:93
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:55
+#: lib/phoenix_kit_locations/web/location_form_live.ex:97
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:94
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:56
 #: lib/phoenix_kit_locations/web/locations_live.ex:36
-#: lib/phoenix_kit_locations/web/locations_live.ex:81
-#: lib/phoenix_kit_locations/web/locations_live.ex:91
+#: lib/phoenix_kit_locations/web/locations_live.ex:82
+#: lib/phoenix_kit_locations/web/locations_live.ex:92
 #, elixir-format
 msgid "Locations"
 msgstr "Asukohad"
@@ -183,31 +183,31 @@ msgstr "Teisalda alla"
 msgid "Move up"
 msgstr "Teisalda üles"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:622
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:462
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:544
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:217
-#: lib/phoenix_kit_locations/web/locations_live.ex:330
-#: lib/phoenix_kit_locations/web/locations_live.ex:418
+#: lib/phoenix_kit_locations/web/location_form_live.ex:645
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:468
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:550
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:218
+#: lib/phoenix_kit_locations/web/locations_live.ex:331
+#: lib/phoenix_kit_locations/web/locations_live.ex:408
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "Nimi"
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:318
 #: lib/phoenix_kit_locations/web/locations_live.ex:319
-#: lib/phoenix_kit_locations/web/locations_live.ex:322
+#: lib/phoenix_kit_locations/web/locations_live.ex:320
+#: lib/phoenix_kit_locations/web/locations_live.ex:323
 #, elixir-format
 msgid "New Location"
 msgstr "Uus asukoht"
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:406
-#: lib/phoenix_kit_locations/web/locations_live.ex:407
-#: lib/phoenix_kit_locations/web/locations_live.ex:410
+#: lib/phoenix_kit_locations/web/locations_live.ex:396
+#: lib/phoenix_kit_locations/web/locations_live.ex:397
+#: lib/phoenix_kit_locations/web/locations_live.ex:400
 #, elixir-format
 msgid "New Type"
 msgstr "Uus tüüp"
 
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:458
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:446
 #, elixir-autogen, elixir-format
 msgid "No locations found"
 msgstr "Asukohti ei leitud"
@@ -217,12 +217,12 @@ msgstr "Asukohti ei leitud"
 msgid "No spaces yet."
 msgstr "Kohti pole veel."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:583
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:589
 #, elixir-autogen, elixir-format
 msgid "Photos, layouts, anything specific to this space."
 msgstr "Fotod, plaanid ja kõik muu selle koha kohta."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:584
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:590
 #, elixir-autogen, elixir-format
 msgid "Remove this file from the space?"
 msgstr "Eemaldada see fail selle koha juurest?"
@@ -232,117 +232,109 @@ msgstr "Eemaldada see fail selle koha juurest?"
 msgid "Rename"
 msgstr "Nimeta ümber"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:597
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:603
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "Salvesta"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:857
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:595
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:259
+#: lib/phoenix_kit_locations/web/location_form_live.ex:916
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:601
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:260
 #, elixir-autogen, elixir-format
 msgid "Saving..."
 msgstr "Salvestamine..."
 
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:453
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:441
 #, elixir-autogen, elixir-format
 msgid "Search locations…"
 msgstr "Otsi asukohti…"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:582
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:588
 #, elixir-autogen, elixir-format
 msgid "Shown for this space."
 msgstr "Kuvatakse selle koha juures."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:791
-#: lib/phoenix_kit_locations/web/location_form_live.ex:811
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:523
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:244
-#: lib/phoenix_kit_locations/web/locations_live.ex:308
-#: lib/phoenix_kit_locations/web/locations_live.ex:336
-#: lib/phoenix_kit_locations/web/locations_live.ex:399
-#: lib/phoenix_kit_locations/web/locations_live.ex:420
+#: lib/phoenix_kit_locations/web/location_form_live.ex:866
+#: lib/phoenix_kit_locations/web/location_form_live.ex:886
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:529
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:245
+#: lib/phoenix_kit_locations/web/locations_live.ex:333
+#: lib/phoenix_kit_locations/web/locations_live.ex:389
+#: lib/phoenix_kit_locations/web/locations_live.ex:410
+#: lib/phoenix_kit_locations/web/locations_live.ex:501
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Olek"
 
-#: lib/phoenix_kit_locations/web/components/location_tabs.ex:36
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:92
-#: lib/phoenix_kit_locations/web/locations_live.ex:372
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:61
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:93
+#: lib/phoenix_kit_locations/web/locations_live.ex:361
+#: lib/phoenix_kit_locations/web/locations_live.ex:373
 #, elixir-format
 msgid "Structure"
 msgstr "Struktuur"
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:86
-#: lib/phoenix_kit_locations/web/locations_live.ex:90
-#: lib/phoenix_kit_locations/web/locations_live.ex:307
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:87
+#: lib/phoenix_kit_locations/web/locations_live.ex:91
+#: lib/phoenix_kit_locations/web/locations_live.ex:496
 #, elixir-format
 msgid "Types"
 msgstr "Tüübid"
 
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:432
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:420
 #, elixir-autogen, elixir-format
 msgid "Use this location (no specific space)"
 msgstr "Kasuta seda asukohta (ilma konkreetse kohata)"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:87
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:180
 #, elixir-autogen, elixir-format
 msgid "A location with an owner is private to that account; without one it is global. The change applies when you save."
 msgstr "Omanikuga asukoht on selle konto privaatne; ilma omanikuta on see üldine. Muudatus rakendub salvestamisel."
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:47
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:140
 #, elixir-autogen, elixir-format
 msgid "All"
 msgstr "Kõik"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:53
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:146
 #, elixir-autogen, elixir-format
 msgid "Filter by owner"
 msgstr "Filtreeri omaniku järgi"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:26
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:48
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:94
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:112
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:141
 #, elixir-autogen, elixir-format
 msgid "Global"
 msgstr "Üldine"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:99
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:199
 #, elixir-autogen, elixir-format
 msgid "No owner (global)"
 msgstr "Omanik puudub (üldine)"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:115
-#, elixir-autogen, elixir-format
-msgid "No users found."
-msgstr "Kasutajaid ei leitud."
-
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:49
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:142
 #, elixir-autogen, elixir-format
 msgid "Owned"
 msgstr "Omanikuga"
 
 #: lib/phoenix_kit_locations/web/components/owner_components.ex:22
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:81
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:174
 #, elixir-autogen, elixir-format
 msgid "Owner"
 msgstr "Omanik"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:96
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:195
 #, elixir-autogen, elixir-format
 msgid "Remove owner"
 msgstr "Eemalda omanik"
-
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:110
-#, elixir-autogen, elixir-format
-msgid "Search users by email or name…"
-msgstr "Otsi kasutajaid e-posti või nime järgi…"
 
 #: lib/phoenix_kit_locations/attachments.ex:345
 #, elixir-autogen, elixir-format
 msgid "Could not remove file."
 msgstr "Faili ei õnnestunud eemaldada."
 
-#: lib/phoenix_kit_locations/attachments.ex:622
+#: lib/phoenix_kit_locations/attachments.ex:634
 #, elixir-autogen, elixir-format
 msgid "Selected image could not be loaded."
 msgstr "Valitud pilti ei õnnestunud laadida."
@@ -352,75 +344,73 @@ msgstr "Valitud pilti ei õnnestunud laadida."
 msgid "Upload failed: no target file area selected."
 msgstr "Üleslaadimine ebaõnnestus: failiala pole valitud."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:179
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:82
-#: lib/phoenix_kit_locations/web/locations_live.ex:371
-#: lib/phoenix_kit_locations/web/locations_live.ex:383
-#: lib/phoenix_kit_locations/web/locations_live.ex:442
-#: lib/phoenix_kit_locations/web/locations_live.ex:453
+#: lib/phoenix_kit_locations/web/location_form_live.ex:189
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:83
+#: lib/phoenix_kit_locations/web/locations_live.ex:360
+#: lib/phoenix_kit_locations/web/locations_live.ex:372
+#: lib/phoenix_kit_locations/web/locations_live.ex:432
+#: lib/phoenix_kit_locations/web/locations_live.ex:443
 #, elixir-autogen, elixir-format
 msgid "Edit"
 msgstr "Muuda"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:178
+#: lib/phoenix_kit_locations/web/location_form_live.ex:188
 #, elixir-autogen, elixir-format
 msgid "New location"
 msgstr "Uus asukoht"
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:81
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:82
 #, elixir-autogen, elixir-format
 msgid "New type"
 msgstr "Uus tüüp"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:136
+#: lib/phoenix_kit_locations/web/components/files_card.ex:150
 #, elixir-autogen, elixir-format
 msgid " or drag & drop"
 msgstr " või lohista siia"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:737
+#: lib/phoenix_kit_locations/web/location_form_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "+1 234 567 890"
 msgstr "+372 5123 4567"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:929
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1042
 #, elixir-autogen, elixir-format
 msgid "24/7 Security"
 msgstr "Valve 24/7"
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:337
-#: lib/phoenix_kit_locations/web/locations_live.ex:421
+#: lib/phoenix_kit_locations/web/locations_live.ex:334
+#: lib/phoenix_kit_locations/web/locations_live.ex:411
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "Toimingud"
 
-#: lib/phoenix_kit_locations/web/project_sites_live.ex:98
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:106
 #, elixir-autogen, elixir-format
 msgid "Add location UUIDs (comma-separated) in the project's Modules & features panel."
 msgstr "Lisa asukohtade UUID-d (komaga eraldatult) projekti moodulite ja funktsioonide paneelil."
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:472
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:478
 #, elixir-autogen, elixir-format
 msgid "Adding..."
 msgstr "Lisamine..."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:659
-#: lib/phoenix_kit_locations/web/locations_live.ex:304
-#: lib/phoenix_kit_locations/web/locations_live.ex:331
+#: lib/phoenix_kit_locations/web/location_form_live.ex:697
 #, elixir-autogen, elixir-format
 msgid "Address"
 msgstr "Aadress"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:678
+#: lib/phoenix_kit_locations/web/location_form_live.ex:707
 #, elixir-autogen, elixir-format
 msgid "Address Line 1"
 msgstr "Aadressi rida 1"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:685
+#: lib/phoenix_kit_locations/web/location_form_live.ex:714
 #, elixir-autogen, elixir-format
 msgid "Address Line 2"
 msgstr "Aadressi rida 2"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:926
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1039
 #, elixir-autogen, elixir-format
 msgid "Air Conditioning"
 msgstr "Konditsioneer"
@@ -430,27 +420,27 @@ msgstr "Konditsioneer"
 msgid "An unexpected error occurred."
 msgstr "Tekkis ootamatu viga."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:686
+#: lib/phoenix_kit_locations/web/location_form_live.ex:715
 #, elixir-autogen, elixir-format
 msgid "Apartment, suite, unit, building, floor"
 msgstr "Korter, büroo, hoone, korrus"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:110
+#: lib/phoenix_kit_locations/web/components/files_card.ex:124
 #, elixir-autogen, elixir-format
 msgid "Attached Files"
 msgstr "Manusfailid"
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:234
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:235
 #, elixir-autogen, elixir-format
 msgid "Brief description of this location type..."
 msgstr "Selle asukohatüübi lühikirjeldus..."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:639
+#: lib/phoenix_kit_locations/web/location_form_live.ex:663
 #, elixir-autogen, elixir-format
 msgid "Brief description of this location..."
 msgstr "Selle asukoha lühikirjeldus..."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:930
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1043
 #, elixir-autogen, elixir-format
 msgid "CCTV"
 msgstr "Videovalve"
@@ -460,72 +450,69 @@ msgstr "Videovalve"
 msgid "Cannot make a space its own ancestor."
 msgstr "Koht ei saa olla iseenda ülemkoht."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:712
-#: lib/phoenix_kit_locations/web/location_form_live.ex:716
-#: lib/phoenix_kit_locations/web/locations_live.ex:332
+#: lib/phoenix_kit_locations/web/location_form_live.ex:741
+#: lib/phoenix_kit_locations/web/location_form_live.ex:749
 #, elixir-autogen, elixir-format
 msgid "City"
 msgstr "Linn"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:820
+#: lib/phoenix_kit_locations/web/location_form_live.ex:813
 #, elixir-autogen, elixir-format
 msgid "Click to toggle. A location can have multiple types."
 msgstr "Klõpsa, et sisse või välja lülitada. Asukohal võib olla mitu tüüpi."
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:135
+#: lib/phoenix_kit_locations/web/components/files_card.ex:149
 #, elixir-autogen, elixir-format
 msgid "Click to upload"
 msgstr "Klõpsa üleslaadimiseks"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:730
+#: lib/phoenix_kit_locations/web/location_form_live.ex:770
 #, elixir-autogen, elixir-format
 msgid "Contact"
 msgstr "Kontakt"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:670
-#: lib/phoenix_kit_locations/web/locations_live.ex:305
-#: lib/phoenix_kit_locations/web/locations_live.ex:333
+#: lib/phoenix_kit_locations/web/location_form_live.ex:691
 #, elixir-autogen, elixir-format
 msgid "Country"
 msgstr "Riik"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:861
+#: lib/phoenix_kit_locations/web/location_form_live.ex:921
 #, elixir-autogen, elixir-format
 msgid "Create Location"
 msgstr "Loo asukoht"
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:258
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Create Type"
 msgstr "Loo tüüp"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:857
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:259
+#: lib/phoenix_kit_locations/web/location_form_live.ex:916
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:260
 #, elixir-autogen, elixir-format
 msgid "Creating..."
 msgstr "Loomine..."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:276
+#: lib/phoenix_kit_locations/web/locations_live.ex:283
 #, elixir-autogen, elixir-format
 msgid "Delete Location"
 msgstr "Kustuta asukoht"
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:287
+#: lib/phoenix_kit_locations/web/locations_live.ex:294
 #, elixir-autogen, elixir-format
 msgid "Delete Location Type"
 msgstr "Kustuta asukohatüüp"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:202
+#: lib/phoenix_kit_locations/web/components/files_card.ex:216
 #, elixir-autogen, elixir-format
 msgid "Download"
 msgstr "Laadi alla"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:922
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1035
 #, elixir-autogen, elixir-format
 msgid "Elevator"
 msgstr "Lift"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:742
+#: lib/phoenix_kit_locations/web/location_form_live.ex:782
 #, elixir-autogen, elixir-format
 msgid "Email"
 msgstr "E-post"
@@ -540,80 +527,80 @@ msgstr "Asukohatüübi kustutamine ebaõnnestus."
 msgid "Failed to delete location."
 msgstr "Asukoha kustutamine ebaõnnestus."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:129
+#: lib/phoenix_kit_locations/web/locations_live.ex:134
 #, elixir-autogen, elixir-format
 msgid "Failed to load location types."
 msgstr "Asukohatüüpide laadimine ebaõnnestus."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:116
+#: lib/phoenix_kit_locations/web/locations_live.ex:121
 #, elixir-autogen, elixir-format
 msgid "Failed to load locations."
 msgstr "Asukohtade laadimine ebaõnnestus."
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:47
+#: lib/phoenix_kit_locations/web/components/files_card.ex:57
 #, elixir-autogen, elixir-format
 msgid "Featured Image"
 msgstr "Esiletõstetud pilt"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:753
+#: lib/phoenix_kit_locations/web/location_form_live.ex:793
 #, elixir-autogen, elixir-format
 msgid "Features & Amenities"
 msgstr "Omadused ja mugavused"
 
-#: lib/phoenix_kit_locations/web/project_sites_live.ex:104
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:112
 #, elixir-autogen, elixir-format
 msgid "Find them in Locations"
 msgstr "Leia need asukohtade alt"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:37
-#: lib/phoenix_kit_locations/web/location_form_live.ex:781
+#: lib/phoenix_kit_locations/web/components/files_card.ex:39
+#: lib/phoenix_kit_locations/web/location_form_live.ex:852
 #, elixir-autogen, elixir-format
 msgid "Floor plans, brochures, certificates. Any file type is accepted."
 msgstr "Korruseplaanid, brošüürid, sertifikaadid. Sobib iga failitüüp."
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:249
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:250
 #, elixir-autogen, elixir-format
 msgid "Inactive types won't appear in the location type selection."
 msgstr "Mitteaktiivseid tüüpe asukohatüübi valikus ei kuvata."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:791
+#: lib/phoenix_kit_locations/web/location_form_live.ex:866
 #, elixir-autogen, elixir-format
 msgid "Internal"
 msgstr "Sisemine"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:803
+#: lib/phoenix_kit_locations/web/location_form_live.ex:878
 #, elixir-autogen, elixir-format
 msgid "Internal Notes"
 msgstr "Sisemärkmed"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:113
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:456
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:215
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:444
 #, elixir-autogen, elixir-format
 msgid "Load more"
 msgstr "Laadi rohkem"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:925
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1038
 #, elixir-autogen, elixir-format
 msgid "Loading Dock"
 msgstr "Laadimisplatvorm"
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:114
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:457
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:216
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:445
 #, elixir-autogen, elixir-format
 msgid "Loading…"
 msgstr "Laadimine…"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:818
+#: lib/phoenix_kit_locations/web/location_form_live.ex:811
 #, elixir-autogen, elixir-format
 msgid "Location Types"
 msgstr "Asukohatüübid"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:447
+#: lib/phoenix_kit_locations/web/location_form_live.ex:475
 #, elixir-autogen, elixir-format
 msgid "Location created."
 msgstr "Asukoht on loodud."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:241
+#: lib/phoenix_kit_locations/web/locations_live.ex:246
 #, elixir-autogen, elixir-format
 msgid "Location deleted."
 msgstr "Asukoht on kustutatud."
@@ -623,12 +610,12 @@ msgstr "Asukoht on kustutatud."
 msgid "Location not found."
 msgstr "Asukohta ei leitud."
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:154
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:155
 #, elixir-autogen, elixir-format
 msgid "Location type created."
 msgstr "Asukohatüüp on loodud."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:242
+#: lib/phoenix_kit_locations/web/locations_live.ex:247
 #, elixir-autogen, elixir-format
 msgid "Location type deleted."
 msgstr "Asukohatüüp on kustutatud."
@@ -638,115 +625,115 @@ msgstr "Asukohatüüp on kustutatud."
 msgid "Location type not found."
 msgstr "Asukohatüüpi ei leitud."
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:167
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:168
 #, elixir-autogen, elixir-format
 msgid "Location type updated."
 msgstr "Asukohatüüp on uuendatud."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:467
+#: lib/phoenix_kit_locations/web/location_form_live.ex:501
 #, elixir-autogen, elixir-format
 msgid "Location updated."
 msgstr "Asukoht on uuendatud."
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:96
+#: lib/phoenix_kit_locations/web/components/files_card.ex:110
 #, elixir-autogen, elixir-format
 msgid "No featured image set."
 msgstr "Esiletõstetud pilti pole määratud."
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:174
+#: lib/phoenix_kit_locations/web/components/files_card.ex:188
 #, elixir-autogen, elixir-format
 msgid "No files attached yet."
 msgstr "Faile pole veel lisatud."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:492
+#: lib/phoenix_kit_locations/web/locations_live.ex:482
 #, elixir-autogen, elixir-format
 msgid "No location types yet."
 msgstr "Asukohatüüpe pole veel."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:480
+#: lib/phoenix_kit_locations/web/locations_live.ex:470
 #, elixir-autogen, elixir-format
 msgid "No locations match this filter."
 msgstr "Sellele filtrile ei vasta ükski asukoht."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:468
+#: lib/phoenix_kit_locations/web/locations_live.ex:458
 #, elixir-autogen, elixir-format
 msgid "No locations yet."
 msgstr "Asukohti pole veel."
 
-#: lib/phoenix_kit_locations/web/project_sites_live.ex:95
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:103
 #, elixir-autogen, elixir-format
 msgid "No sites linked to this project yet."
 msgstr "Selle projektiga pole veel ühtegi objekti seotud."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:805
+#: lib/phoenix_kit_locations/web/location_form_live.ex:880
 #, elixir-autogen, elixir-format
 msgid "Notes only visible to admins..."
 msgstr "Märkmed, mida näevad ainult administraatorid..."
 
-#: lib/phoenix_kit_locations/web/project_sites_live.ex:119
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:122
 #, elixir-autogen, elixir-format
 msgid "Open location"
 msgstr "Ava asukoht"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:58
+#: lib/phoenix_kit_locations/web/components/files_card.ex:68
 #, elixir-autogen, elixir-format
 msgid "Open original"
 msgstr "Ava originaal"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:923
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1036
 #, elixir-autogen, elixir-format
 msgid "Parking"
 msgstr "Parkimine"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:736
+#: lib/phoenix_kit_locations/web/location_form_live.ex:776
 #, elixir-autogen, elixir-format
 msgid "Phone"
 msgstr "Telefon"
 
-#: lib/phoenix_kit_locations/geo.ex:174
+#: lib/phoenix_kit_locations/geo.ex:175
 #, elixir-autogen, elixir-format
 msgid "Postal Code"
 msgstr "Postiindeks"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:652
+#: lib/phoenix_kit_locations/web/location_form_live.ex:676
 #, elixir-autogen, elixir-format
 msgid "Public Notes"
 msgstr "Avalikud märkmed"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:924
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1037
 #, elixir-autogen, elixir-format
 msgid "Public Transport Nearby"
 msgstr "Ühistransport lähedal"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:88
-#: lib/phoenix_kit_locations/web/components/files_card.ex:225
+#: lib/phoenix_kit_locations/web/components/files_card.ex:102
+#: lib/phoenix_kit_locations/web/components/files_card.ex:239
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "Eemalda"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:782
+#: lib/phoenix_kit_locations/web/location_form_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "Remove this file from the location? If it's not attached to any other resource, it will be moved to trash (admins can restore)."
 msgstr "Eemaldada see fail asukoha juurest? Kui see pole seotud ühegi teise kirjega, liigub see prügikasti (administraatorid saavad selle taastada)."
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:40
+#: lib/phoenix_kit_locations/web/components/files_card.ex:42
 #, elixir-autogen, elixir-format
 msgid "Remove this file? If it's not attached to any other resource, it will be moved to trash (admins can restore)."
 msgstr "Eemaldada see fail? Kui see pole seotud ühegi teise kirjega, liigub see prügikasti (administraatorid saavad selle taastada)."
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:86
-#: lib/phoenix_kit_locations/web/components/files_card.ex:223
+#: lib/phoenix_kit_locations/web/components/files_card.ex:100
+#: lib/phoenix_kit_locations/web/components/files_card.ex:237
 #, elixir-autogen, elixir-format
 msgid "Removing..."
 msgstr "Eemaldamine..."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:928
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1041
 #, elixir-autogen, elixir-format
 msgid "Restrooms"
 msgstr "Tualetid"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:862
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:258
+#: lib/phoenix_kit_locations/web/location_form_live.ex:922
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Save Changes"
 msgstr "Salvesta muudatused"
@@ -761,28 +748,23 @@ msgstr "Salvestatud, kuid tüüpide määramist ei õnnestunud uuendada."
 msgid "Saved, but failed to change the owner."
 msgstr "Salvestatud, kuid omanikku ei õnnestunud muuta."
 
-#: lib/phoenix_kit_locations/web/components/owner_components.ex:112
-#: lib/phoenix_kit_locations/web/components/place_picker.ex:455
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:214
+#: lib/phoenix_kit_locations/web/components/place_picker.ex:443
 #, elixir-autogen, elixir-format
 msgid "Searching…"
 msgstr "Otsimine…"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:104
+#: lib/phoenix_kit_locations/web/components/files_card.ex:118
 #, elixir-autogen, elixir-format
 msgid "Set featured image"
 msgstr "Määra esiletõstetud pilt"
 
-#: lib/phoenix_kit_locations/web/components/files_card.ex:34
+#: lib/phoenix_kit_locations/web/components/files_card.ex:36
 #, elixir-autogen, elixir-format
 msgid "Shown alongside this item in listings."
 msgstr "Kuvatakse loendites selle kirje juures."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:780
-#, elixir-autogen, elixir-format
-msgid "Shown alongside this location in listings."
-msgstr "Kuvatakse loendites selle asukoha juures."
-
-#: lib/phoenix_kit_locations/web/location_form_live.ex:310
+#: lib/phoenix_kit_locations/web/location_form_live.ex:325
 #, elixir-autogen, elixir-format
 msgid "Similar address found at: %{names}"
 msgstr "Sarnane aadress on juba olemas: %{names}"
@@ -792,13 +774,13 @@ msgstr "Sarnane aadress on juba olemas: %{names}"
 msgid "Space not found."
 msgstr "Kohta ei leitud."
 
-#: lib/phoenix_kit_locations/geo.ex:352
-#: lib/phoenix_kit_locations/web/location_form_live.ex:210
+#: lib/phoenix_kit_locations/geo.ex:367
+#: lib/phoenix_kit_locations/web/location_form_live.ex:220
 #, elixir-autogen, elixir-format
 msgid "State / Region"
 msgstr "Maakond / piirkond"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:679
+#: lib/phoenix_kit_locations/web/location_form_live.ex:708
 #, elixir-autogen, elixir-format
 msgid "Street address, P.O. box"
 msgstr "Tänav ja maja, postkast"
@@ -813,52 +795,47 @@ msgstr "Valitud ülemkoht kuulub teise asukohta."
 msgid "The chosen parent space no longer exists."
 msgstr "Valitud ülemkohta enam ei ole."
 
-#: lib/phoenix_kit_locations/web/project_sites_live.ex:94
+#: lib/phoenix_kit_locations/web/project_sites_live.ex:102
 #, elixir-autogen, elixir-format
 msgid "The configured locations no longer exist."
 msgstr "Seadistatud asukohti enam ei ole."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:797
+#: lib/phoenix_kit_locations/web/location_form_live.ex:872
 #, elixir-autogen, elixir-format
 msgid "This information is only visible to administrators."
 msgstr "Seda teavet näevad ainult administraatorid."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:289
+#: lib/phoenix_kit_locations/web/locations_live.ex:296
 #, elixir-autogen, elixir-format
 msgid "This will permanently delete this location type. Locations using it will lose the type association."
 msgstr "See kustutab asukohatüübi jäädavalt. Seda tüüpi kasutavatelt asukohtadelt eemaldatakse see tüüp."
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:278
+#: lib/phoenix_kit_locations/web/locations_live.ex:285
 #, elixir-autogen, elixir-format
 msgid "This will permanently delete this location. This cannot be undone."
 msgstr "See kustutab asukoha jäädavalt. Seda ei saa tagasi võtta."
-
-#: lib/phoenix_kit_locations/web/locations_live.ex:335
-#, elixir-autogen, elixir-format
-msgid "Type"
-msgstr "Tüüp"
 
 #: lib/phoenix_kit_locations/errors.ex:64
 #, elixir-autogen, elixir-format
 msgid "Unexpected error: %{reason}"
 msgstr "Ootamatu viga: %{reason}"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:860
+#: lib/phoenix_kit_locations/web/location_form_live.ex:920
 #, elixir-autogen, elixir-format
 msgid "Waiting for uploads..."
 msgstr "Ootan üleslaadimiste lõppu..."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:748
+#: lib/phoenix_kit_locations/web/location_form_live.ex:788
 #, elixir-autogen, elixir-format
 msgid "Website"
 msgstr "Veebileht"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:921
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1034
 #, elixir-autogen, elixir-format
 msgid "Wheelchair Accessible"
 msgstr "Ratastooliga ligipääsetav"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:927
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1040
 #, elixir-autogen, elixir-format
 msgid "Wi-Fi"
 msgstr "Wi-Fi"
@@ -868,22 +845,22 @@ msgstr "Wi-Fi"
 msgid "You don't have permission to do that."
 msgstr "Sul pole selleks õigust."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:654
+#: lib/phoenix_kit_locations/web/location_form_live.ex:679
 #, elixir-autogen, elixir-format
 msgid "e.g., Bell is broken — knock loudly, entrance from side street..."
 msgstr "nt uksekell ei tööta — koputage valjult, sissepääs kõrvaltänavalt..."
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:623
+#: lib/phoenix_kit_locations/web/location_form_live.ex:646
 #, elixir-autogen, elixir-format
 msgid "e.g., Main Office, Downtown Showroom"
 msgstr "nt peakontor, kesklinna esindus"
 
-#: lib/phoenix_kit_locations/web/location_type_form_live.ex:218
+#: lib/phoenix_kit_locations/web/location_type_form_live.ex:219
 #, elixir-autogen, elixir-format
 msgid "e.g., Showroom, Storage, Office"
 msgstr "nt näidissaal, ladu, kontor"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:749
+#: lib/phoenix_kit_locations/web/location_form_live.ex:789
 #, elixir-autogen, elixir-format
 msgid "https://..."
 msgstr "https://..."
@@ -893,154 +870,149 @@ msgstr "https://..."
 msgid "its parent floor was not saved (it might need a name)"
 msgstr "selle ülemkorrust ei salvestatud (võib-olla puudub nimi)"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:743
+#: lib/phoenix_kit_locations/web/location_form_live.ex:783
 #, elixir-autogen, elixir-format
 msgid "location@example.com"
 msgstr "asukoht@example.com"
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:483
+#: lib/phoenix_kit_locations/web/locations_live.ex:473
 #, elixir-autogen, elixir-format
 msgid "Clear filter"
 msgstr "Tühista filter"
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:471
+#: lib/phoenix_kit_locations/web/locations_live.ex:461
 #, elixir-autogen, elixir-format
 msgid "Create your first location"
 msgstr "Loo esimene asukoht"
 
-#: lib/phoenix_kit_locations/web/locations_live.ex:495
+#: lib/phoenix_kit_locations/web/locations_live.ex:485
 #, elixir-autogen, elixir-format
 msgid "Create your first type"
 msgstr "Loo esimene tüüp"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:584
-#, elixir-autogen, elixir-format
-msgid "Public information"
-msgstr "Avalik teave"
-
-#: lib/phoenix_kit_locations/schemas/space.ex:118
+#: lib/phoenix_kit_locations/schemas/space.ex:120
 #, elixir-autogen, elixir-format
 msgid "cannot be its own parent"
 msgstr "ei saa olla iseenda ülem"
 
-#: lib/phoenix_kit_locations/schemas/location.ex:127
+#: lib/phoenix_kit_locations/schemas/location.ex:129
 #, elixir-autogen, elixir-format
 msgid "must be a valid email address"
 msgstr "peab olema korrektne e-posti aadress"
 
-#: lib/phoenix_kit_locations/schemas/space.ex:103
-#: lib/phoenix_kit_locations/schemas/space.ex:107
+#: lib/phoenix_kit_locations/schemas/space.ex:105
+#: lib/phoenix_kit_locations/schemas/space.ex:109
 #, elixir-autogen, elixir-format
 msgid "must be one of: %{values}"
 msgstr "peab olema üks järgmistest: %{values}"
 
-#: lib/phoenix_kit_locations/schemas/location.ex:142
+#: lib/phoenix_kit_locations/schemas/location.ex:144
 #, elixir-autogen, elixir-format
 msgid "must start with http:// or https://"
 msgstr "peab algama http:// või https://"
 
-#: lib/phoenix_kit_locations/geo.ex:345
+#: lib/phoenix_kit_locations/geo.ex:360
 #, elixir-autogen, elixir-format
 msgid "Canton"
 msgstr "Kanton"
 
-#: lib/phoenix_kit_locations/geo.ex:340
+#: lib/phoenix_kit_locations/geo.ex:355
 #, elixir-autogen, elixir-format
 msgid "County"
 msgstr "Maakond"
 
-#: lib/phoenix_kit_locations/geo.ex:342
+#: lib/phoenix_kit_locations/geo.ex:357
 #, elixir-autogen, elixir-format
 msgid "Department"
 msgstr "Departemang"
 
-#: lib/phoenix_kit_locations/geo.ex:341
+#: lib/phoenix_kit_locations/geo.ex:356
 #, elixir-autogen, elixir-format
 msgid "District"
 msgstr "Piirkond"
 
-#: lib/phoenix_kit_locations/geo.ex:347
+#: lib/phoenix_kit_locations/geo.ex:362
 #, elixir-autogen, elixir-format
 msgid "Division"
 msgstr "Haldusüksus"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:718
+#: lib/phoenix_kit_locations/web/location_form_live.ex:756
 #, elixir-autogen, elixir-format
 msgid "Don't see your city? Please contact the support team and we will add it."
 msgstr "Ei näe oma linna? Võta palun ühendust klienditoega, et me selle lisaksime."
 
-#: lib/phoenix_kit_locations/geo.ex:348
+#: lib/phoenix_kit_locations/geo.ex:363
 #, elixir-autogen, elixir-format
 msgid "Emirate"
 msgstr "Emiraat"
 
-#: lib/phoenix_kit_locations/geo.ex:343
+#: lib/phoenix_kit_locations/geo.ex:358
 #, elixir-autogen, elixir-format
 msgid "Governorate"
 msgstr "Kubermang"
 
-#: lib/phoenix_kit_locations/geo.ex:344
+#: lib/phoenix_kit_locations/geo.ex:359
 #, elixir-autogen, elixir-format
 msgid "Municipality"
 msgstr "Omavalitsus"
 
-#: lib/phoenix_kit_locations/geo.ex:346
+#: lib/phoenix_kit_locations/geo.ex:361
 #, elixir-autogen, elixir-format
 msgid "Oblast"
 msgstr "Oblast"
 
-#: lib/phoenix_kit_locations/geo.ex:349
+#: lib/phoenix_kit_locations/geo.ex:364
 #, elixir-autogen, elixir-format
 msgid "Parish"
 msgstr "Kihelkond"
 
-#: lib/phoenix_kit_locations/geo.ex:350
+#: lib/phoenix_kit_locations/geo.ex:365
 #, elixir-autogen, elixir-format
 msgid "Prefecture"
 msgstr "Prefektuur"
 
-#: lib/phoenix_kit_locations/geo.ex:334
+#: lib/phoenix_kit_locations/geo.ex:349
 #, elixir-autogen, elixir-format
 msgid "Province"
 msgstr "Provints"
 
-#: lib/phoenix_kit_locations/geo.ex:337
+#: lib/phoenix_kit_locations/geo.ex:352
 #, elixir-autogen, elixir-format
 msgid "Province / Territory"
 msgstr "Provints / territoorium"
 
-#: lib/phoenix_kit_locations/geo.ex:339
+#: lib/phoenix_kit_locations/geo.ex:354
 #, elixir-autogen, elixir-format
 msgid "Region"
 msgstr "Piirkond"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:671
+#: lib/phoenix_kit_locations/web/location_form_live.ex:692
 #, elixir-autogen, elixir-format
 msgid "Select a country"
 msgstr "Vali riik"
 
-#: lib/phoenix_kit_locations/web/location_form_live.ex:698
-#: lib/phoenix_kit_locations/web/location_form_live.ex:713
+#: lib/phoenix_kit_locations/web/location_form_live.ex:727
+#: lib/phoenix_kit_locations/web/location_form_live.ex:742
 #, elixir-autogen, elixir-format
 msgid "Select…"
 msgstr "Vali…"
 
-#: lib/phoenix_kit_locations/geo.ex:333
+#: lib/phoenix_kit_locations/geo.ex:348
 #, elixir-autogen, elixir-format
 msgid "State"
 msgstr "Osariik"
 
-#: lib/phoenix_kit_locations/geo.ex:351
+#: lib/phoenix_kit_locations/geo.ex:366
 #, elixir-autogen, elixir-format
 msgid "Voivodeship"
 msgstr "Vojevoodkond"
 
-#: lib/phoenix_kit_locations/geo.ex:173
+#: lib/phoenix_kit_locations/geo.ex:174
 #, elixir-autogen, elixir-format
 msgid "ZIP Code"
 msgstr "Postiindeks (ZIP)"
 
-#: lib/phoenix_kit_locations/web/location_structure_live.ex:682
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:688
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{name}\" and its %{count} descendant? This cannot be undone."
 msgid_plural "Delete \"%{name}\" and its %{count} descendants? This cannot be undone."
@@ -1051,14 +1023,42 @@ msgstr[1] "Kustutada «%{name}» ja selle %{count} alamelementi? Seda ei saa tag
 msgid "Manage all locations"
 msgstr "Kõigi asukohtade haldamine"
 
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:56
 #, elixir-autogen
 msgid "Basics"
 msgstr "Põhiandmed"
 
+#: lib/phoenix_kit_locations/web/components/location_tabs.ex:64
 #, elixir-autogen
 msgid "Settings"
 msgstr "Seaded"
 
+#: lib/phoenix_kit_locations/web/location_form_live.ex:897
 #, elixir-autogen
 msgid "Photos"
 msgstr "Fotod"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:217
+#, elixir-autogen, elixir-format
+msgid "No users or organizations found."
+msgstr "Kasutajaid ega organisatsioone ei leitud."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:89
+#, elixir-autogen, elixir-format
+msgid "Organization"
+msgstr "Organisatsioon"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:209
+#, elixir-autogen, elixir-format
+msgid "Search users and organizations by name or email…"
+msgstr "Otsi kasutajaid ja organisatsioone nime või e-posti järgi…"
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:90
+#, elixir-autogen, elixir-format
+msgid "User"
+msgstr "Kasutaja"
+
+#: lib/phoenix_kit_locations/web/location_structure_live.ex:206
+#, elixir-autogen, elixir-format
+msgid "Space saved."
+msgstr "Koht salvestatud."

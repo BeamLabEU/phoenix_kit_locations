@@ -202,7 +202,8 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
          |> assign(:tree, Spaces.list_tree(socket.assigns.location.uuid))
          |> assign(:selected_space, updated)
          |> Attachments.put_resource(socket.assigns.selected_uuid, updated)
-         |> assign_space_form(Spaces.change_space(updated))}
+         |> assign_space_form(Spaces.change_space(updated))
+         |> put_flash(:info, gettext("Space saved."))}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_space_form(socket, changeset)}
@@ -255,6 +256,10 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
 
     {:noreply, assign(socket, :new_space_form, to_form(changeset, as: :space, id: "new_space"))}
   end
+
+  # A submit that arrives after the add form closed (a double submit).
+  def handle_event("create_space", _params, %{assigns: %{adding_parent_uuid: nil}} = socket),
+    do: {:noreply, socket}
 
   def handle_event("create_space", %{"space" => params}, socket) do
     location = socket.assigns.location
@@ -419,7 +424,7 @@ defmodule PhoenixKitLocations.Web.LocationStructureLive do
       />
 
       <div class="max-w-5xl mx-auto w-full flex flex-col gap-4">
-        <.location_tabs location={@location} active={:structure} />
+        <.location_tabs location={@location} active="structure" />
 
         <div class="card bg-base-100 shadow-lg">
           <div class="card-body">

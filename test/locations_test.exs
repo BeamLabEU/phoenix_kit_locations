@@ -317,6 +317,50 @@ defmodule PhoenixKitLocations.LocationsTest do
       assert unreferenced?(location_cond, [loose.uuid])
     end
 
+    test "file_references counts the files in a location's and a space's files folder" do
+      user = fixture_user()
+      location = create_location(%{name: "With Files"})
+      {:ok, folder} = Storage.create_folder(%{name: "location-#{location.uuid}"})
+      {:ok, space_folder} = Storage.create_folder(%{name: "location-space-x"})
+      {:ok, plan} = storage_file(user, "plan.jpg")
+      {:ok, linked} = storage_file(user, "linked.jpg")
+      {:ok, space_plan} = storage_file(user, "space-plan.jpg")
+      {:ok, loose} = storage_file(user, "loose.jpg")
+
+      Repo.update_all(from(f in StorageFile, where: f.uuid == ^plan.uuid),
+        set: [folder_uuid: folder.uuid]
+      )
+
+      Repo.update_all(from(f in StorageFile, where: f.uuid == ^space_plan.uuid),
+        set: [folder_uuid: space_folder.uuid]
+      )
+
+      Repo.insert!(%PhoenixKit.Modules.Storage.FolderLink{
+        folder_uuid: folder.uuid,
+        file_uuid: linked.uuid
+      })
+
+      assert {:ok, _} =
+               Locations.update_location(location, %{data: %{"files_folder_uuid" => folder.uuid}})
+
+      {:ok, space} =
+        Spaces.create_space(%{
+          "location_uuid" => location.uuid,
+          "kind" => "floor",
+          "name" => "Floor"
+        })
+
+      assert {:ok, _} =
+               Spaces.update_space(space, %{"data" => %{"files_folder_uuid" => space_folder.uuid}})
+
+      [{_, location_cond}, {_, space_cond}] = PhoenixKitLocations.file_references()
+
+      refute unreferenced?(location_cond, [plan.uuid, linked.uuid])
+      refute unreferenced?(space_cond, [space_plan.uuid])
+      assert unreferenced?(location_cond, [loose.uuid])
+      assert unreferenced?(space_cond, [loose.uuid])
+    end
+
     test "update_location/3 on a location deleted since it was loaded returns :location_not_found" do
       l = create_location()
       assert {:ok, _} = Locations.delete_location(l)

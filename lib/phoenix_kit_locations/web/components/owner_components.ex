@@ -21,10 +21,103 @@ defmodule PhoenixKitLocations.Web.Components.OwnerComponents do
   @spec owner_column_title() :: String.t()
   def owner_column_title, do: gettext("Owner")
 
-  @doc "An owner's display text: their email from `emails`, or \"Global\" for `nil`."
-  @spec owner_text(String.t() | nil, %{optional(String.t()) => String.t()}) :: String.t()
-  def owner_text(nil, _emails), do: gettext("Global")
-  def owner_text(owner_uuid, emails), do: Map.get(emails, owner_uuid, owner_uuid)
+  @typedoc """
+  What the UI shows for an owner account: `name` is the organization's name,
+  the person's name, their username or (last) their email; `email` is an
+  address a human can use, so a managed organization's placeholder login
+  address never appears; `kind` tells a person from an organization.
+  """
+  @type owner :: %{
+          uuid: String.t(),
+          name: String.t(),
+          email: String.t() | nil,
+          kind: :person | :organization
+        }
+
+  @doc "Builds the display map for an owner from a core user row."
+  @spec owner_info(map()) :: owner()
+  def owner_info(%{uuid: uuid} = user) do
+    email = shown_email(user)
+
+    %{
+      uuid: to_string(uuid),
+      name:
+        first_present([account_name(user), Map.get(user, :username), email]) || to_string(uuid),
+      email: email,
+      kind: if(Map.get(user, :account_type) == "organization", do: :organization, else: :person)
+    }
+  end
+
+  @doc "The display map for an owner whose account could not be loaded."
+  @spec unknown_owner(String.t()) :: owner()
+  def unknown_owner(uuid), do: %{uuid: uuid, name: uuid, email: nil, kind: :person}
+
+  # A managed organization signs in through its members; its `email` column
+  # holds a generated `org-<uuid>@organization.invalid`, never shown.
+  defp shown_email(%{managed_by_members: true} = user),
+    do: blank_to_nil(Map.get(user, :contact_email))
+
+  defp shown_email(user), do: blank_to_nil(Map.get(user, :email))
+
+  defp account_name(%{account_type: "organization"} = user), do: Map.get(user, :organization_name)
+
+  defp account_name(user) do
+    [Map.get(user, :first_name), Map.get(user, :last_name)]
+    |> Enum.map(&blank_to_nil/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" ")
+  end
+
+  defp first_present(values), do: Enum.find_value(values, &blank_to_nil/1)
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(_value), do: nil
+
+  @doc "The heroicon for an owner kind."
+  @spec owner_icon(:person | :organization) :: String.t()
+  def owner_icon(:organization), do: "hero-building-office-2"
+  def owner_icon(_kind), do: "hero-user"
+
+  @doc "The translated word for an owner kind."
+  @spec owner_kind_label(:person | :organization) :: String.t()
+  def owner_kind_label(:organization), do: gettext("Organization")
+  def owner_kind_label(_kind), do: gettext("User")
+
+  @doc "An owner's display text: their name from `owners`, or \"Global\" for `nil`."
+  @spec owner_text(String.t() | nil, %{optional(String.t()) => owner()}) :: String.t()
+  def owner_text(nil, _owners), do: gettext("Global")
+
+  def owner_text(owner_uuid, owners) do
+    case Map.get(owners, owner_uuid) do
+      %{name: name} -> name
+      nil -> owner_uuid
+    end
+  end
+
+  attr(:owner_uuid, :string, default: nil)
+  attr(:owners, :map, required: true, doc: "uuid => `t:owner/0`")
+
+  @doc "The owner cell of the list: kind icon and name, the email as a tooltip."
+  def owner_label(assigns) do
+    assigns =
+      assign(assigns, :owner, assigns.owner_uuid && Map.get(assigns.owners, assigns.owner_uuid))
+
+    ~H"""
+    <span :if={!@owner_uuid} class="text-base-content/40">{gettext("Global")}</span>
+    <span :if={@owner_uuid && !@owner}>{@owner_uuid}</span>
+    <span :if={@owner} class="inline-flex items-center gap-1.5" title={@owner.email}>
+      <.icon name={owner_icon(@owner.kind)} class="h-4 w-4 shrink-0 text-base-content/50" />
+      <span class="sr-only">{owner_kind_label(@owner.kind)}:</span>
+      {@owner.name}
+    </span>
+    """
+  end
 
   @doc "Parses the list page's `?owner=` param into a filter key."
   @spec parse_owner_filter(String.t() | nil) :: :all | :global | :owned
@@ -64,7 +157,7 @@ defmodule PhoenixKitLocations.Web.Components.OwnerComponents do
     """
   end
 
-  attr(:owner, :map, default: nil, doc: "`%{uuid: _, email: _}` or `nil`")
+  attr(:owner, :map, default: nil, doc: "`t:owner/0` or `nil`")
 
   @doc """
   Owner card for the admin location form. The chosen owner applies on save.
@@ -87,17 +180,23 @@ defmodule PhoenixKitLocations.Web.Components.OwnerComponents do
         {gettext("A location with an owner is private to that account; without one it is global. The change applies when you save.")}
       </:subtitle>
 
-      <div class="flex flex-wrap items-center gap-2">
-        <span :if={@owner} id="location-owner-current" class="badge badge-lg badge-primary gap-1">
-          <.icon name="hero-user" class="h-3.5 w-3.5" />
-          {@owner.email}
-        </span>
-        <.button :if={@owner} type="button" variant="ghost" size="xs" phx-click="clear_owner">
+      <div :if={@owner} id="location-owner-current" class="flex items-center gap-3 rounded-box border border-base-300 p-3">
+        <.icon name={owner_icon(@owner.kind)} class="h-6 w-6 shrink-0 text-primary" />
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-medium truncate">{@owner.name}</span>
+            <span class="badge badge-sm badge-ghost">{owner_kind_label(@owner.kind)}</span>
+          </div>
+          <div :if={@owner.email && @owner.email != @owner.name} class="text-sm text-base-content/60 truncate">
+            {@owner.email}
+          </div>
+        </div>
+        <.button type="button" variant="ghost" size="xs" phx-click="clear_owner">
           {gettext("Remove owner")}
         </.button>
-        <span :if={!@owner} id="location-owner-current" class="badge badge-lg badge-ghost">
-          {gettext("No owner (global)")}
-        </span>
+      </div>
+      <div :if={!@owner} id="location-owner-current">
+        <span class="badge badge-lg badge-ghost">{gettext("No owner (global)")}</span>
       </div>
 
       <.search_picker
@@ -107,31 +206,39 @@ defmodule PhoenixKitLocations.Web.Components.OwnerComponents do
         results_event="owner_results"
         pick_event="pick_owner"
         staged_event="owner_staged"
-        placeholder={gettext("Search users by email or name…")}
+        placeholder={gettext("Search users and organizations by name or email…")}
         class="input input-sm w-full"
+        row_layout="stacked"
+        search_on_focus
+        close_on_pick
         searching_label={gettext("Searching…")}
         more_label={gettext("Load more")}
         loading_more_label={gettext("Loading…")}
-        no_matches_label={gettext("No users found.")}
+        no_matches_label={gettext("No users or organizations found.")}
       />
     </.form_section>
     """
   end
 
   @doc """
-  Rows for the owner picker's `owner_results` push: the user's email as the
-  label and their name, when they have one, underneath.
+  Rows for the owner picker's `owner_results` push: the account's name as the
+  label, with its kind and (when it has a usable one) its email underneath.
   """
-  @spec owner_picker_rows([map()]) :: [map()]
-  def owner_picker_rows(users) do
-    Enum.map(users, fn user ->
-      name =
-        [Map.get(user, :first_name), Map.get(user, :last_name)]
-        |> Enum.reject(&(&1 in [nil, ""]))
-        |> Enum.join(" ")
+  @spec owner_picker_rows([owner()]) :: [map()]
+  def owner_picker_rows(owners) do
+    Enum.map(owners, fn owner ->
+      sublabel =
+        [owner_kind_label(owner.kind), owner.email != owner.name && owner.email]
+        |> Enum.filter(& &1)
+        |> Enum.join(" · ")
 
-      %{kind: "user", uuid: to_string(user.uuid), label: user.email, icon: "hero-user"}
-      |> then(&if(name == "", do: &1, else: Map.put(&1, :sublabel, name)))
+      %{
+        kind: to_string(owner.kind),
+        uuid: owner.uuid,
+        label: owner.name,
+        sublabel: sublabel,
+        icon: owner_icon(owner.kind)
+      }
     end)
   end
 end

@@ -20,6 +20,10 @@ defmodule PhoenixKitLocations.Paths do
   @spec location_edit(String.t()) :: String.t()
   def location_edit(uuid), do: Routes.path("#{@base}/#{uuid}/edit")
 
+  @doc "The edit page opened on one of its panels: `basics`, `details` or `settings`."
+  @spec location_edit(String.t(), String.t()) :: String.t()
+  def location_edit(uuid, tab), do: location_edit(uuid) <> "?tab=" <> URI.encode_www_form(tab)
+
   @spec location_structure(String.t()) :: String.t()
   def location_structure(uuid), do: Routes.path("#{@base}/#{uuid}/structure")
 

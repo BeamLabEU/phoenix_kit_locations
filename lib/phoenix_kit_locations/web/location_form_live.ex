@@ -34,7 +34,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   import PhoenixKitLocations.Web.Components.LocationTabs, only: [location_tabs: 1]
 
   import PhoenixKitLocations.Web.Components.OwnerComponents,
-    only: [owner_picker_card: 1, owner_picker_rows: 1]
+    only: [owner_picker_card: 1, owner_picker_rows: 1, owner_info: 1, unknown_owner: 1]
 
   alias PhoenixKit.Users.Auth
   alias PhoenixKitLocations.Attachments
@@ -57,6 +57,8 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   # Feature keys are paired with a translatable label at render time via
   # `feature_label/1` — keeping the call site literal is what lets
   # `mix gettext.extract` (run in this repo) pick these up.
+  @form_tabs PhoenixKitLocations.Web.Components.LocationTabs.form_tabs()
+
   @feature_keys ~w(
     wheelchair_accessible
     elevator
@@ -97,7 +99,7 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
            page_crumbs: page_crumbs(action, location),
            mode: mode,
            action: action,
-           form_tab: "basics",
+           form_tab: initial_tab(params),
            photos: photo_selection(location.data || %{}),
            location: location,
            owner: load_owner(mode, location),
@@ -148,13 +150,17 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     end
   end
 
+  # `?tab=` is how the Structure page links back to one of the form's panels.
+  defp initial_tab(%{"tab" => tab}) when tab in @form_tabs, do: tab
+  defp initial_tab(_params), do: "basics"
+
   defp load_owner(:all, %Location{owner_uuid: owner_uuid}) when is_binary(owner_uuid) do
     case Auth.get_user(owner_uuid) do
-      %{uuid: uuid, email: email} -> %{uuid: uuid, email: email}
-      _ -> %{uuid: owner_uuid, email: owner_uuid}
+      %{uuid: _} = user -> owner_info(user)
+      _ -> unknown_owner(owner_uuid)
     end
   rescue
-    _ -> %{uuid: owner_uuid, email: owner_uuid}
+    _ -> unknown_owner(owner_uuid)
   end
 
   defp load_owner(_mode, _location), do: nil
@@ -241,8 +247,10 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   end
 
   @impl true
-  def handle_event("form_tab", %{"tab" => tab}, socket) when tab in ~w(basics details settings),
+  def handle_event("form_tab", %{"tab" => tab}, socket) when tab in @form_tabs,
     do: {:noreply, assign(socket, :form_tab, tab)}
+
+  def handle_event("form_tab", _params, socket), do: {:noreply, socket}
 
   def handle_event("switch_language", %{"lang" => lang_code}, socket) do
     {:noreply, handle_switch_language(socket, lang_code)}
@@ -359,28 +367,28 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   # `pick_owner` only accepts a uuid from the rows this socket last sent, so a
   # forged payload can't pick an arbitrary user. `owner_staged` tells the
   # picker the pick landed (it clears its input).
-  defp owner_event("search_owner", %{"q" => query}, socket) when is_binary(query) do
-    users = safe_search_users(query)
+  defp owner_event("search_owner", %{"q" => query} = params, socket) when is_binary(query) do
+    {owners, has_more} = search_owners(query, params["limit"])
 
     {:noreply,
      socket
-     |> assign(owner_matches: users)
+     |> assign(owner_matches: owners)
      |> push_event("owner_results", %{
        q: query,
-       results: owner_picker_rows(users),
-       has_more: false
+       results: owner_picker_rows(owners),
+       has_more: has_more
      })}
   end
 
   defp owner_event("pick_owner", %{"uuid" => uuid}, socket) do
-    case Enum.find(socket.assigns.owner_matches, &(to_string(&1.uuid) == uuid)) do
+    case Enum.find(socket.assigns.owner_matches, &(&1.uuid == uuid)) do
       nil ->
         {:noreply, socket}
 
-      user ->
+      owner ->
         {:noreply,
          socket
-         |> assign(owner: %{uuid: to_string(user.uuid), email: user.email}, owner_matches: [])
+         |> assign(owner: owner, owner_matches: [])
          |> push_event("owner_staged", %{})}
     end
   end
@@ -574,18 +582,9 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     <div class="flex flex-col w-full px-4 py-8 gap-6">
       <%!-- Form content capped at 5xl (matches AI module pattern). --%>
       <div class="max-w-5xl mx-auto w-full">
-        <%!-- Structure tab needs a persisted uuid; :new has none. --%>
-        <.location_tabs :if={@action == :edit} location={@location} active={:details} />
-        <PhoenixKitWeb.Components.Core.NavTabs.nav_tabs
-          id="location-form-tabs"
-          active_tab={@form_tab}
-          on_change="form_tab"
-          tabs={[
-            %{id: "basics", label: gettext("Basics")},
-            %{id: "details", label: gettext("Details")},
-            %{id: "settings", label: gettext("Settings")}
-          ]}
-        />
+        <%!-- One strip: the form's three panels plus, once the location
+             is saved, the link to its Structure page. --%>
+        <.location_tabs location={@location} active={@form_tab} on_change="form_tab" />
         <div :if={@mode == :all} hidden={@form_tab != "settings"}>
           <.owner_picker_card owner={@owner} />
         </div>
@@ -1009,13 +1008,25 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
     if manage_all?(socket), do: params, else: Map.delete(params, "notes")
   end
 
-  defp safe_search_users(query) do
-    Auth.search_users(query)
+  # Core's paginated user list rather than `Auth.search_users/1`: that one
+  # answers nothing under two characters and returns neither the account type
+  # nor an organization's name. An empty query is the picker's browse mode
+  # (the newest accounts), so a small install can pick without typing.
+  defp search_owners(query, limit) do
+    limit = owner_search_limit(limit)
+
+    %{users: users, total_count: total} =
+      Auth.list_users_paginated(search: String.trim(query), page: 1, page_size: limit)
+
+    {Enum.map(users, &owner_info/1), total > limit}
   rescue
     error ->
       Logger.error("Owner search failed: #{inspect(error)}")
-      []
+      {[], false}
   end
+
+  defp owner_search_limit(limit) when is_integer(limit), do: limit |> max(1) |> min(50)
+  defp owner_search_limit(_limit), do: 10
 
   # Translatable feature labels. Each literal string is picked up by
   # `mix gettext.extract` (run in this repo). Falls back to the raw key so

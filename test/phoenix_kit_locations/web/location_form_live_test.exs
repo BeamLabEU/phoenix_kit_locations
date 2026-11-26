@@ -15,15 +15,15 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       assert html =~ "Address"
       assert html =~ "Contact"
       assert html =~ "Features &amp; Amenities"
-      # No persisted uuid yet, so the Details/Structure strip stays off.
+      # No persisted uuid yet, so the strip has no Structure tab.
       refute has_element?(view, "[role=tab]", "Structure")
-      assert has_element?(view, "#location-form-tabs [phx-value-tab=basics]")
+      assert has_element?(view, "#location-tabs [phx-value-tab=basics]")
       assert has_element?(view, "[hidden] #location_email")
       refute has_element?(view, "[hidden] #location_country")
-      view |> element("#location-form-tabs [phx-value-tab=details]") |> render_click()
+      view |> element("#location-tabs [phx-value-tab=details]") |> render_click()
       refute has_element?(view, "[hidden] #location_email")
       assert has_element?(view, "[hidden] #location_country")
-      view |> element("#location-form-tabs [phx-value-tab=settings]") |> render_click()
+      view |> element("#location-tabs [phx-value-tab=settings]") |> render_click()
       refute has_element?(view, "[hidden] #location_status")
     end
 
@@ -89,18 +89,33 @@ defmodule PhoenixKitLocations.Web.LocationFormLiveTest do
       assert html =~ "value=\"Oldtown\""
     end
 
-    test "renders the Details/Structure tabs linking to the Structure page", %{conn: conn} do
+    test "renders one tab strip, with Structure linking to its page", %{conn: conn} do
       location = fixture_location(%{name: "Has Tabs"})
 
-      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit")
+      {:ok, view, html} = live(conn, "/admin/locations/#{location.uuid}/edit")
 
-      assert has_element?(view, "a.tab-active", "Details")
+      assert length(Regex.scan(~r/role="tablist"/, html)) == 1
+      assert has_element?(view, "#location-tabs .tab-active", "Basics")
+      assert has_element?(view, "#location-tabs [phx-value-tab=details]", "Details")
+      assert has_element?(view, "#location-tabs [phx-value-tab=settings]", "Settings")
 
       assert has_element?(
                view,
-               ~s(a[href="#{Paths.location_structure(location.uuid)}"]),
+               ~s(#location-tabs a[href="#{Paths.location_structure(location.uuid)}"]),
                "Structure"
              )
+    end
+
+    test "?tab= opens the form on that panel", %{conn: conn} do
+      location = fixture_location(%{name: "Deep Link"})
+
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit?tab=settings")
+
+      assert has_element?(view, "#location-tabs .tab-active", "Settings")
+      refute has_element?(view, "[hidden] #location_status")
+
+      {:ok, view, _html} = live(conn, "/admin/locations/#{location.uuid}/edit?tab=bogus")
+      assert has_element?(view, "#location-tabs .tab-active", "Basics")
     end
 
     test "updating fields persists changes, redirects, and logs with actor_uuid",
