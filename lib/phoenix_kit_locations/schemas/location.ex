@@ -29,6 +29,12 @@ defmodule PhoenixKitLocations.Schemas.Location do
     field(:postal_code, :string)
     field(:country, :string)
 
+    # Coordinates (WGS 84 decimal degrees, `numeric(9,6)`; V3). Both or
+    # neither: a lone latitude is rejected. Typed by hand or filled by the
+    # opt-in geocoder (`PhoenixKitLocations.Geocoding`).
+    field(:latitude, :decimal)
+    field(:longitude, :decimal)
+
     # Contact
     field(:phone, :string)
     field(:email, :string)
@@ -60,6 +66,7 @@ defmodule PhoenixKitLocations.Schemas.Location do
   end
 
   @required_fields [:name]
+  @address_fields [:address_line_1, :address_line_2, :city, :state, :postal_code, :country]
   @optional_fields [
     :description,
     :public_notes,
@@ -69,6 +76,8 @@ defmodule PhoenixKitLocations.Schemas.Location do
     :state,
     :postal_code,
     :country,
+    :latitude,
+    :longitude,
     :phone,
     :email,
     :website,
@@ -96,6 +105,7 @@ defmodule PhoenixKitLocations.Schemas.Location do
     |> validate_length(:email, max: 255)
     |> validate_length(:website, max: 500)
     |> validate_inclusion(:status, @statuses)
+    |> validate_coordinates()
     |> maybe_validate_email()
     |> maybe_validate_website()
     |> Geo.normalize_changeset()
@@ -114,6 +124,66 @@ defmodule PhoenixKitLocations.Schemas.Location do
     location_or_changeset
     |> cast(%{owner_uuid: owner_uuid}, [:owner_uuid])
     |> foreign_key_constraint(:owner_uuid)
+  end
+
+  @doc """
+  The address fields a geocoder reads, in order. A change to any of them makes
+  stored coordinates (and a queued geocode job) stale.
+  """
+  @spec address_fields() :: [atom()]
+  def address_fields, do: @address_fields
+
+  @doc """
+  Changeset that writes only coordinates (the geocode job's write). Same range
+  and both-or-neither rules as `changeset/2`.
+  """
+  @spec coordinates_changeset(t(), map()) :: Ecto.Changeset.t()
+  def coordinates_changeset(location, attrs) do
+    location
+    |> cast(attrs, [:latitude, :longitude])
+    |> validate_coordinates()
+  end
+
+  defp validate_coordinates(changeset) do
+    changeset
+    |> round_coordinate(:latitude)
+    |> round_coordinate(:longitude)
+    |> validate_number(:latitude,
+      greater_than_or_equal_to: -90,
+      less_than_or_equal_to: 90,
+      message: gettext("must be between -90 and 90")
+    )
+    |> validate_number(:longitude,
+      greater_than_or_equal_to: -180,
+      less_than_or_equal_to: 180,
+      message: gettext("must be between -180 and 180")
+    )
+    |> validate_coordinate_pair()
+  end
+
+  # The column is `numeric(9,6)`: round here so the struct a write returns
+  # holds what the database stores.
+  defp round_coordinate(changeset, field) do
+    case get_change(changeset, field) do
+      %Decimal{} = value -> put_change(changeset, field, Decimal.round(value, 6))
+      _ -> changeset
+    end
+  end
+
+  defp validate_coordinate_pair(changeset) do
+    case {get_field(changeset, :latitude), get_field(changeset, :longitude)} do
+      {nil, nil} ->
+        changeset
+
+      {_, nil} ->
+        add_error(changeset, :longitude, gettext("enter both latitude and longitude"))
+
+      {nil, _} ->
+        add_error(changeset, :latitude, gettext("enter both latitude and longitude"))
+
+      _ ->
+        changeset
+    end
   end
 
   defp maybe_validate_email(changeset) do

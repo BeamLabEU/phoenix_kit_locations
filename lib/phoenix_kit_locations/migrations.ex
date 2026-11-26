@@ -53,6 +53,15 @@ defmodule PhoenixKitLocations.Migrations do
   table's actual columns), so no core release or manifest exclusion is
   needed — the same reasoning as `phoenix_kit_catalogue`'s V2 slug column.
 
+  ## What V3 is
+
+  Coordinates: nullable `latitude` / `longitude` columns (`numeric(9,6)`,
+  about 0.1 m of precision, enough for any street address), guarded CHECK
+  constraints holding them to -90..90 / -180..180, and a btree index on the
+  pair for bounding-box prefilters (`Locations.list_locations(near: ...)`).
+  Every existing row reads `NULL`, which is what it was ("no coordinates").
+  Like V2 it only adds objects core's V135 manifest never names.
+
   ## What `down/1` is NOT
 
   `down/1` rewrites the version marker; it NEVER drops a table. The rows are
@@ -77,7 +86,7 @@ defmodule PhoenixKitLocations.Migrations do
 
   use Ecto.Migration
 
-  @current_version 2
+  @current_version 3
   @marker_prefix "pkloc_schema:"
   @version_table "phoenix_kit_locations"
 
@@ -169,10 +178,12 @@ defmodule PhoenixKitLocations.Migrations do
     target = min(target, @current_version)
 
     v2 = if target >= 2, do: v2_statements(prefix, p), else: []
+    v3 = if target >= 3, do: v3_statements(prefix, p), else: []
 
     List.flatten([
       v1_statements(prefix, p),
       v2,
+      v3,
       "COMMENT ON TABLE #{p}#{@version_table} IS '#{@marker_prefix}#{target}'"
     ])
   end
@@ -215,6 +226,28 @@ defmodule PhoenixKitLocations.Migrations do
         "ALTER TABLE #{p}phoenix_kit_locations ADD CONSTRAINT phoenix_kit_locations_owner_uuid_fkey FOREIGN KEY (owner_uuid) REFERENCES #{p}phoenix_kit_users(uuid) ON DELETE CASCADE"
       ),
       "CREATE INDEX IF NOT EXISTS phoenix_kit_locations_owner_uuid_index ON #{p}phoenix_kit_locations USING btree (owner_uuid)"
+    ]
+  end
+
+  # ── V3: coordinates ─────────────────────────────────────────────────────
+
+  defp v3_statements(prefix, p) do
+    [
+      "ALTER TABLE #{p}phoenix_kit_locations ADD COLUMN IF NOT EXISTS latitude numeric(9,6)",
+      "ALTER TABLE #{p}phoenix_kit_locations ADD COLUMN IF NOT EXISTS longitude numeric(9,6)",
+      guarded_constraint(
+        prefix,
+        "phoenix_kit_locations",
+        "phoenix_kit_locations_latitude_range",
+        "ALTER TABLE #{p}phoenix_kit_locations ADD CONSTRAINT phoenix_kit_locations_latitude_range CHECK (latitude IS NULL OR (latitude >= -90 AND latitude <= 90))"
+      ),
+      guarded_constraint(
+        prefix,
+        "phoenix_kit_locations",
+        "phoenix_kit_locations_longitude_range",
+        "ALTER TABLE #{p}phoenix_kit_locations ADD CONSTRAINT phoenix_kit_locations_longitude_range CHECK (longitude IS NULL OR (longitude >= -180 AND longitude <= 180))"
+      ),
+      "CREATE INDEX IF NOT EXISTS phoenix_kit_locations_latitude_longitude_index ON #{p}phoenix_kit_locations USING btree (latitude, longitude)"
     ]
   end
 

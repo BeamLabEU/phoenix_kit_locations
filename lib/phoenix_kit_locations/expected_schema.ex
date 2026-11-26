@@ -22,7 +22,7 @@ defmodule PhoenixKitLocations.ExpectedSchema do
   @schema_token "__SCHEMA__"
   @name_marker_exempt "__PK_NAME_EXEMPT__"
   @name_marker_always "__PK_NAME_ALWAYS__"
-  @chain_hash "8491f91081300335d2d17278b544ce92be200638a94f0deffb82c73c01675f3a"
+  @chain_hash "ae328498d9c231ce194ce5eb2e7b02cb4221d672cc3c686cee8e4d83685bebf9"
 
   def objects(prefix) do
     prefix = normalize_prefix!(prefix)
@@ -616,6 +616,30 @@ defmodule PhoenixKitLocations.ExpectedSchema do
         backfill: nil
       },
       %{
+        id: "column:phoenix_kit_locations.latitude",
+        owner: :phoenix_kit_locations,
+        check: {:catalog, %{table: "phoenix_kit_locations", column: "latitude", kind: :column}},
+        create:
+          "ALTER TABLE __SCHEMA__.phoenix_kit_locations ADD COLUMN IF NOT EXISTS \"latitude\" numeric(9,6)",
+        since: 1,
+        class: :column,
+        revisions: [{1, %{default: nil, type: "numeric(9,6)", pos: 21, not_null: false}}],
+        presence: :required,
+        backfill: nil
+      },
+      %{
+        id: "column:phoenix_kit_locations.longitude",
+        owner: :phoenix_kit_locations,
+        check: {:catalog, %{table: "phoenix_kit_locations", column: "longitude", kind: :column}},
+        create:
+          "ALTER TABLE __SCHEMA__.phoenix_kit_locations ADD COLUMN IF NOT EXISTS \"longitude\" numeric(9,6)",
+        since: 1,
+        class: :column,
+        revisions: [{1, %{default: nil, type: "numeric(9,6)", pos: 22, not_null: false}}],
+        presence: :required,
+        backfill: nil
+      },
+      %{
         id: "column:phoenix_kit_locations.name",
         owner: :phoenix_kit_locations,
         check: {:catalog, %{table: "phoenix_kit_locations", column: "name", kind: :column}},
@@ -783,9 +807,9 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_location_spaces",
              keys: ["location_uuid"],
              unique: false,
-             method: "btree",
              definition:
                "CREATE INDEX phoenix_kit_location_spaces_location_uuid_index ON __SCHEMA__.phoenix_kit_location_spaces USING btree (location_uuid)",
+             method: "btree",
              predicate: nil,
              opclasses: ["uuid_ops"],
              name_template: nil
@@ -814,9 +838,9 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_location_spaces",
              keys: ["location_uuid", "parent_uuid", "\"position\""],
              unique: false,
-             method: "btree",
              definition:
                "CREATE INDEX phoenix_kit_location_spaces_location_uuid_parent_uuid_position_ ON __SCHEMA__.phoenix_kit_location_spaces USING btree (location_uuid, parent_uuid, \"position\")",
+             method: "btree",
              predicate: nil,
              opclasses: ["uuid_ops", "uuid_ops", "int4_ops"],
              name_template: nil
@@ -845,9 +869,9 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_location_spaces",
              keys: ["parent_uuid"],
              unique: false,
-             method: "btree",
              definition:
                "CREATE INDEX phoenix_kit_location_spaces_parent_uuid_index ON __SCHEMA__.phoenix_kit_location_spaces USING btree (parent_uuid)",
+             method: "btree",
              predicate: nil,
              opclasses: ["uuid_ops"],
              name_template: nil
@@ -876,9 +900,9 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_location_type_assignments",
              keys: ["location_uuid"],
              unique: false,
-             method: "btree",
              definition:
                "CREATE INDEX phoenix_kit_location_type_assignments_location_uuid_index ON __SCHEMA__.phoenix_kit_location_type_assignments USING btree (location_uuid)",
+             method: "btree",
              predicate: nil,
              opclasses: ["uuid_ops"],
              name_template: nil
@@ -907,9 +931,9 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_location_type_assignments",
              keys: ["location_uuid", "location_type_uuid"],
              unique: true,
-             method: "btree",
              definition:
                "CREATE UNIQUE INDEX phoenix_kit_location_type_assignments_location_uuid_location_ty ON __SCHEMA__.phoenix_kit_location_type_assignments USING btree (location_uuid, location_type_uuid)",
+             method: "btree",
              predicate: nil,
              opclasses: ["uuid_ops", "uuid_ops"],
              name_template: nil
@@ -938,11 +962,42 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_location_types",
              keys: ["status"],
              unique: false,
-             method: "btree",
              definition:
                "CREATE INDEX phoenix_kit_location_types_status_index ON __SCHEMA__.phoenix_kit_location_types USING btree (status)",
+             method: "btree",
              predicate: nil,
              opclasses: ["text_ops"],
+             name_template: nil
+           }}
+        ],
+        presence: :required,
+        backfill: nil
+      },
+      %{
+        id: "index:phoenix_kit_locations_latitude_longitude_index",
+        owner: :phoenix_kit_locations,
+        check:
+          {:catalog,
+           %{
+             name: "phoenix_kit_locations_latitude_longitude_index",
+             table: "phoenix_kit_locations",
+             kind: :index
+           }},
+        create:
+          "CREATE INDEX IF NOT EXISTS phoenix_kit_locations_latitude_longitude_index ON __SCHEMA__.phoenix_kit_locations USING btree (latitude, longitude)",
+        since: 1,
+        class: :index,
+        revisions: [
+          {1,
+           %{
+             table: "phoenix_kit_locations",
+             keys: ["latitude", "longitude"],
+             unique: false,
+             definition:
+               "CREATE INDEX phoenix_kit_locations_latitude_longitude_index ON __SCHEMA__.phoenix_kit_locations USING btree (latitude, longitude)",
+             method: "btree",
+             predicate: nil,
+             opclasses: ["numeric_ops", "numeric_ops"],
              name_template: nil
            }}
         ],
@@ -969,9 +1024,9 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_locations",
              keys: ["owner_uuid"],
              unique: false,
-             method: "btree",
              definition:
                "CREATE INDEX phoenix_kit_locations_owner_uuid_index ON __SCHEMA__.phoenix_kit_locations USING btree (owner_uuid)",
+             method: "btree",
              predicate: nil,
              opclasses: ["uuid_ops"],
              name_template: nil
@@ -1000,9 +1055,9 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              table: "phoenix_kit_locations",
              keys: ["status"],
              unique: false,
-             method: "btree",
              definition:
                "CREATE INDEX phoenix_kit_locations_status_index ON __SCHEMA__.phoenix_kit_locations USING btree (status)",
+             method: "btree",
              predicate: nil,
              opclasses: ["text_ops"],
              name_template: nil
@@ -1154,6 +1209,68 @@ defmodule PhoenixKitLocations.ExpectedSchema do
              type: "p",
              columns: ["uuid"],
              definition: "PRIMARY KEY (uuid)",
+             name_template: nil,
+             foreign_table: nil,
+             foreign_columns: nil,
+             on_delete: nil,
+             on_update: nil
+           }}
+        ],
+        presence: :required,
+        backfill: nil
+      },
+      %{
+        id: "constraint:phoenix_kit_locations.phoenix_kit_locations_latitude_range",
+        owner: :phoenix_kit_locations,
+        check:
+          {:catalog,
+           %{
+             name: "phoenix_kit_locations_latitude_range",
+             table: "phoenix_kit_locations",
+             kind: :constraint
+           }},
+        create:
+          "DO $$\nBEGIN\n  IF NOT EXISTS (\n    SELECT 1\n    FROM pg_constraint c\n    JOIN pg_class t ON t.oid = c.conrelid\n    JOIN pg_namespace n ON n.oid = t.relnamespace\n    WHERE c.conname = 'phoenix_kit_locations_latitude_range'\n      AND t.relname = 'phoenix_kit_locations'\n      AND n.nspname = '__SCHEMA__'\n  ) THEN\n    ALTER TABLE __SCHEMA__.phoenix_kit_locations ADD CONSTRAINT phoenix_kit_locations_latitude_range CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))));\n  END IF;\nEND\n$$",
+        since: 1,
+        class: :constraint,
+        revisions: [
+          {1,
+           %{
+             type: "c",
+             columns: ["latitude"],
+             definition:
+               "CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))))",
+             name_template: nil,
+             foreign_table: nil,
+             foreign_columns: nil,
+             on_delete: nil,
+             on_update: nil
+           }}
+        ],
+        presence: :required,
+        backfill: nil
+      },
+      %{
+        id: "constraint:phoenix_kit_locations.phoenix_kit_locations_longitude_range",
+        owner: :phoenix_kit_locations,
+        check:
+          {:catalog,
+           %{
+             name: "phoenix_kit_locations_longitude_range",
+             table: "phoenix_kit_locations",
+             kind: :constraint
+           }},
+        create:
+          "DO $$\nBEGIN\n  IF NOT EXISTS (\n    SELECT 1\n    FROM pg_constraint c\n    JOIN pg_class t ON t.oid = c.conrelid\n    JOIN pg_namespace n ON n.oid = t.relnamespace\n    WHERE c.conname = 'phoenix_kit_locations_longitude_range'\n      AND t.relname = 'phoenix_kit_locations'\n      AND n.nspname = '__SCHEMA__'\n  ) THEN\n    ALTER TABLE __SCHEMA__.phoenix_kit_locations ADD CONSTRAINT phoenix_kit_locations_longitude_range CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))));\n  END IF;\nEND\n$$",
+        since: 1,
+        class: :constraint,
+        revisions: [
+          {1,
+           %{
+             type: "c",
+             columns: ["longitude"],
+             definition:
+               "CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))))",
              name_template: nil,
              foreign_table: nil,
              foreign_columns: nil,
