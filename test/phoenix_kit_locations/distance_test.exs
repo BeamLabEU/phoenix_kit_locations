@@ -50,6 +50,7 @@ defmodule PhoenixKitLocations.DistanceTest do
     assert Distance.coordinates({Decimal.new("Infinity"), 0}) == nil
     assert Distance.coordinates({Decimal.new("1e400"), 0}) == nil
     assert Distance.coordinates({Integer.pow(10, 400), 0}) == nil
+    assert Distance.coordinates({Decimal.new("1e-400"), 0}) == nil
     assert Distance.haversine({0, Integer.pow(10, 400)}, {0, 0}) == nil
   end
 

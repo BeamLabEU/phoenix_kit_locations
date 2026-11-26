@@ -242,13 +242,14 @@ defmodule PhoenixKitLocations.Geocoding do
   defp to_decimal(value) when is_float(value), do: {:ok, Decimal.from_float(value)}
   defp to_decimal(nil), do: :error
 
-  # Finite and within ±180 only: a provider's "NaN" or "Infinity" passes
-  # `Decimal.cast/1` but raises in Ecto's cast inside the write.
+  # Finite only: a provider's "NaN" or "Infinity" passes `Decimal.cast/1`
+  # but raises in Ecto's cast inside the write. The range itself is the
+  # changeset's (after rounding to 6 places, so 180.0000001 is 180).
   defp to_decimal(value) do
     case Decimal.cast(value) do
       {:ok, decimal} ->
         if Decimal.inf?(decimal) or Decimal.nan?(decimal) or
-             Decimal.gt?(Decimal.abs(decimal), 180),
+             Decimal.gt?(Decimal.abs(decimal), 1000),
            do: :error,
            else: {:ok, decimal}
 

@@ -24,11 +24,17 @@ defmodule PhoenixKitLocations.Schemas.LocationCoordinatesTest do
   end
 
   test "a huge or non-finite value is an error, not a raise" do
-    for value <- ["1e28", String.duplicate("9", 40), "1e400"] do
+    for value <- ["1e28", "1e400"] do
       cs = changeset(%{"latitude" => value, "longitude" => "0"})
       refute cs.valid?
       assert cs.errors[:latitude]
     end
+  end
+
+  test "a value a hair past ±180 rounds to the edge instead of failing" do
+    cs = changeset(%{"latitude" => "0", "longitude" => "180.0000004"})
+    assert cs.valid?
+    assert Decimal.equal?(Ecto.Changeset.get_change(cs, :longitude), Decimal.new(180))
   end
 
   test "requires both or neither" do

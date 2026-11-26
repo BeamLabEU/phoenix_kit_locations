@@ -106,6 +106,9 @@ defmodule PhoenixKitLocations.Distance do
     if Decimal.inf?(d) or Decimal.nan?(d) or Decimal.gt?(Decimal.abs(d), 180),
       do: nil,
       else: Decimal.to_float(d)
+  rescue
+    # Below the smallest float (1e-400): not a coordinate anyone meant.
+    Decimal.Error -> nil
   end
 
   defp to_float(s) when is_binary(s) do
