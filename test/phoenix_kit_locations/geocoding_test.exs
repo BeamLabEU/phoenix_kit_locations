@@ -251,6 +251,41 @@ defmodule PhoenixKitLocations.GeocodingTest do
       refute_enqueued(worker: GeocodeWorker, args: %{"location_uuid" => loc.uuid})
     end
 
+    test "on: a save from an old struct enqueues for what the row holds, not the struct" do
+      loc = location()
+      Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
+
+      # The row was geocoded after `loc` was loaded (by a job, or another
+      # editor typing coordinates).
+      {:ok, _} = Locations.write_geocoded_coordinates(loc.uuid, %{latitude: 1, longitude: 2}, Geocoding.expectation(loc))
+
+      # The old struct still says "no coordinates"; this save moves the city.
+      {:ok, _} = Locations.update_location(loc, %{city: "Tartu"})
+      row = Locations.get_location(loc.uuid)
+
+      assert [job] = all_enqueued(worker: GeocodeWorker)
+      assert job.args["fingerprint"] == Geocoding.address_fingerprint(row)
+      assert Decimal.equal?(Decimal.new(job.args["latitude"]), Decimal.new(1))
+
+      # So the job writes the new address's coordinates instead of being
+      # cancelled as stale (which left Tartu with the old address's).
+      reply({:ok, %{latitude: 58.378, longitude: 26.729}})
+      assert :ok = perform_job(GeocodeWorker, job.args)
+      assert Decimal.equal?(Locations.get_location(loc.uuid).latitude, Decimal.new("58.378"))
+    end
+
+    test "on: a field another session saved since the struct was loaded is the row's, not the struct's" do
+      loc = location()
+      {:ok, _} = Locations.update_location(Locations.get_location(loc.uuid), %{postal_code: "10111"})
+      Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
+
+      {:ok, _} = Locations.update_location(loc, %{city: "Tartu"})
+      row = Locations.get_location(loc.uuid)
+
+      assert [job] = all_enqueued(worker: GeocodeWorker)
+      assert job.args["fingerprint"] == Geocoding.address_fingerprint(row)
+    end
+
     test "enqueue_missing/1 queues every geocodable location without coordinates" do
       _no_address = location(%{name: "A", address_line_1: nil, city: nil})
       _has_coords = location(%{name: "B", latitude: "1", longitude: "1"})

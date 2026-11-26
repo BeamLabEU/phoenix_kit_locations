@@ -317,12 +317,12 @@ defmodule PhoenixKitLocations.Locations do
   @spec create_location(map(), opts) :: {:ok, Location.t()} | {:error, Ecto.Changeset.t()}
   def create_location(attrs, opts \\ []) do
     changeset = %Location{} |> Location.changeset(attrs) |> maybe_put_owner(opts)
-    geocode? = geocode_on_save?(changeset)
+    geocode? = geocode_on_save?(changeset, %Location{}, Ecto.Changeset.apply_changes(changeset))
 
     changeset
     |> repo().insert()
     |> log_activity("location.created", "location", opts, &location_metadata/1)
-    |> maybe_enqueue_geocode(geocode?, opts)
+    |> then(fn result -> maybe_enqueue_geocode(result, geocode? && result, opts) end)
   end
 
   @doc """
@@ -356,21 +356,28 @@ defmodule PhoenixKitLocations.Locations do
             |> with_stored_data(stored, attrs)
             |> Location.changeset(attrs)
 
-          # Compared with the locked row, not the caller's copy: an address
-          # another session already saved is no change.
-          geocode? = geocode_on_save?(changeset) and address_changed?(stored, changeset)
+          # The changeset is built on the caller's struct, so `changes` is
+          # measured against the caller's copy, and a field it left alone
+          # keeps the LOCKED row's value in the database. What the row holds
+          # after this save is therefore the locked row plus the changes —
+          # never `apply_changes/1`, which would read a field another
+          # session saved since the caller loaded its copy as the caller's
+          # older value (and enqueue a job whose fingerprint and expected
+          # coordinates match no row, so it is always cancelled as stale).
+          saved = Map.merge(stored, changeset.changes)
+          geocode_target = geocode_on_save?(changeset, stored, saved) && saved
 
           changeset
           |> repo().update()
           |> ok_or_rollback()
-          |> then(&{&1, geocode?})
+          |> then(&{&1, geocode_target})
       end
     end)
     |> case do
-      {:ok, {record, geocode?}} ->
+      {:ok, {record, geocode_target}} ->
         {:ok, record}
         |> log_activity("location.updated", "location", opts, &location_metadata/1)
-        |> maybe_enqueue_geocode(geocode?, opts)
+        |> maybe_enqueue_geocode(geocode_target && {:ok, geocode_target}, opts)
 
       error ->
         log_activity(error, "location.updated", "location", opts, &location_metadata/1)
@@ -393,27 +400,26 @@ defmodule PhoenixKitLocations.Locations do
 
   # ── Geocoding on save (opt-in, see `PhoenixKitLocations.Geocoder`) ──
 
-  # A save geocodes when the host opted in, the address changed, and the
-  # same save did not set coordinates by hand (typed coordinates win).
-  defp geocode_on_save?(%Ecto.Changeset{valid?: true, changes: changes}) do
-    Enum.any?(Location.address_fields(), &Map.has_key?(changes, &1)) and
-      not Map.has_key?(changes, :latitude) and not Map.has_key?(changes, :longitude) and
-      Geocoder.on_save?()
+  # A save geocodes when the host opted in, the address changed (`before` →
+  # `saved`, the row before and after the save), and the same save did not
+  # set coordinates by hand (typed coordinates win).
+  defp geocode_on_save?(%Ecto.Changeset{valid?: true, changes: changes}, before, saved) do
+    not Map.has_key?(changes, :latitude) and not Map.has_key?(changes, :longitude) and
+      Geocoder.on_save?() and
+      Geocoding.address_fingerprint(before) != Geocoding.address_fingerprint(saved)
   end
 
-  defp geocode_on_save?(_changeset), do: false
+  defp geocode_on_save?(_changeset, _before, _saved), do: false
 
-  defp address_changed?(stored, changeset) do
-    Geocoding.address_fingerprint(stored) !=
-      Geocoding.address_fingerprint(Ecto.Changeset.apply_changes(changeset))
+  # `target` is the saved row (`{:ok, %Location{}}`) to geocode, or a falsy
+  # value when this save does not geocode. The save's own result is
+  # returned unchanged either way.
+  defp maybe_enqueue_geocode(result, {:ok, %Location{} = target}, opts) do
+    _ = Geocoding.enqueue(target, Keyword.take(opts, [:actor_uuid]))
+    result
   end
 
-  defp maybe_enqueue_geocode({:ok, %Location{} = location} = ok, true, opts) do
-    _ = Geocoding.enqueue(location, Keyword.take(opts, [:actor_uuid]))
-    ok
-  end
-
-  defp maybe_enqueue_geocode(result, _geocode?, _opts), do: result
+  defp maybe_enqueue_geocode(result, _target, _opts), do: result
 
   @doc false
   # The geocode write (`Geocoding.geocode_now/2`): under the row lock, only
