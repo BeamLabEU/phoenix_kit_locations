@@ -43,16 +43,21 @@ defmodule PhoenixKitLocations.Locations do
   require Logger
 
   alias PhoenixKitLocations.Geo
+  alias PhoenixKitLocations.Geocoder
+  alias PhoenixKitLocations.Geocoding
   alias PhoenixKitLocations.Schemas.{Location, LocationType, LocationTypeAssignment}
 
   @type opts :: keyword()
   @type status_filter :: [status: String.t()]
   @typedoc "`owner_uuid:` filter value — an owner's uuid, `nil` (unowned only) or `:any` (owned by anyone)."
   @type owner_filter :: String.t() | [String.t()] | nil | :any
+  @typedoc "`near:` filter — a point in decimal degrees and a radius in kilometres."
+  @type near_filter :: {number() | Decimal.t(), number() | Decimal.t(), number()}
   @type list_locations_opts :: [
           status: String.t(),
           type_uuid: String.t(),
-          owner_uuid: owner_filter()
+          owner_uuid: owner_filter(),
+          near: near_filter()
         ]
 
   defp repo, do: PhoenixKit.RepoHelper.repo()
@@ -177,12 +182,23 @@ defmodule PhoenixKitLocations.Locations do
       owned or not — so a tenant-facing caller must always pass it. A `nil`
       that reaches this option by mistake fails closed (global rows only),
       never open.
+    * `:near` — `{latitude, longitude, radius_km}`: only locations with
+      coordinates within `radius_km` (great-circle, the same haversine as
+      `PhoenixKitLocations.Distance`), ordered nearest first instead of by
+      name. Locations without coordinates are left out.
 
   All filters compose.
   """
   @spec list_locations(list_locations_opts) :: [Location.t()]
   def list_locations(opts \\ []) do
-    query = from(l in Location, order_by: [asc: :name], preload: [:location_types])
+    query =
+      case Keyword.get(opts, :near) do
+        nil ->
+          from(l in Location, order_by: [asc: :name], preload: [:location_types])
+
+        near ->
+          from(l in Location, preload: [:location_types]) |> filter_near(near)
+      end
 
     query =
       case Keyword.get(opts, :status) do
@@ -300,11 +316,13 @@ defmodule PhoenixKitLocations.Locations do
   """
   @spec create_location(map(), opts) :: {:ok, Location.t()} | {:error, Ecto.Changeset.t()}
   def create_location(attrs, opts \\ []) do
-    %Location{}
-    |> Location.changeset(attrs)
-    |> maybe_put_owner(opts)
+    changeset = %Location{} |> Location.changeset(attrs) |> maybe_put_owner(opts)
+    geocode? = geocode_on_save?(changeset)
+
+    changeset
     |> repo().insert()
     |> log_activity("location.created", "location", opts, &location_metadata/1)
+    |> maybe_enqueue_geocode(geocode?, opts)
   end
 
   @doc """
@@ -333,14 +351,87 @@ defmodule PhoenixKitLocations.Locations do
             |> keep_folder_pointer(stored)
             |> preserve_photos(stored, Keyword.get(opts, :preserve_photos, false))
 
-          location
-          |> with_stored_data(stored, attrs)
-          |> Location.changeset(attrs)
+          changeset =
+            location
+            |> with_stored_data(stored, attrs)
+            |> Location.changeset(attrs)
+
+          # Compared with the locked row, not the caller's copy: an address
+          # another session already saved is no change.
+          geocode? = geocode_on_save?(changeset) and address_changed?(stored, changeset)
+
+          changeset
           |> repo().update()
           |> ok_or_rollback()
+          |> then(&{&1, geocode?})
       end
     end)
-    |> log_activity("location.updated", "location", opts, &location_metadata/1)
+    |> case do
+      {:ok, {record, geocode?}} ->
+        {:ok, record}
+        |> log_activity("location.updated", "location", opts, &location_metadata/1)
+        |> maybe_enqueue_geocode(geocode?, opts)
+
+      error ->
+        log_activity(error, "location.updated", "location", opts, &location_metadata/1)
+    end
+  end
+
+  defp lock_geocode_target(uuid, expect) do
+    case lock_row(Location, uuid) do
+      nil -> repo().rollback(:location_not_found)
+      row -> if Geocoding.current?(row, expect), do: row, else: repo().rollback(:stale)
+    end
+  end
+
+  defp write_coordinates(row, coords) do
+    row
+    |> Location.coordinates_changeset(coords)
+    |> repo().update()
+    |> ok_or_rollback()
+  end
+
+  # ── Geocoding on save (opt-in, see `PhoenixKitLocations.Geocoder`) ──
+
+  # A save geocodes when the host opted in, the address changed, and the
+  # same save did not set coordinates by hand (typed coordinates win).
+  defp geocode_on_save?(%Ecto.Changeset{valid?: true, changes: changes}) do
+    Enum.any?(Location.address_fields(), &Map.has_key?(changes, &1)) and
+      not Map.has_key?(changes, :latitude) and not Map.has_key?(changes, :longitude) and
+      Geocoder.on_save?()
+  end
+
+  defp geocode_on_save?(_changeset), do: false
+
+  defp address_changed?(stored, changeset) do
+    Geocoding.address_fingerprint(stored) !=
+      Geocoding.address_fingerprint(Ecto.Changeset.apply_changes(changeset))
+  end
+
+  defp maybe_enqueue_geocode({:ok, %Location{} = location} = ok, true, opts) do
+    _ = Geocoding.enqueue(location, Keyword.take(opts, [:actor_uuid]))
+    ok
+  end
+
+  defp maybe_enqueue_geocode(result, _geocode?, _opts), do: result
+
+  @doc false
+  # The geocode write (`Geocoding.geocode_now/2`): under the row lock, only
+  # when the row still matches `expect` (address fingerprint + the
+  # coordinates it had when the geocode started), else `{:error, :stale}`.
+  @spec write_geocoded_coordinates(String.t(), map(), map(), opts) ::
+          {:ok, Location.t()}
+          | {:error, :stale | :location_not_found | Ecto.Changeset.t()}
+  def write_geocoded_coordinates(uuid, coords, expect, opts \\ []) do
+    repo().transaction(fn ->
+      uuid |> lock_geocode_target(expect) |> write_coordinates(coords)
+    end)
+    |> log_activity(
+      "location.geocoded",
+      "location",
+      Keyword.put_new(opts, :mode, "auto"),
+      &location_metadata/1
+    )
   end
 
   # A form that didn't edit photos (including every owner-scoped form) keeps
@@ -760,6 +851,80 @@ defmodule PhoenixKitLocations.Locations do
         where(query, [_l], false)
     end
   end
+
+  # 2r·asin(√(sin²(Δφ/2) + cos φ1 · cos φ2 · sin²(Δλ/2))), in float8.
+  defmacrop haversine_km(lat1, lng1, lat2, lng2) do
+    quote do
+      fragment(
+        "2 * 6371.0088 * asin(least(1, sqrt(power(sin(radians(?::float8 - ?::float8) / 2), 2) + cos(radians(?::float8)) * cos(radians(?::float8)) * power(sin(radians(?::float8 - ?::float8) / 2), 2))))",
+        unquote(lat1),
+        unquote(lat2),
+        unquote(lat2),
+        unquote(lat1),
+        unquote(lng1),
+        unquote(lng2)
+      )
+    end
+  end
+
+  # Great-circle distance in km between the row and a point, in SQL. The
+  # bounding box (index-friendly on (latitude, longitude)) prefilters; the
+  # haversine decides. `LEAST(1, …)` keeps float rounding out of ASIN's
+  # domain. 6371.0088 km is the mean Earth radius `Distance` uses too.
+  defp filter_near(query, {lat, lng, radius_km}) do
+    lat = to_float(lat)
+    lng = to_float(lng)
+    radius = to_float(radius_km)
+
+    if is_nil(lat) or is_nil(lng) or is_nil(radius) or radius < 0 do
+      raise ArgumentError,
+            "near: expects {latitude, longitude, radius_km} numbers, got #{inspect({lat, lng, radius_km})}"
+    end
+
+    dlat = radius / 111.0
+    cos_lat = :math.cos(lat * :math.pi() / 180)
+    dlng = if cos_lat < 1.0e-6, do: 180.0, else: min(radius / (111.0 * cos_lat), 180.0)
+
+    query =
+      from(l in query,
+        where: not is_nil(l.latitude) and not is_nil(l.longitude),
+        where: l.latitude >= ^(lat - dlat) and l.latitude <= ^(lat + dlat)
+      )
+
+    # Longitude prefilter on the wrapped angular difference (a radius that
+    # spans the antimeridian or a pole skips it).
+    query =
+      if dlng >= 180.0 do
+        query
+      else
+        where(
+          query,
+          [l],
+          fragment(
+            "abs(mod((?::numeric - ?::numeric + 540), 360) - 180) <= ?::numeric",
+            l.longitude,
+            ^lng,
+            ^dlng
+          )
+        )
+      end
+
+    from(l in query,
+      where: haversine_km(l.latitude, l.longitude, ^lat, ^lng) <= ^radius,
+      order_by: haversine_km(l.latitude, l.longitude, ^lat, ^lng),
+      order_by: [asc: l.name]
+    )
+  end
+
+  defp filter_near(_query, other) do
+    raise ArgumentError,
+          "near: expects {latitude, longitude, radius_km}, got #{inspect(other)}"
+  end
+
+  defp to_float(%Decimal{} = d), do: Decimal.to_float(d)
+  defp to_float(n) when is_integer(n), do: n * 1.0
+  defp to_float(n) when is_float(n), do: n
+  defp to_float(_), do: nil
 
   defp maybe_put_owner(changeset, opts) do
     case Keyword.fetch(opts, :owner_uuid) do
