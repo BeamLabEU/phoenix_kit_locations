@@ -16,7 +16,10 @@ defmodule PhoenixKitLocations.Workers.GeocodeWorker do
     max_attempts: 5,
     unique: [
       period: :infinity,
-      keys: [:location_uuid, :fingerprint],
+      # The expected coordinates are part of the key: a job queued for the
+      # same address while the row held other coordinates is a different
+      # job (it would be cancelled as stale), never the same one.
+      keys: [:location_uuid, :fingerprint, :latitude, :longitude],
       states: [:available, :scheduled, :retryable]
     ]
 

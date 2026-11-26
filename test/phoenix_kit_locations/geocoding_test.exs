@@ -286,6 +286,16 @@ defmodule PhoenixKitLocations.GeocodingTest do
       assert job.args["fingerprint"] == Geocoding.address_fingerprint(row)
     end
 
+    test "a queued job for the same address but other expected coordinates does not swallow a new one" do
+      loc = location()
+      assert {:ok, _} = Geocoding.enqueue(loc)
+      # Same address, the row now holds coordinates: a different job.
+      assert {:ok, _} = Geocoding.enqueue(%{loc | latitude: Decimal.new(1), longitude: Decimal.new(2)})
+      # The exact same job is still deduplicated.
+      assert {:ok, %{conflict?: true}} = Geocoding.enqueue(loc)
+      assert length(all_enqueued(worker: GeocodeWorker)) == 2
+    end
+
     test "enqueue_missing/1 queues every geocodable location without coordinates" do
       _no_address = location(%{name: "A", address_line_1: nil, city: nil})
       _has_coords = location(%{name: "B", latitude: "1", longitude: "1"})
