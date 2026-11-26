@@ -881,9 +881,7 @@ defmodule PhoenixKitLocations.Locations do
             "near: expects {latitude, longitude, radius_km} numbers, got #{inspect({lat, lng, radius_km})}"
     end
 
-    dlat = radius / 111.0
-    cos_lat = :math.cos(lat * :math.pi() / 180)
-    dlng = if cos_lat < 1.0e-6, do: 180.0, else: min(radius / (111.0 * cos_lat), 180.0)
+    {dlat, dlng} = bounding_box(lat, radius)
 
     query =
       from(l in query,
@@ -891,8 +889,9 @@ defmodule PhoenixKitLocations.Locations do
         where: l.latitude >= ^(lat - dlat) and l.latitude <= ^(lat + dlat)
       )
 
-    # Longitude prefilter on the wrapped angular difference (a radius that
-    # spans the antimeridian or a pole skips it).
+    # Longitude prefilter on the wrapped angular difference (a circle that
+    # reaches a pole or spans every meridian skips it; the antimeridian is
+    # handled by the wrap).
     query =
       if dlng >= 180.0 do
         query
@@ -914,6 +913,32 @@ defmodule PhoenixKitLocations.Locations do
       order_by: haversine_km(l.latitude, l.longitude, ^lat, ^lng),
       order_by: [asc: l.name]
     )
+  end
+
+  # Half-sizes in degrees of a box that contains every point within
+  # `radius_km` of a centre at `lat`. Latitude: the angular radius. Longitude:
+  # the widest meridian span of the circle, asin(sin d / cos φ), which is
+  # reached not at the centre's latitude but poleward of it (d / cos φ, the
+  # span at the centre's own latitude, is too narrow: at 60° N and 1000 km
+  # it misses 0.2° on each side). A circle that reaches a pole contains all
+  # longitudes. A small margin keeps float and numeric(9,6) rounding from
+  # dropping a point on the edge; the haversine decides exactly.
+  @box_margin_deg 1.0e-4
+  @doc false
+  @spec bounding_box(float(), float()) :: {float(), float()}
+  def bounding_box(lat, radius_km) do
+    d = radius_km / PhoenixKitLocations.Distance.earth_radius_km()
+    dlat = d * 180 / :math.pi() + @box_margin_deg
+    lat_rad = lat * :math.pi() / 180
+    reaches_pole? = abs(lat) + dlat >= 90.0
+    ratio = if reaches_pole?, do: 2.0, else: :math.sin(min(d, :math.pi() / 2)) / :math.cos(lat_rad)
+
+    dlng =
+      if reaches_pole? or ratio >= 1.0 or d >= :math.pi() / 2,
+        do: 180.0,
+        else: min(:math.asin(ratio) * 180 / :math.pi() + @box_margin_deg, 180.0)
+
+    {dlat, dlng}
   end
 
   defp filter_near(_query, other) do
