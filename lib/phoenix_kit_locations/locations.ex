@@ -934,6 +934,11 @@ defmodule PhoenixKitLocations.Locations do
     )
   end
 
+  defp filter_near(_query, other) do
+    raise ArgumentError,
+          "near: expects {latitude, longitude, radius_km}, got #{inspect(other)}"
+  end
+
   # Half-sizes in degrees of a box that contains every point within
   # `radius_km` of a centre at `lat`. Latitude: the angular radius. Longitude:
   # the widest meridian span of the circle, asin(sin d / cos φ), which is
@@ -960,11 +965,6 @@ defmodule PhoenixKitLocations.Locations do
         else: min(:math.asin(ratio) * 180 / :math.pi() + @box_margin_deg, 180.0)
 
     {dlat, dlng}
-  end
-
-  defp filter_near(_query, other) do
-    raise ArgumentError,
-          "near: expects {latitude, longitude, radius_km}, got #{inspect(other)}"
   end
 
   defp to_float(%Decimal{} = d), do: Decimal.to_float(d)
