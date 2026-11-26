@@ -1062,3 +1062,59 @@ msgstr "Usuario"
 #, elixir-autogen, elixir-format
 msgid "Space saved."
 msgstr "Espacio guardado."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:115
+#, elixir-autogen, elixir-format
+msgid "No users found."
+msgstr "No se encontraron usuarios."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:110
+#, elixir-autogen, elixir-format
+msgid "Search users by email or name…"
+msgstr "Buscar usuarios por correo electrónico o nombre…"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1068
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees (WGS 84), for maps and distance search. Optional."
+msgstr "Grados decimales (WGS 84), para mapas y búsqueda por distancia. Opcional."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1064
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees. Leave blank to look them up from the address after saving."
+msgstr "Grados decimales. Déjalos en blanco para obtenerlos de la dirección al guardar."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:781
+#, elixir-autogen, elixir-format
+msgid "Latitude"
+msgstr "Latitud"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:790
+#, elixir-autogen, elixir-format
+msgid "Longitude"
+msgstr "Longitud"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:791
+#, elixir-autogen, elixir-format
+msgid "e.g. 24.7536"
+msgstr "p. ej. 24.7536"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:782
+#, elixir-autogen, elixir-format
+msgid "e.g. 59.437"
+msgstr "p. ej. 59.437"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:179
+#: lib/phoenix_kit_locations/schemas/location.ex:182
+#, elixir-autogen, elixir-format
+msgid "enter both latitude and longitude"
+msgstr "introduce latitud y longitud"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:159
+#, elixir-autogen, elixir-format
+msgid "must be between -180 and 180"
+msgstr "debe estar entre -180 y 180"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:154
+#, elixir-autogen, elixir-format
+msgid "must be between -90 and 90"
+msgstr "debe estar entre -90 y 90"

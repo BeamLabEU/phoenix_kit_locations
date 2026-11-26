@@ -1063,3 +1063,59 @@ msgstr "Пользователь"
 #, elixir-autogen, elixir-format
 msgid "Space saved."
 msgstr "Пространство сохранено."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:115
+#, elixir-autogen, elixir-format
+msgid "No users found."
+msgstr "Пользователи не найдены."
+
+#: lib/phoenix_kit_locations/web/components/owner_components.ex:110
+#, elixir-autogen, elixir-format
+msgid "Search users by email or name…"
+msgstr "Поиск пользователей по email или имени…"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1068
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees (WGS 84), for maps and distance search. Optional."
+msgstr "Десятичные градусы (WGS 84), для карт и поиска по расстоянию. Необязательно."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1064
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees. Leave blank to look them up from the address after saving."
+msgstr "Десятичные градусы. Оставьте пустыми, чтобы определить их по адресу после сохранения."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:781
+#, elixir-autogen, elixir-format
+msgid "Latitude"
+msgstr "Широта"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:790
+#, elixir-autogen, elixir-format
+msgid "Longitude"
+msgstr "Долгота"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:791
+#, elixir-autogen, elixir-format
+msgid "e.g. 24.7536"
+msgstr "напр. 24.7536"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:782
+#, elixir-autogen, elixir-format
+msgid "e.g. 59.437"
+msgstr "напр. 59.437"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:179
+#: lib/phoenix_kit_locations/schemas/location.ex:182
+#, elixir-autogen, elixir-format
+msgid "enter both latitude and longitude"
+msgstr "укажите и широту, и долготу"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:159
+#, elixir-autogen, elixir-format
+msgid "must be between -180 and 180"
+msgstr "должно быть от -180 до 180"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:154
+#, elixir-autogen, elixir-format
+msgid "must be between -90 and 90"
+msgstr "должно быть от -90 до 90"
