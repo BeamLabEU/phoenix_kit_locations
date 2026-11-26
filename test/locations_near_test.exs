@@ -85,9 +85,11 @@ defmodule PhoenixKitLocations.LocationsNearTest do
           )
 
       plat = Float.round(p2 * 180 / :math.pi(), 6)
-      plng = Float.round(l2 * 180 / :math.pi(), 6)
+      plng = Float.round(:math.fmod(l2 * 180 / :math.pi() + 540, 360) - 180, 6)
+      distance = Distance.haversine({lat, lng}, {plat, plng})
+      assert distance, "no distance for #{inspect({plat, plng})}"
 
-      if Distance.haversine({lat, lng}, {plat, plng}) <= radius do
+      if distance <= radius do
         assert plat >= lat - dlat and plat <= lat + dlat,
                "lat: #{inspect({lat, lng, radius, plat, plng})}"
 
