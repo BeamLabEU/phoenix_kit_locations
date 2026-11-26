@@ -202,6 +202,29 @@ defmodule PhoenixKitLocations.GeocodingTest do
       assert Locations.get_location(loc.uuid).latitude == nil
     end
 
+    test "junk, out-of-range results and a removed geocoder cancel instead of retrying" do
+      loc = location()
+      args = Geocoding.new_job(loc).changes.args
+
+      reply({:ok, %{latitude: "north"}})
+      assert {:cancel, :invalid_result} = perform_job(GeocodeWorker, args)
+
+      reply({:ok, %{latitude: 95, longitude: 0}})
+      assert {:cancel, :invalid_coordinates} = perform_job(GeocodeWorker, args)
+
+      Application.delete_env(:phoenix_kit_locations, :geocoder)
+      assert {:cancel, :no_geocoder} = perform_job(GeocodeWorker, args)
+    end
+
+    test "the geocoded activity entry carries the job's actor and mode auto" do
+      loc = location()
+      actor = Ecto.UUID.generate()
+      args = Geocoding.new_job(loc, actor_uuid: actor).changes.args
+
+      assert :ok = perform_job(GeocodeWorker, args)
+      assert_activity_logged("location.geocoded", resource_uuid: loc.uuid, actor_uuid: actor)
+    end
+
     test "a deleted location or a provider miss cancels; other errors retry" do
       loc = location()
       args = Geocoding.new_job(loc).changes.args
