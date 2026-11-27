@@ -35,6 +35,10 @@ defmodule PhoenixKitLocations.Schemas.Location do
     field(:latitude, :decimal)
     field(:longitude, :decimal)
 
+    # The address fingerprint the geocoder last answered `:not_found` for
+    # (V4). Written by `Geocoding` only, never cast from attrs.
+    field(:geocode_miss, :string)
+
     # Contact
     field(:phone, :string)
     field(:email, :string)

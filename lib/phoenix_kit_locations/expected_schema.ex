@@ -601,6 +601,19 @@ defmodule PhoenixKitLocations.ExpectedSchema do
         backfill: nil
       },
       %{
+        id: "column:phoenix_kit_locations.geocode_miss",
+        owner: :phoenix_kit_locations,
+        check:
+          {:catalog, %{table: "phoenix_kit_locations", column: "geocode_miss", kind: :column}},
+        create:
+          "ALTER TABLE __SCHEMA__.phoenix_kit_locations ADD COLUMN IF NOT EXISTS \"geocode_miss\" character varying(32)",
+        since: 1,
+        class: :column,
+        revisions: [{1, %{default: nil, type: "character varying(32)", pos: 23, not_null: false}}],
+        presence: :required,
+        backfill: nil
+      },
+      %{
         id: "column:phoenix_kit_locations.inserted_at",
         owner: :phoenix_kit_locations,
         check:

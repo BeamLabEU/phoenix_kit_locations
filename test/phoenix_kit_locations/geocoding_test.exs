@@ -43,6 +43,14 @@ defmodule PhoenixKitLocations.GeocodingTest do
 
   defp reply(value), do: :persistent_term.put({FakeGeocoder, :reply}, value)
 
+  defp flush_geocode_calls do
+    receive do
+      {:geocode_called, _} -> flush_geocode_calls()
+    after
+      0 -> :ok
+    end
+  end
+
   defp location(attrs \\ %{}) do
     {:ok, l} =
       Locations.create_location(
@@ -367,6 +375,72 @@ defmodule PhoenixKitLocations.GeocodingTest do
       # The exact same job is still deduplicated.
       assert {:ok, %{conflict?: true}} = Geocoding.enqueue(loc)
       assert length(all_enqueued(worker: GeocodeWorker)) == 2
+    end
+
+    test "on: a :not_found is remembered for that address, so later saves don't ask again" do
+      loc = location()
+      reply({:error, :not_found})
+      assert {:error, :not_found} = Geocoding.geocode_now(loc)
+      assert Locations.get_location(loc.uuid).geocode_miss == Geocoding.address_fingerprint(loc)
+
+      Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
+
+      # Blank on purpose: a rename asks nobody.
+      {:ok, renamed} = Locations.update_location(loc, %{name: "Renamed"})
+      refute_enqueued(worker: GeocodeWorker, args: %{"location_uuid" => loc.uuid})
+
+      # A new address asks again.
+      {:ok, moved} = Locations.update_location(renamed, %{city: "Tartu"})
+
+      assert_enqueued(
+        worker: GeocodeWorker,
+        args: %{
+          "location_uuid" => loc.uuid,
+          "fingerprint" => Geocoding.address_fingerprint(moved)
+        }
+      )
+
+      # Missing-batch skips a remembered miss.
+      Application.delete_env(:phoenix_kit_locations, :geocode_on_save)
+      other = location(%{name: "Other"})
+      assert {:error, :not_found} = Geocoding.geocode_now(other)
+
+      refute Enum.any?(
+               all_enqueued(worker: GeocodeWorker),
+               &(&1.args["location_uuid"] == other.uuid)
+             )
+
+      Geocoding.enqueue_missing()
+
+      refute Enum.any?(
+               all_enqueued(worker: GeocodeWorker),
+               &(&1.args["location_uuid"] == other.uuid)
+             )
+    end
+
+    test "geocode_now still asks for a remembered miss, and a hit clears it" do
+      loc = location()
+      reply({:error, :not_found})
+      assert {:error, :not_found} = Geocoding.geocode_now(loc)
+      flush_geocode_calls()
+
+      reply(:default)
+      assert {:ok, found} = Geocoding.geocode_now(Locations.get_location(loc.uuid))
+      assert_received {:geocode_called, _}
+      assert found.geocode_miss == nil
+      assert Locations.get_location(loc.uuid).geocode_miss == nil
+    end
+
+    test "a miss for an address the row no longer has is not recorded" do
+      loc = location()
+
+      reply(fn _ ->
+        {:ok, _} = Locations.update_location(Locations.get_location(loc.uuid), %{city: "Tartu"})
+        {:error, :not_found}
+      end)
+
+      assert {:error, :not_found} = Geocoding.geocode_now(loc)
+      assert Locations.get_location(loc.uuid).geocode_miss == nil
     end
 
     test "enqueue_missing/1 queues every geocodable location without coordinates" do

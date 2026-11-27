@@ -154,7 +154,9 @@ defmodule PhoenixKitLocations.Geocoding do
   end
 
   @doc """
-  Enqueues a job for every location that has an address but no coordinates.
+  Enqueues a job for every location that has an address but no coordinates,
+  except those the geocoder already answered `:not_found` for at their
+  current address (`geocode_miss`; `geocode_now/2` still retries them).
   Returns the number of jobs inserted. Accepts `list_locations/1`'s
   `:owner_uuid` / `:status` filters to narrow the batch.
   """
@@ -164,7 +166,9 @@ defmodule PhoenixKitLocations.Geocoding do
       opts
       |> Keyword.take([:owner_uuid, :status])
       |> Locations.list_locations()
-      |> Enum.filter(&(is_nil(&1.latitude) and geocodable?(&1)))
+      |> Enum.filter(
+        &(is_nil(&1.latitude) and geocodable?(&1) and &1.geocode_miss != address_fingerprint(&1))
+      )
       |> Enum.count(&match?({:ok, _}, enqueue(&1, opts)))
     else
       0
@@ -191,6 +195,15 @@ defmodule PhoenixKitLocations.Geocoding do
          {:ok, coords} <- call_geocoder(mod, location, geo_opts),
          {:ok, coords} <- normalize_result(coords) do
       Locations.write_geocoded_coordinates(location.uuid, coords, expect, opts)
+    else
+      # Remembered per address, so saves stop asking again for it (see
+      # `geocode_miss`); this function itself always asks.
+      {:error, :not_found} = miss ->
+        :ok = Locations.record_geocode_miss(location.uuid, expect)
+        miss
+
+      other ->
+        other
     end
   end
 

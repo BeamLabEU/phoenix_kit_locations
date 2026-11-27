@@ -400,8 +400,30 @@ defmodule PhoenixKitLocations.Locations do
   defp write_coordinates(row, coords) do
     row
     |> Location.coordinates_changeset(coords)
+    # Found now: any remembered miss is over.
+    |> Ecto.Changeset.put_change(:geocode_miss, nil)
     |> repo().update()
     |> ok_or_rollback()
+  end
+
+  @doc false
+  # Remembers that the geocoder found nothing for the address `expect` was
+  # taken from (`Geocoding.geocode_now/2` on `:not_found`), under the row
+  # lock and only while the row still has that address and those
+  # coordinates. `:ok` either way: a stale miss is simply not recorded.
+  @spec record_geocode_miss(String.t(), map()) :: :ok
+  def record_geocode_miss(uuid, %{fingerprint: fingerprint} = expect) do
+    _ =
+      repo().transaction(fn ->
+        row = uuid |> lock_geocode_target(expect)
+
+        row
+        |> Ecto.Changeset.change(geocode_miss: fingerprint)
+        |> repo().update()
+        |> ok_or_rollback()
+      end)
+
+    :ok
   end
 
   # ── Geocoding on save (opt-in, see `PhoenixKitLocations.Geocoder`) ──
@@ -411,15 +433,20 @@ defmodule PhoenixKitLocations.Locations do
   # either the address changed (`before` → `saved`, the row before and after
   # the save) or the row is left without coordinates — the form's "leave
   # blank to look them up" promise, which also covers a location saved
-  # before a geocoder was configured. `Geocoding.enqueue/2` still skips a
+  # before a geocoder was configured — unless the geocoder already answered
+  # `:not_found` for this very address (`geocode_miss`): then blank stays
+  # blank until the address changes. `Geocoding.enqueue/2` still skips a
   # row with no usable address, and the job's uniqueness keeps repeated
   # saves from queueing it twice.
   defp geocode_on_save?(%Ecto.Changeset{valid?: true, changes: changes}, before, saved) do
     typed? = Map.get(changes, :latitude) != nil or Map.get(changes, :longitude) != nil
 
+    fingerprint = Geocoding.address_fingerprint(saved)
+    blank? = is_nil(saved.latitude) or is_nil(saved.longitude)
+
     not typed? and Geocoder.on_save?() and
-      (is_nil(saved.latitude) or is_nil(saved.longitude) or
-         Geocoding.address_fingerprint(before) != Geocoding.address_fingerprint(saved))
+      (Geocoding.address_fingerprint(before) != fingerprint or
+         (blank? and saved.geocode_miss != fingerprint))
   end
 
   defp geocode_on_save?(_changeset, _before, _saved), do: false

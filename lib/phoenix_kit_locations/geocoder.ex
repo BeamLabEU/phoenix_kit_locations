@@ -19,6 +19,20 @@ defmodule PhoenixKitLocations.Geocoder do
   coordinates (and did not type them by hand); without it the host
   calls `PhoenixKitLocations.Geocoding.enqueue/2` or `geocode_now/2` itself.
 
+  A provider `:not_found` is remembered for that address
+  (`Location.geocode_miss`, the address fingerprint): saves don't ask again
+  until the address changes, so coordinates can be left blank on purpose.
+  `PhoenixKitLocations.Geocoding.geocode_now/2` always asks.
+
+  **Inside a host transaction.** The job is inserted right after the save,
+  in the caller's process. If the host wraps `create_location/2` or
+  `update_location/3` in its own `Repo.transaction/1`, the insert joins that
+  transaction: a database-level failure of the insert (e.g. Oban's tables
+  missing) aborts the host's transaction even though the error is rescued
+  here. Hosts that save inside their own transaction should have Oban
+  installed, or call `Geocoding.enqueue/2` after their transaction commits
+  (with `geocode_on_save` off).
+
   ## The callback
 
   `c:geocode/2` receives an `t:address/0` map and the configured options. It
