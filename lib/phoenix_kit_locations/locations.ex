@@ -413,14 +413,18 @@ defmodule PhoenixKitLocations.Locations do
   # coordinates. `:ok` either way: a stale miss is simply not recorded.
   @spec record_geocode_miss(String.t(), map()) :: :ok
   def record_geocode_miss(uuid, %{fingerprint: fingerprint} = expect) do
+    # Never `rollback/1` here: inside a host's own transaction a rolled-back
+    # nested one would doom the host's work for a mere hint.
     _ =
       repo().transaction(fn ->
-        row = uuid |> lock_geocode_target(expect)
+        case lock_row(Location, uuid) do
+          %Location{} = row ->
+            if Geocoding.current?(row, expect),
+              do: row |> Ecto.Changeset.change(geocode_miss: fingerprint) |> repo().update()
 
-        row
-        |> Ecto.Changeset.change(geocode_miss: fingerprint)
-        |> repo().update()
-        |> ok_or_rollback()
+          nil ->
+            nil
+        end
       end)
 
     :ok
