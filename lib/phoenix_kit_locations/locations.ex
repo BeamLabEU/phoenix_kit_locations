@@ -417,18 +417,20 @@ defmodule PhoenixKitLocations.Locations do
     # nested one would doom the host's work for a mere hint.
     _ =
       repo().transaction(fn ->
-        case lock_row(Location, uuid) do
-          %Location{} = row ->
-            if Geocoding.current?(row, expect),
-              do: row |> Ecto.Changeset.change(geocode_miss: fingerprint) |> repo().update()
-
-          nil ->
-            nil
-        end
+        uuid |> lock_row_for(Location) |> put_miss(expect, fingerprint)
       end)
 
     :ok
   end
+
+  defp lock_row_for(uuid, schema), do: lock_row(schema, uuid)
+
+  defp put_miss(%Location{} = row, expect, fingerprint) do
+    if Geocoding.current?(row, expect),
+      do: row |> Ecto.Changeset.change(geocode_miss: fingerprint) |> repo().update()
+  end
+
+  defp put_miss(nil, _expect, _fingerprint), do: nil
 
   # ── Geocoding on save (opt-in, see `PhoenixKitLocations.Geocoder`) ──
 
