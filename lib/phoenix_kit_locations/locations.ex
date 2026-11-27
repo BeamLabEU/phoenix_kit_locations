@@ -447,10 +447,12 @@ defmodule PhoenixKitLocations.Locations do
 
     fingerprint = Geocoding.address_fingerprint(saved)
     blank? = is_nil(saved.latitude) or is_nil(saved.longitude)
+    # Cleared in this very save: the user asks for a look-up, miss or not.
+    cleared? = Map.has_key?(changes, :latitude) or Map.has_key?(changes, :longitude)
 
     not typed? and Geocoder.on_save?() and
       (Geocoding.address_fingerprint(before) != fingerprint or
-         (blank? and saved.geocode_miss != fingerprint))
+         (blank? and (cleared? or saved.geocode_miss != fingerprint)))
   end
 
   defp geocode_on_save?(_changeset, _before, _saved), do: false

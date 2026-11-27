@@ -418,6 +418,32 @@ defmodule PhoenixKitLocations.GeocodingTest do
              )
     end
 
+    test "clearing typed coordinates asks again, even for a remembered miss" do
+      loc = location()
+      reply({:error, :not_found})
+      assert {:error, :not_found} = Geocoding.geocode_now(loc)
+      {:ok, typed} = Locations.update_location(loc, %{latitude: "1", longitude: "2"})
+      Application.put_env(:phoenix_kit_locations, :geocode_on_save, true)
+
+      {:ok, _} = Locations.update_location(typed, %{latitude: "", longitude: ""})
+      assert_enqueued(worker: GeocodeWorker, args: %{"location_uuid" => loc.uuid})
+    end
+
+    test "a stale miss inside a host transaction does not doom it" do
+      loc = location()
+
+      reply(fn _ ->
+        {:ok, _} = Locations.update_location(Locations.get_location(loc.uuid), %{city: "Tartu"})
+        {:error, :not_found}
+      end)
+
+      assert {:ok, :host_work_done} =
+               Repo.transaction(fn ->
+                 assert {:error, :not_found} = Geocoding.geocode_now(loc)
+                 :host_work_done
+               end)
+    end
+
     test "geocode_now still asks for a remembered miss, and a hit clears it" do
       loc = location()
       reply({:error, :not_found})
