@@ -767,6 +767,33 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
                 />
               </div>
 
+              <%!-- Both or neither (`Location.changeset/2`). Left blank they
+                 are filled by the host's geocoder when one is configured
+                 with `geocode_on_save` (`PhoenixKitLocations.Geocoder`). --%>
+              <div id="location-coordinates" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <.input
+                  field={@form[:latitude]}
+                  type="number"
+                  step="any"
+                  min="-90"
+                  max="90"
+                  label={gettext("Latitude")}
+                  placeholder={gettext("e.g. 59.437")}
+                />
+                <.input
+                  field={@form[:longitude]}
+                  type="number"
+                  step="any"
+                  min="-180"
+                  max="180"
+                  label={gettext("Longitude")}
+                  placeholder={gettext("e.g. 24.7536")}
+                />
+              </div>
+              <p class="-mt-2 text-xs text-base-content/60">
+                {coordinates_hint()}
+              </p>
+
               <.section_header icon="hero-envelope" title={gettext("Contact")} />
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1042,4 +1069,12 @@ defmodule PhoenixKitLocations.Web.LocationFormLive do
   defp feature_label("security"), do: gettext("24/7 Security")
   defp feature_label("cctv"), do: gettext("CCTV")
   defp feature_label(key), do: key
+
+  defp coordinates_hint do
+    if PhoenixKitLocations.Geocoder.on_save?() do
+      gettext("Decimal degrees. Leave blank to look them up from the address after saving.")
+    else
+      gettext("Decimal degrees (WGS 84), for maps and distance search. Optional.")
+    end
+  end
 end

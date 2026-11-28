@@ -1061,3 +1061,49 @@ msgstr "用户"
 #, elixir-autogen, elixir-format
 msgid "Space saved."
 msgstr "空间已保存。"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1068
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees (WGS 84), for maps and distance search. Optional."
+msgstr "十进制度数（WGS 84），用于地图和距离搜索。可选。"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1064
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees. Leave blank to look them up from the address after saving."
+msgstr "十进制度数。留空则在保存后根据地址查询。"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:781
+#, elixir-autogen, elixir-format
+msgid "Latitude"
+msgstr "纬度"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:790
+#, elixir-autogen, elixir-format
+msgid "Longitude"
+msgstr "经度"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:791
+#, elixir-autogen, elixir-format
+msgid "e.g. 24.7536"
+msgstr "例如 24.7536"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:782
+#, elixir-autogen, elixir-format
+msgid "e.g. 59.437"
+msgstr "例如 59.437"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:179
+#: lib/phoenix_kit_locations/schemas/location.ex:182
+#, elixir-autogen, elixir-format
+msgid "enter both latitude and longitude"
+msgstr "请同时填写纬度和经度"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:159
+#, elixir-autogen, elixir-format
+msgid "must be between -180 and 180"
+msgstr "必须介于 -180 和 180 之间"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:154
+#, elixir-autogen, elixir-format
+msgid "must be between -90 and 90"
+msgstr "必须介于 -90 和 90 之间"

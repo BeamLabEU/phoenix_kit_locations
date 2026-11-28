@@ -1062,3 +1062,49 @@ msgstr "Utilisateur"
 #, elixir-autogen, elixir-format
 msgid "Space saved."
 msgstr "Espace enregistré."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1068
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees (WGS 84), for maps and distance search. Optional."
+msgstr "Degrés décimaux (WGS 84), pour les cartes et la recherche par distance. Facultatif."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:1064
+#, elixir-autogen, elixir-format
+msgid "Decimal degrees. Leave blank to look them up from the address after saving."
+msgstr "Degrés décimaux. Laissez vide pour les déduire de l'adresse après l'enregistrement."
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:781
+#, elixir-autogen, elixir-format
+msgid "Latitude"
+msgstr "Latitude"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:790
+#, elixir-autogen, elixir-format
+msgid "Longitude"
+msgstr "Longitude"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:791
+#, elixir-autogen, elixir-format
+msgid "e.g. 24.7536"
+msgstr "p. ex. 24.7536"
+
+#: lib/phoenix_kit_locations/web/location_form_live.ex:782
+#, elixir-autogen, elixir-format
+msgid "e.g. 59.437"
+msgstr "p. ex. 59.437"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:179
+#: lib/phoenix_kit_locations/schemas/location.ex:182
+#, elixir-autogen, elixir-format
+msgid "enter both latitude and longitude"
+msgstr "saisissez la latitude et la longitude"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:159
+#, elixir-autogen, elixir-format
+msgid "must be between -180 and 180"
+msgstr "doit être compris entre -180 et 180"
+
+#: lib/phoenix_kit_locations/schemas/location.ex:154
+#, elixir-autogen, elixir-format
+msgid "must be between -90 and 90"
+msgstr "doit être compris entre -90 et 90"

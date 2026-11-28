@@ -11,7 +11,7 @@ defmodule PhoenixKitLocations.MigrationsTest do
     phoenix_kit_location_spaces
   )
 
-  # Every index this chain owns: core V135's seven, then V2's owner index. The
+  # Every index this chain owns: core V135's seven, V2's owner index, V3's coordinates index. The
   # "guarded" test below only scans statements that exist, so without this
   # list all of them could be deleted and it would still pass.
   @indexes ~w(
@@ -23,10 +23,13 @@ defmodule PhoenixKitLocations.MigrationsTest do
     phoenix_kit_location_spaces_location_uuid_parent_uuid_position_
     phoenix_kit_location_spaces_parent_uuid_index
     phoenix_kit_locations_owner_uuid_index
+    phoenix_kit_locations_latitude_longitude_index
   )
 
-  # All 11 constraint names: V135's 4 PKs + 4 FKs + 2 CHECKs, then V2's owner FK.
+  # All 13 constraint names: V135's 4 PKs + 4 FKs + 2 CHECKs, V2's owner FK, V3's two range CHECKs.
   @constraints ~w(
+    phoenix_kit_locations_latitude_range
+    phoenix_kit_locations_longitude_range
     phoenix_kit_locations_owner_uuid_fkey
     phoenix_kit_locations_pkey
     phoenix_kit_location_types_pkey
@@ -40,8 +43,8 @@ defmodule PhoenixKitLocations.MigrationsTest do
     phoenix_kit_location_spaces_status_check
   )
 
-  test "chain is V2 and marks phoenix_kit_locations" do
-    assert Migrations.current_version() == 2
+  test "chain is V4 and marks phoenix_kit_locations" do
+    assert Migrations.current_version() == 4
     assert Migrations.version_table() == "phoenix_kit_locations"
   end
 
@@ -60,12 +63,12 @@ defmodule PhoenixKitLocations.MigrationsTest do
     assert Enum.count(stmts, &(&1 =~ ~r/CREATE TABLE/)) == length(@tables)
 
     assert List.last(stmts) ==
-             "COMMENT ON TABLE public.phoenix_kit_locations IS 'pkloc_schema:2'"
+             "COMMENT ON TABLE public.phoenix_kit_locations IS 'pkloc_schema:4'"
   end
 
   test "up_statements/2 defaults target to current_version/0 and clamps above it" do
-    assert Migrations.up_statements("public") == Migrations.up_statements("public", 2)
-    assert Migrations.up_statements("public", 99) == Migrations.up_statements("public", 2)
+    assert Migrations.up_statements("public") == Migrations.up_statements("public", 4)
+    assert Migrations.up_statements("public", 99) == Migrations.up_statements("public", 4)
   end
 
   test "no statement can destroy data, in either direction" do
@@ -150,7 +153,7 @@ defmodule PhoenixKitLocations.MigrationsTest do
     assert joined =~ "DEFAULT tenant_a.uuid_generate_v7()"
     assert joined =~ "REFERENCES tenant_a.phoenix_kit_locations(uuid)"
     assert joined =~ "REFERENCES tenant_a.phoenix_kit_users(uuid)"
-    assert joined =~ "COMMENT ON TABLE tenant_a.phoenix_kit_locations IS 'pkloc_schema:2'"
+    assert joined =~ "COMMENT ON TABLE tenant_a.phoenix_kit_locations IS 'pkloc_schema:4'"
   end
 
   describe "V2 (location ownership)" do
@@ -190,15 +193,60 @@ defmodule PhoenixKitLocations.MigrationsTest do
       assert List.last(stmts) ==
                "COMMENT ON TABLE public.phoenix_kit_locations IS 'pkloc_schema:1'"
 
-      assert Enum.count(stmts, &(&1 =~ ~r/DO \$\$/)) == length(@constraints) - 1
+      assert Enum.count(stmts, &(&1 =~ ~r/DO \$\$/)) == length(@constraints) - 3
 
       assert Enum.count(stmts, &(&1 =~ ~r/CREATE (UNIQUE )?INDEX IF NOT EXISTS/)) ==
-               length(@indexes) - 1
+               length(@indexes) - 2
     end
 
     test "rolling back to V1 re-stamps the marker without dropping the column" do
       assert Migrations.down_statements("public", 1) ==
                ["COMMENT ON TABLE public.phoenix_kit_locations IS 'pkloc_schema:1'"]
+    end
+  end
+
+  describe "V4 (remembered geocoder miss)" do
+    test "adds a nullable geocode_miss column; up_statements(prefix, 3) has none of it" do
+      assert "ALTER TABLE public.phoenix_kit_locations ADD COLUMN IF NOT EXISTS geocode_miss character varying(32)" in Migrations.up_statements(
+               "public"
+             )
+
+      v3 = Migrations.up_statements("public", 3)
+      refute Enum.join(v3, "\n") =~ "geocode_miss"
+      assert List.last(v3) == "COMMENT ON TABLE public.phoenix_kit_locations IS 'pkloc_schema:3'"
+    end
+  end
+
+  describe "V3 (coordinates)" do
+    test "adds nullable numeric latitude/longitude, guarded range CHECKs and an index" do
+      stmts = Migrations.up_statements("public")
+
+      assert "ALTER TABLE public.phoenix_kit_locations ADD COLUMN IF NOT EXISTS latitude numeric(9,6)" in stmts
+
+      assert "ALTER TABLE public.phoenix_kit_locations ADD COLUMN IF NOT EXISTS longitude numeric(9,6)" in stmts
+
+      joined = Enum.join(stmts, "\n")
+      assert joined =~ "CHECK (latitude IS NULL OR (latitude >= -90 AND latitude <= 90))"
+      assert joined =~ "CHECK (longitude IS NULL OR (longitude >= -180 AND longitude <= 180))"
+
+      assert "CREATE INDEX IF NOT EXISTS phoenix_kit_locations_latitude_longitude_index ON public.phoenix_kit_locations USING btree (latitude, longitude)" in stmts
+    end
+
+    test "up_statements(prefix, 2) emits no coordinate objects and stamps pkloc_schema:2" do
+      stmts = Migrations.up_statements("public", 2)
+      joined = Enum.join(stmts, "\n")
+
+      refute joined =~ "latitude"
+      refute joined =~ "longitude"
+      assert joined =~ "owner_uuid"
+
+      assert List.last(stmts) ==
+               "COMMENT ON TABLE public.phoenix_kit_locations IS 'pkloc_schema:2'"
+    end
+
+    test "rolling back to V2 re-stamps the marker without dropping the columns" do
+      assert Migrations.down_statements("public", 2) ==
+               ["COMMENT ON TABLE public.phoenix_kit_locations IS 'pkloc_schema:2'"]
     end
   end
 
